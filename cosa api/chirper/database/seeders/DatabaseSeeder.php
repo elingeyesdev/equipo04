@@ -17,9 +17,30 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        // Demo citizen user
+        User::updateOrCreate(
+            ['carnet' => '12345678'],
+            [
+                'name' => 'Test User',
+                'phone' => '555-0000',
+                'address' => 'Test Address',
+                'email' => 'test@example.com',
+                'password' => 'password123',
+                'role' => User::ROLE_CITIZEN,
+            ],
+        );
+
+        // Demo authority/admin user
+        User::updateOrCreate(
+            ['carnet' => '99999999'],
+            [
+                'name' => 'Authority User',
+                'phone' => '555-9999',
+                'address' => 'Authority Address',
+                'email' => 'authority@example.com',
+                'password' => 'password123',
+                'role' => User::ROLE_AUTHORITY,
+            ],
+        );
     }
 }

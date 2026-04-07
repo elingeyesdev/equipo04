@@ -12,37 +12,46 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     @endif
 </head>
-<body class="min-h-screen bg-white text-gray-900">
-    <header class="border-b border-gray-200">
-        <div class="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between">
-            <a href="{{ route('reports.index') }}" class="font-semibold">{{ config('app.name', 'Flood Reports') }}</a>
+<body class="min-h-screen bg-gray-50 text-gray-900 antialiased">
+    <header class="border-b border-gray-200 bg-white">
+        <div class="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between gap-4">
+            <a href="{{ route('reports.index') }}" class="font-semibold tracking-tight hover:underline underline-offset-4">
+                {{ config('app.name', 'Flood Reports') }}
+            </a>
 
-            <nav class="flex items-center gap-4 text-sm">
+            <nav class="flex items-center gap-1 text-sm">
                 @php($apiUser = (array) session('api_user', []))
                 @php($apiRole = (string) ($apiUser['role'] ?? ''))
 
                 @if (session()->has('api_token'))
-                    <a href="{{ route('reports.index') }}" class="hover:underline">Reportes</a>
-                    <a href="{{ route('reports.create') }}" class="hover:underline">Crear</a>
-                    <span class="text-gray-600">
-                        {{ (string) ($apiUser['name'] ?? '') }}
+                    <a href="{{ route('reports.index') }}" class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                        Reportes
+                    </a>
+                    <a href="{{ route('reports.create') }}" class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                        Crear
+                    </a>
+                    <span class="hidden sm:inline-flex items-center gap-1 rounded-md px-3 py-2 text-gray-600">
+                        <span class="truncate max-w-[14rem]">{{ (string) ($apiUser['name'] ?? '') }}</span>
                         @if ($apiRole !== '')
-                            ({{ $apiRole }})
+                            <span class="text-gray-400">·</span>
+                            <span class="text-gray-500">{{ $apiRole }}</span>
                         @endif
                     </span>
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
-                        <button type="submit" class="hover:underline">Salir</button>
+                        <button type="submit" class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                            Salir
+                        </button>
                     </form>
                 @else
-                    <a href="{{ route('login') }}" class="hover:underline">Login</a>
-                    <a href="{{ route('register') }}" class="hover:underline">Registro</a>
+                    <a href="{{ route('login') }}" class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">Login</a>
+                    <a href="{{ route('register') }}" class="rounded-md bg-gray-900 px-3 py-2 font-medium text-white hover:bg-gray-800">Registro</a>
                 @endif
             </nav>
         </div>
     </header>
 
-    <main class="mx-auto max-w-5xl px-4 py-6">
+    <main class="mx-auto max-w-5xl px-4 py-8">
         @if (session('status'))
             <div class="mb-4 rounded-md border border-gray-200 bg-gray-50 p-3 text-sm">
                 {{ session('status') }}
