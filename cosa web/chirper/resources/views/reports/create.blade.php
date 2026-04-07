@@ -17,7 +17,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium mb-1" for="latitude">Latitude</label>
-                    <input id="latitude" name="latitude" type="number" step="any" value="{{ old('latitude') }}" class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-gray-900 focus:ring-1 focus:ring-gray-900" required>
+                    <input id="latitude" name="latitude" type="number" step="any" value="{{ old('latitude') }}" class="w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 shadow-sm focus:border-gray-900 focus:ring-1 focus:ring-gray-900" readonly required>
                     @error('latitude')
                         <div class="text-sm text-red-700 mt-1">{{ $message }}</div>
                     @enderror
@@ -25,11 +25,15 @@
 
                 <div>
                     <label class="block text-sm font-medium mb-1" for="longitude">Longitude</label>
-                    <input id="longitude" name="longitude" type="number" step="any" value="{{ old('longitude') }}" class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-gray-900 focus:ring-1 focus:ring-gray-900" required>
+                    <input id="longitude" name="longitude" type="number" step="any" value="{{ old('longitude') }}" class="w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 shadow-sm focus:border-gray-900 focus:ring-1 focus:ring-gray-900" readonly required>
                     @error('longitude')
                         <div class="text-sm text-red-700 mt-1">{{ $message }}</div>
                     @enderror
                 </div>
+            </div>
+            
+            <div class="-mt-1">
+                <p id="locationStatus" class="text-sm text-gray-600"></p>
             </div>
 
             <div>
@@ -69,4 +73,49 @@
             </form>
         </div>
     </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const latInput = document.getElementById('latitude');
+            const lngInput = document.getElementById('longitude');
+            const locStatus = document.getElementById('locationStatus');
+
+            function fetchLocation() {
+                if (!navigator.geolocation) {
+                    locStatus.textContent = "Tu navegador no soporta geolocalización.";
+                    locStatus.classList.replace('text-gray-600', 'text-red-600');
+                    enableInputs();
+                    return;
+                }
+
+                locStatus.textContent = "Obteniendo ubicación...";
+                locStatus.className = "text-sm text-gray-600";
+                
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    latInput.value = position.coords.latitude;
+                    lngInput.value = position.coords.longitude;
+                    locStatus.textContent = "Ubicación obtenida exitosamente.";
+                    locStatus.classList.replace('text-gray-600', 'text-green-600');
+                }, function(error) {
+                    locStatus.textContent = "Error al obtener ubicación. Puedes ingresarla manualmente.";
+                    locStatus.classList.replace('text-gray-600', 'text-red-600');
+                    enableInputs();
+                }, {
+                    enableHighAccuracy: true,
+                    timeout: 10000
+                });
+            }
+
+            function enableInputs() {
+                latInput.removeAttribute('readonly');
+                latInput.classList.replace('bg-gray-50', 'bg-white');
+                lngInput.removeAttribute('readonly');
+                lngInput.classList.replace('bg-gray-50', 'bg-white');
+            }
+
+            if (!latInput.value || !lngInput.value) {
+                fetchLocation();
+            }
+        });
+    </script>
 @endsection
