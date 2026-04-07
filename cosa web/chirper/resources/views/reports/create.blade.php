@@ -33,11 +33,7 @@
             </div>
             
             <div class="-mt-1">
-                <button type="button" id="getLocationBtn" class="text-sm inline-flex items-center bg-gray-100 text-gray-700 border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400">
-                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                    Obtener mi ubicación actual
-                </button>
-                <p id="locationStatus" class="inline-block mt-2 sm:mt-0 sm:ml-3 text-sm text-gray-600 block sm:inline"></p>
+                <p id="locationStatus" class="text-sm text-gray-600"></p>
             </div>
 
             <div>
@@ -82,7 +78,6 @@
         document.addEventListener("DOMContentLoaded", function() {
             const latInput = document.getElementById('latitude');
             const lngInput = document.getElementById('longitude');
-            const locBtn = document.getElementById('getLocationBtn');
             const locStatus = document.getElementById('locationStatus');
 
             function fetchLocation() {
@@ -94,7 +89,7 @@
                 }
 
                 locStatus.textContent = "Obteniendo ubicación...";
-                locStatus.className = "inline-block mt-2 sm:mt-0 sm:ml-3 text-sm text-gray-600 block sm:inline";
+                locStatus.className = "text-sm text-gray-600";
                 
                 navigator.geolocation.getCurrentPosition(function(position) {
                     latInput.value = position.coords.latitude;
@@ -117,8 +112,6 @@
                 lngInput.removeAttribute('readonly');
                 lngInput.classList.replace('bg-gray-50', 'bg-white');
             }
-
-            locBtn.addEventListener('click', fetchLocation);
 
             if (!latInput.value || !lngInput.value) {
                 fetchLocation();
