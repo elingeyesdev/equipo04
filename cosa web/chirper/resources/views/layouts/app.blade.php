@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -12,10 +13,12 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     @endif
 </head>
+
 <body class="min-h-screen bg-gray-50 text-gray-900 antialiased">
     <header class="border-b border-gray-200 bg-white">
         <div class="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between gap-4">
-            <a href="{{ route('reports.index') }}" class="font-semibold tracking-tight hover:underline underline-offset-4">
+            <a href="{{ route('reports.index') }}"
+                class="font-semibold tracking-tight hover:underline underline-offset-4">
                 {{ config('app.name', 'Flood Reports') }}
             </a>
 
@@ -24,10 +27,20 @@
                 @php($apiRole = (string) ($apiUser['role'] ?? ''))
 
                 @if (session()->has('api_token'))
-                    <a href="{{ route('reports.index') }}" class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                    <a href="{{ route('reports.index') }}"
+                        class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
                         Reportes
                     </a>
-                    <a href="{{ route('reports.create') }}" class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                    <a href="{{ route('maps.index') }}"
+                        class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                        Mapas
+                    </a>
+                    <a href="{{ route('logistica.index') }}"
+                        class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                        Logística
+                    </a>
+                    <a href="{{ route('reports.create') }}"
+                        class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
                         Crear
                     </a>
                     <span class="hidden sm:inline-flex items-center gap-1 rounded-md px-3 py-2 text-gray-600">
@@ -39,13 +52,16 @@
                     </span>
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
-                        <button type="submit" class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                        <button type="submit"
+                            class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
                             Salir
                         </button>
                     </form>
                 @else
-                    <a href="{{ route('login') }}" class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">Login</a>
-                    <a href="{{ route('register') }}" class="rounded-md bg-gray-900 px-3 py-2 font-medium text-white hover:bg-gray-800">Registro</a>
+                    <a href="{{ route('login') }}"
+                        class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">Login</a>
+                    <a href="{{ route('register') }}"
+                        class="rounded-md bg-gray-900 px-3 py-2 font-medium text-white hover:bg-gray-800">Registro</a>
                 @endif
             </nav>
         </div>
@@ -72,4 +88,5 @@
         @yield('content')
     </main>
 </body>
+
 </html>

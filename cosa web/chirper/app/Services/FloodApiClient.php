@@ -169,6 +169,51 @@ final class FloodApiClient
         return (array) Arr::get($json, 'data', []);
     }
 
+    /**
+     * @return array<int,mixed>
+     */
+    public function listCentros(string $token, int $page = 1): array
+    {
+        $response = $this->client($token)->get('/centros', [
+            'page' => $page,
+        ]);
+
+        $this->throwIfError($response);
+
+        $json = (array) $response->json();
+
+        // El backend retorna un array puro en 'data'
+        return (array) Arr::get($json, 'data', []);
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    public function createCentro(string $token, array $payload): array
+    {
+        $response = $this->client($token)->post('/centros', $payload);
+
+        $this->throwIfError($response);
+
+        $json = (array) $response->json();
+
+        return (array) Arr::get($json, 'data', []);
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    public function updateCentro(string $token, string|int $id, array $payload): array
+    {
+        $response = $this->client($token)->patch('/centros/' . urlencode((string) $id), $payload);
+
+        $this->throwIfError($response);
+
+        $json = (array) $response->json();
+
+        return (array) Arr::get($json, 'data', []);
+    }
+
     private function throwIfError(Response $response): void
     {
         if ($response->successful()) {
