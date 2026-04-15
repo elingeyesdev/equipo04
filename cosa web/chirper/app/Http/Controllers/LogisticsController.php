@@ -52,9 +52,13 @@ final class LogisticsController
         } catch (ApiUnauthorizedException) {
             $request->session()->forget(['api_token', 'api_user']);
             return redirect()->route('login');
+        } catch (\App\Services\FloodApiExceptions\ApiValidationException $e) {
+            $validationMessages = [];
+            foreach ($e->errors as $field => $messages) {
+                 $validationMessages[$field] = is_array($messages) ? implode(' ', $messages) : $messages;
+            }
+            return back()->withInput()->withErrors($validationMessages);
         } catch (ApiRequestException $e) {
-            // Si es un error de validación, retornará 422 manejado por el Handler de Laravel (en FloodApiClient) si fuera ValidationException
-            // o lo devolvemos como back()->withErrors.
             return back()->withInput()->withErrors(['apiError' => $e->getMessage()]);
         }
         
@@ -72,6 +76,12 @@ final class LogisticsController
         } catch (ApiUnauthorizedException) {
             $request->session()->forget(['api_token', 'api_user']);
             return redirect()->route('login');
+        } catch (\App\Services\FloodApiExceptions\ApiValidationException $e) {
+            $validationMessages = [];
+            foreach ($e->errors as $field => $messages) {
+                 $validationMessages[$field] = is_array($messages) ? implode(' ', $messages) : $messages;
+            }
+            return back()->withInput()->withErrors($validationMessages);
         } catch (ApiRequestException $e) {
             return back()->withInput()->withErrors(['apiError' => 'Error al actualizar: ' . $e->getMessage()]);
         }

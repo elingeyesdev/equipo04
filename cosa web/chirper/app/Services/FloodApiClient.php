@@ -146,7 +146,8 @@ final class FloodApiClient
      */
     public function updateReport(string $token, int|string $reportId, array $payload): array
     {
-        $response = $this->client($token)->patch('/reports/'.urlencode((string) $reportId), $payload);
+        $payload['_method'] = 'PATCH';
+        $response = $this->client($token)->post('/reports/'.urlencode((string) $reportId), $payload);
 
         $this->throwIfError($response);
 
@@ -205,7 +206,9 @@ final class FloodApiClient
      */
     public function updateCentro(string $token, string|int $id, array $payload): array
     {
-        $response = $this->client($token)->patch('/centros/' . urlencode((string) $id), $payload);
+        // Usamos POST con _method=PATCH para evitar el Fatal Error de PHP 8.4 (request_parse_body) en el servidor de desarrollo
+        $payload['_method'] = 'PATCH';
+        $response = $this->client($token)->post('/centros/' . urlencode((string) $id), $payload);
 
         $this->throwIfError($response);
 

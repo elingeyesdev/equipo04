@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\FloodApiExceptions;
 
-final class ApiValidationException extends \RuntimeException
+final class ApiValidationException extends ApiRequestException
 {
     /** @var array<string, array<int, string>> */
     public array $errors;
@@ -12,9 +12,9 @@ final class ApiValidationException extends \RuntimeException
     /**
      * @param array<string, array<int, string>> $errors
      */
-    public function __construct(string $message, array $errors, int $code = 0, ?\Throwable $previous = null)
+    public function __construct(string $message, array $errors, int $status = 422, array $payload = [], int $code = 0, ?\Throwable $previous = null)
     {
-        parent::__construct($message, $code, $previous);
+        parent::__construct($message, $status, $payload, $code, $previous);
 
         $this->errors = $errors;
     }

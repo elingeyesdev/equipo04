@@ -29,20 +29,14 @@ class CentroAsistenciaController extends Controller
     {
         $validated = $request->validate([
             'nombre' => 'required|string|max:255',
-            'tipo' => 'required|string|in:Acopio,Donación,Mixto',
             'direccion' => 'nullable|string|max:255',
             'latitud' => 'required|numeric',
             'longitud' => 'required|numeric',
-            'estado' => 'nullable|string|in:Abierto,Lleno,Cerrado',
-            'contacto_emergencia' => 'nullable|string|max:255',
+            'hora_apertura' => 'required|date_format:H:i',
+            'hora_cierre' => 'required|date_format:H:i',
+            'contacto' => 'nullable|string|max:255',
             'encargado' => 'nullable|string|max:255',
-            'insumos_necesarios' => 'nullable|string',
         ]);
-
-        // Si no se proveyó estado explícito, forzamos "Abierto"
-        if (!isset($validated['estado'])) {
-            $validated['estado'] = 'Abierto';
-        }
 
         // Guardamos
         $centro = CentroAsistencia::create($validated);
@@ -61,14 +55,13 @@ class CentroAsistenciaController extends Controller
 
         $validated = $request->validate([
             'nombre' => 'sometimes|required|string|max:255',
-            'tipo' => 'sometimes|required|string|in:Acopio,Donación,Mixto',
             'direccion' => 'nullable|string|max:255',
             'latitud' => 'sometimes|required|numeric',
             'longitud' => 'sometimes|required|numeric',
-            'estado' => 'sometimes|required|string|in:Abierto,Lleno,Cerrado',
-            'contacto_emergencia' => 'nullable|string|max:255',
+            'hora_apertura' => 'sometimes|required|date_format:H:i',
+            'hora_cierre' => 'sometimes|required|date_format:H:i',
+            'contacto' => 'nullable|string|max:255',
             'encargado' => 'nullable|string|max:255',
-            'insumos_necesarios' => 'nullable|string',
         ]);
 
         $centro->fill($validated);

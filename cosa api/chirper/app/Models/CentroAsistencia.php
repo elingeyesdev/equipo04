@@ -34,14 +34,13 @@ class CentroAsistencia extends Model
      */
     protected $fillable = [
         'nombre',
-        'tipo',
         'direccion',
         'latitud',
         'longitud',
-        'estado',
-        'contacto_emergencia',
+        'hora_apertura',
+        'hora_cierre',
+        'contacto',
         'encargado',
-        'insumos_necesarios',
         'ultima_actualizacion',
     ];
 }
