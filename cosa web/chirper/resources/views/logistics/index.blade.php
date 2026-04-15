@@ -32,13 +32,15 @@
                     <input type="text" id="nombre" name="nombre" value="{{ old('nombre') }}" required class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
                 </div>
 
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Tipo *</label>
-                    <select id="tipo" name="tipo" required class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white">
-                        <option value="Acopio" {{ old('tipo') === 'Acopio' ? 'selected' : '' }}>Acopio</option>
-                        <option value="Donación" {{ old('tipo') === 'Donación' ? 'selected' : '' }}>Donación</option>
-                        <option value="Mixto" {{ old('tipo') === 'Mixto' ? 'selected' : '' }}>Mixto</option>
-                    </select>
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Hora de Apertura *</label>
+                        <input type="time" id="hora_apertura" name="hora_apertura" value="{{ old('hora_apertura', '08:00') }}" required class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Hora de Cierre *</label>
+                        <input type="time" id="hora_cierre" name="hora_cierre" value="{{ old('hora_cierre', '18:00') }}" required class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white">
+                    </div>
                 </div>
 
                 <div class="mb-4">
@@ -58,27 +60,13 @@
                 </div>
 
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Contacto de Emergencia</label>
-                    <input type="text" id="contacto_emergencia" name="contacto_emergencia" value="{{ old('contacto_emergencia') }}" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Número de Contacto</label>
+                    <input type="text" id="contacto" name="contacto" value="{{ old('contacto') }}" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
                 </div>
 
-                <div class="mb-4">
+                <div class="mb-6">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Encargado Responsable</label>
                     <input type="text" id="encargado" name="encargado" value="{{ old('encargado') }}" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
-                </div>
-
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Insumos Necesarios</label>
-                    <textarea id="insumos_necesarios" name="insumos_necesarios" rows="2" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-gray-400" placeholder="Ej: Agua en botella, víveres secos, frazadas...">{{ old('insumos_necesarios') }}</textarea>
-                </div>
-
-                <div class="mb-6 hidden" id="status_container">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Estado del Centro</label>
-                    <select id="estado" name="estado" class="w-full rounded-md border shadow-sm border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white">
-                        <option value="Abierto">🟢 Abierto</option>
-                        <option value="Lleno">🟡 Lleno (Capacidad Máxima)</option>
-                        <option value="Cerrado">🔴 Cerrado</option>
-                    </select>
                 </div>
 
                 <button type="submit" id="submit_btn" class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 transition-colors">
@@ -109,8 +97,8 @@
                 <thead class="bg-gray-50">
                     <tr>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Horario</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contacto</th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dirección</th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Encargado</th>
                         <th scope="col" class="relative px-6 py-3"><span class="sr-only">Acciones</span></th>
@@ -123,22 +111,10 @@
                                 <div class="text-sm font-medium text-gray-900">{{ $centro['nombre'] }}</div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                @if($centro['tipo'] === 'Acopio')
-                                    <span class="inline-flex items-center rounded-md bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-800 ring-1 ring-inset ring-yellow-600/20">Acopio</span>
-                                @elseif($centro['tipo'] === 'Donación')
-                                    <span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">Donación</span>
-                                @else
-                                    <span class="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-600/20">Mixto</span>
-                                @endif
+                                <span class="text-xs text-gray-600">{{ $centro['hora_apertura'] ?? '08:00' }} - {{ $centro['hora_cierre'] ?? '18:00' }}</span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                @if($centro['estado'] === 'Cerrado')
-                                    <span class="inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/10">Cerrado</span>
-                                @elseif($centro['estado'] === 'Lleno')
-                                    <span class="inline-flex items-center rounded-md bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-800 ring-1 ring-inset ring-yellow-600/20">Lleno</span>
-                                @else
-                                    <span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/10">Abierto</span>
-                                @endif
+                                <span class="text-xs text-gray-600">{{ $centro['contacto'] ?? 'N/A' }}</span>
                             </td>
                             <td class="px-6 py-4">
                                 <div class="text-sm text-gray-500 max-w-xs truncate" title="{{ $centro['direccion'] ?? 'N/A' }}">{{ $centro['direccion'] ?? 'N/A' }}</div>
@@ -184,15 +160,31 @@
 
             if (isNaN(lat) || isNaN(lng)) return;
 
-            // Colores por tipo
-            let markerColor = "#4285F4"; // Default
-            if (centro.tipo === 'Acopio') markerColor = "#FBBC05"; // Yellow
-            if (centro.tipo === 'Donación') markerColor = "#34A853"; // Green
-            if (centro.tipo === 'Mixto') markerColor = "#9C27B0"; // Purple
+            // Lógica de Estado Abierto / Cerrado basado en horario
+            const horaAperturaStr = centro.hora_apertura || '08:00';
+            const horaCierreStr = centro.hora_cierre || '18:00';
             
-            // Si está cerrado, gris oscuro
-            if (centro.estado === 'Cerrado') markerColor = "#555555"; 
-
+            // Obtener MS desde medianoche
+            const now = new Date();
+            const currentMs = now.getHours() * 3600000 + now.getMinutes() * 60000;
+            
+            const apParts = horaAperturaStr.split(':');
+            const ciParts = horaCierreStr.split(':');
+            
+            const apMs = parseInt(apParts[0] || 0) * 3600000 + parseInt(apParts[1] || 0) * 60000;
+            const ciMs = parseInt(ciParts[0] || 0) * 3600000 + parseInt(ciParts[1] || 0) * 60000;
+            
+            let isOpen = false;
+            
+            if (ciMs < apMs) {
+                // El centro cierra al día siguiente (ej. 20:00 a 02:00)
+                if (currentMs >= apMs || currentMs <= ciMs) isOpen = true;
+            } else {
+                if (currentMs >= apMs && currentMs <= ciMs) isOpen = true;
+            }
+            
+            let markerColor = isOpen ? "#34A853" : "#EA4335"; // Verde o Rojo
+            
             const customIcon = L.divIcon({
                 className: 'custom-leaflet-marker',
                 html: `<div style="
@@ -207,20 +199,19 @@
                 iconAnchor: [10, 10]
             });
 
-            const isClosed = centro.estado === 'Cerrado';
-            const statusBadge = isClosed 
-                ? `<span class="bg-red-100 text-red-800 text-xs font-semibold px-2 py-0.5 rounded">CERRADO</span>` 
-                : `<span class="bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded">${centro.estado}</span>`;
+            const statusBadge = isOpen 
+                ? `<span class="bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded">ABIERTO AHORA</span>` 
+                : `<span class="bg-red-100 text-red-800 text-xs font-semibold px-2 py-0.5 rounded">CERRADO</span>`;
 
             const contentStr = `
                 <div class="max-w-[200px] p-1">
                     <div class="flex items-center justify-between mb-2">
                        <h3 class="font-bold text-sm m-0">${centro.nombre}</h3>
                     </div>
-                    <p class="text-xs text-gray-700 mb-1"><b>Tipo:</b> ${centro.tipo}</p>
                     <p class="text-xs text-gray-700 mb-1"><b>Estado:</b> ${statusBadge}</p>
+                    <p class="text-xs text-gray-700 mb-1"><b>Horario:</b> ${horaAperturaStr} a ${horaCierreStr}</p>
+                    ${centro.contacto ? `<p class="text-xs text-gray-700 mb-1"><b>Cel:</b> ${centro.contacto}</p>` : ''}
                     ${centro.direccion ? `<p class="text-xs text-gray-700 mb-1"><b>Dir:</b> ${centro.direccion}</p>` : ''}
-                    ${centro.insumos_necesarios ? `<p class="text-xs text-gray-600 border-t pt-1 mt-1"><b>Insumos:</b> ${centro.insumos_necesarios}</p>` : ''}
                     <button onclick='editCentro(${JSON.stringify(centro).replace(/'/g, "&apos;")})' class="mt-2 w-full py-1 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold rounded border border-gray-300 transition-colors">
                         ✏️ Editar Centro
                     </button>
@@ -255,7 +246,6 @@
         document.getElementById('submit_btn').classList.replace("bg-blue-600", "bg-indigo-600");
         document.getElementById('submit_btn').classList.replace("hover:bg-blue-500", "hover:bg-indigo-500");
         
-        document.getElementById('status_container').classList.remove("hidden");
         document.getElementById('cancel_edit_btn').classList.remove("hidden");
         
         // Rellenar ocultos/URL
@@ -264,14 +254,13 @@
         
         // Rellenar campos existenes
         document.getElementById('nombre').value = centro.nombre || '';
-        document.getElementById('tipo').value = centro.tipo || 'Acopio';
+        document.getElementById('hora_apertura').value = (centro.hora_apertura || '08:00:00').substring(0, 5);
+        document.getElementById('hora_cierre').value = (centro.hora_cierre || '18:00:00').substring(0, 5);
         document.getElementById('direccion').value = centro.direccion || '';
         document.getElementById('lat').value = centro.latitud;
         document.getElementById('lng').value = centro.longitud;
-        document.getElementById('contacto_emergencia').value = centro.contacto_emergencia || '';
+        document.getElementById('contacto').value = centro.contacto || '';
         document.getElementById('encargado').value = centro.encargado || '';
-        document.getElementById('insumos_necesarios').value = centro.insumos_necesarios || '';
-        document.getElementById('estado').value = centro.estado || 'Abierto';
     };
 
     document.getElementById('cancel_edit_btn').addEventListener('click', function() {
@@ -280,7 +269,6 @@
         document.getElementById('submit_btn').classList.replace("bg-indigo-600", "bg-blue-600");
         document.getElementById('submit_btn').classList.replace("hover:bg-indigo-500", "hover:bg-blue-500");
         
-        document.getElementById('status_container').classList.add("hidden");
         document.getElementById('cancel_edit_btn').classList.add("hidden");
         
         document.getElementById('method_field').innerHTML = '';
