@@ -1,0 +1,61 @@
+version: '3.8'
+services:
+  postgres_db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: chirper_api
+      POSTGRES_USER: sail
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5440:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  api_app:
+    build:
+      context: ./
+      dockerfile: ./.docker/Dockerfile.php
+    volumes:
+      - "./cosa api/chirper:/var/www/html"
+    ports:
+      - "8002:8002"
+    environment:
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres_db
+      - DB_PORT=5432
+      - DB_DATABASE=chirper_api
+      - DB_USERNAME=sail
+      - DB_PASSWORD=password
+    depends_on:
+      - postgres_db
+    command: php artisan serve --host=0.0.0.0 --port=8002
+    networks:
+      - app-network
+
+  web_app:
+    build:
+      context: ./
+      dockerfile: ./.docker/Dockerfile.php
+    volumes:
+      - "./cosa web/chirper:/var/www/html"
+    ports:
+      - "8001:8001"
+      - "5173:5173"
+    environment:
+      - DB_CONNECTION=sqlite
+      - FLOOD_API_BASE_URL=http://api_app:8002/api
+    depends_on:
+      - api_app
+    command: >
+      bash -c "npm install && npm run dev & php artisan serve --host=0.0.0.0 --port=8001"
+    networks:
+      - app-network
+
+volumes:
+  pgdata:
+
+networks:
+  app-network:
+    driver: bridge
