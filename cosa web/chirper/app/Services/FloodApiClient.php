@@ -217,6 +217,15 @@ final class FloodApiClient
         return (array) Arr::get($json, 'data', []);
     }
 
+    public function deleteCentro(string $token, string|int $id): void
+    {
+        $response = $this->client($token)->post('/centros/' . urlencode((string) $id), [
+            '_method' => 'DELETE'
+        ]);
+
+        $this->throwIfError($response);
+    }
+
     private function throwIfError(Response $response): void
     {
         if ($response->successful()) {

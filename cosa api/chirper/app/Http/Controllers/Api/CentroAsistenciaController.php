@@ -27,6 +27,10 @@ class CentroAsistenciaController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        if (!$request->user()->isAuthority()) {
+            abort(403, 'Solo administradores pueden crear centros de asistencia.');
+        }
+
         $validated = $request->validate([
             'nombre' => 'required|string|max:255',
             'direccion' => 'nullable|string|max:255',
@@ -51,6 +55,10 @@ class CentroAsistenciaController extends Controller
      */
     public function update(Request $request, $id_centro): JsonResponse
     {
+        if (!$request->user()->isAuthority()) {
+            abort(403, 'Solo administradores pueden modificar centros de asistencia.');
+        }
+
         $centro = CentroAsistencia::findOrFail($id_centro);
 
         $validated = $request->validate([
@@ -73,6 +81,23 @@ class CentroAsistenciaController extends Controller
 
         return response()->json([
             'data' => $centro
+        ]);
+    }
+
+    /**
+     * Elimina un centro de asistencia existente.
+     */
+    public function destroy(Request $request, $id_centro): JsonResponse
+    {
+        if (!$request->user()->isAuthority()) {
+            abort(403, 'Solo administradores pueden eliminar centros de asistencia.');
+        }
+
+        $centro = CentroAsistencia::findOrFail($id_centro);
+        $centro->delete();
+
+        return response()->json([
+            'message' => 'Centro eliminado correctamente'
         ]);
     }
 }
