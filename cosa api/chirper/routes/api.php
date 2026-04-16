@@ -29,4 +29,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('centros', [CentroAsistenciaController::class, 'index']);
     Route::post('centros', [CentroAsistenciaController::class, 'store']);
     Route::patch('centros/{centro_id}', [CentroAsistenciaController::class, 'update']);
+    Route::delete('centros/{centro_id}', [CentroAsistenciaController::class, 'destroy']);
 });

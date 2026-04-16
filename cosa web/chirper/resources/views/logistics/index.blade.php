@@ -9,13 +9,30 @@
         </div>
     </div>
 
+    @if (session('status'))
+        <div class="mb-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+            {{ session('status') }}
+        </div>
+    @endif
+
     @if ($error ?? null)
-        <div class="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm">
+        <div class="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">
             {{ $error }}
         </div>
     @endif
 
+    @if ($errors->any())
+        <div class="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">
+            <ul class="list-disc pl-5">
+                @foreach ($errors->all() as $err)
+                    <li>{{ $err }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        @if($isAdmin)
         <!-- Panel Izquierdo: Formulario -->
         <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 h-fit">
             <div class="flex justify-between items-center mb-4">
@@ -74,9 +91,10 @@
                 </button>
             </form>
         </div>
+        @endif
 
         <!-- Panel Derecho: Mapa -->
-        <div class="lg:col-span-2">
+        <div class="{{ $isAdmin ? 'lg:col-span-2' : 'lg:col-span-3' }}">
             <div class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden relative" style="height: 700px;">
                 <div id="logistics_map" class="absolute inset-0 z-0"></div>
             </div>
@@ -101,7 +119,9 @@
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contacto</th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dirección</th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Encargado</th>
+                        @if($isAdmin)
                         <th scope="col" class="relative px-6 py-3"><span class="sr-only">Acciones</span></th>
+                        @endif
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
@@ -122,9 +142,24 @@
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {{ $centro['encargado'] ?? 'N/A' }}
                             </td>
+                            @if($isAdmin)
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <button onclick='editCentro(@json($centro))' class="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded transition-colors">Editar</button>
+                                <button onclick='editCentro(@json($centro))' class="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 p-2 rounded transition-colors mr-1 inline-flex items-center" title="Editar">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                                      <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
+                                    </svg>
+                                </button>
+                                <form action="{{ route('logistica.destroy', $centro['id_centro']) }}" method="POST" class="inline-block" onsubmit="return confirm('¿Estás seguro de eliminar este centro? Esta acción es irreversible.');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 p-2 rounded transition-colors inline-flex items-center" title="Eliminar">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                                          <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                        </svg>
+                                    </button>
+                                </form>
                             </td>
+                            @endif
                         </tr>
                     @empty
                         <tr>
@@ -212,9 +247,11 @@
                     <p class="text-xs text-gray-700 mb-1"><b>Horario:</b> ${horaAperturaStr} a ${horaCierreStr}</p>
                     ${centro.contacto ? `<p class="text-xs text-gray-700 mb-1"><b>Cel:</b> ${centro.contacto}</p>` : ''}
                     ${centro.direccion ? `<p class="text-xs text-gray-700 mb-1"><b>Dir:</b> ${centro.direccion}</p>` : ''}
+                    @if($isAdmin)
                     <button onclick='editCentro(${JSON.stringify(centro).replace(/'/g, "&apos;")})' class="mt-2 w-full py-1 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold rounded border border-gray-300 transition-colors">
                         ✏️ Editar Centro
                     </button>
+                    @endif
                 </div>
             `;
             
@@ -224,6 +261,7 @@
         });
 
         // 2. Click en el mapa para el Formulario
+        @if($isAdmin)
         map.on('click', function(e) {
             document.getElementById('lat').value = e.latlng.lat.toFixed(7);
             document.getElementById('lng').value = e.latlng.lng.toFixed(7);
@@ -235,6 +273,7 @@
                 mapMarker = L.marker(e.latlng).addTo(map);
             }
         });
+        @endif
     }
 
     document.addEventListener("DOMContentLoaded", initLogisticsMap);

@@ -39,6 +39,10 @@ Route::middleware(ApiAuthenticate::class)->group(function () {
 
     // Rutas de Logística (Centros de Asistencia)
     Route::get('/logistica', [LogisticsController::class, 'index'])->name('logistica.index');
-    Route::post('/logistica', [LogisticsController::class, 'store'])->name('logistica.store');
-    Route::patch('/logistica/{id}', [LogisticsController::class, 'update'])->name('logistica.update');
+    
+    Route::middleware(EnsureApiAuthority::class)->group(function () {
+        Route::post('/logistica', [LogisticsController::class, 'store'])->name('logistica.store');
+        Route::patch('/logistica/{id}', [LogisticsController::class, 'update'])->name('logistica.update');
+        Route::delete('/logistica/{id}', [LogisticsController::class, 'destroy'])->name('logistica.destroy');
+    });
 });

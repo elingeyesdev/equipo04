@@ -21,6 +21,8 @@ final class LogisticsController
     public function index(Request $request): View|RedirectResponse
     {
         $token = (string) $request->session()->get('api_token', '');
+        $apiUser = (array) $request->session()->get('api_user', []);
+        $isAdmin = (string) ($apiUser['role'] ?? '') === 'authority';
         
         try {
             // Este método en ApiClient devuelve el array puro
@@ -32,12 +34,14 @@ final class LogisticsController
             return view('logistics.index', [
                 'centros' => [],
                 'error' => 'No se pudieron cargar los centros de logística: ' . $e->getMessage(),
+                'isAdmin' => false,
             ]);
         }
 
         return view('logistics.index', [
             'centros' => $centros,
             'error' => null,
+            'isAdmin' => $isAdmin,
         ]);
     }
 
@@ -87,5 +91,20 @@ final class LogisticsController
         }
         
         return redirect()->route('logistica.index')->with('status', 'Centro de asistencia actualizado correctamente.');
+    }
+
+    public function destroy(Request $request, $id): RedirectResponse
+    {
+        $token = (string) $request->session()->get('api_token', '');
+        
+        try {
+            $this->api->deleteCentro($token, $id);
+            return redirect()->route('logistica.index')->with('status', 'Centro de asistencia eliminado correctamente.');
+        } catch (ApiUnauthorizedException) {
+            $request->session()->forget(['api_token', 'api_user']);
+            return redirect()->route('login');
+        } catch (ApiRequestException $e) {
+            return back()->withErrors(['apiError' => 'Error al eliminar: ' . $e->getMessage()]);
+        }
     }
 }
