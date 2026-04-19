@@ -1,38 +1,14 @@
-version: '3.8'
 services:
   postgres_db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: chirper_api
+      POSTGRES_DB: chirper
       POSTGRES_USER: sail
       POSTGRES_PASSWORD: password
     ports:
       - "5440:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-    networks:
-      - app-network
-
-  api_app:
-    build:
-      context: ./
-      dockerfile: ./.docker/Dockerfile.php
-    volumes:
-      - "./cosa api/chirper:/var/www/html"
-    ports:
-      - "8002:8002"
-    environment:
-      - DB_CONNECTION=pgsql
-      - DB_HOST=postgres_db
-      - DB_PORT=5432
-      - DB_DATABASE=chirper_api
-      - DB_USERNAME=sail
-      - DB_PASSWORD=password
-    depends_on:
-      - postgres_db
-    command: >
-      bash -c "php artisan config:clear &&
-               exec php artisan serve --host=0.0.0.0 --port=8002 --no-reload"
     networks:
       - app-network
 
@@ -44,15 +20,30 @@ services:
       - "./cosa web/chirper:/var/www/html"
     ports:
       - "8001:8001"
-      - "5173:5173"
     environment:
-      - FLOOD_API_BASE_URL=http://api_app:8002/api
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - APP_URL=http://localhost:8001
+      - PHP_CLI_SERVER_WORKERS=8
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres_db
+      - DB_PORT=5432
+      - DB_DATABASE=chirper
+      - DB_USERNAME=sail
+      - DB_PASSWORD=password
+      - FLOOD_API_BASE_URL=http://localhost:8001/api
+      - FLOOD_API_INTERNAL=true
     depends_on:
-      - api_app
+      - postgres_db
     command: >
       bash -c "php artisan config:clear &&
-               (npm run dev &) &&
-               exec php artisan serve --host=0.0.0.0 --port=8001 --no-reload"
+               php artisan optimize:clear &&
+               rm -f public/hot &&
+               if [ ! -f public/build/manifest.json ]; then
+                 ([ -d node_modules ] || npm install) && npm run build;
+               fi &&
+               php artisan optimize &&
+               exec php -d opcache.enable_cli=1 -d opcache.validate_timestamps=1 artisan serve --host=0.0.0.0 --port=8001 --no-reload"
     networks:
       - app-network
 

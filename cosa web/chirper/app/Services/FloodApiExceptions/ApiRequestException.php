@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\FloodApiExceptions;
 
-final class ApiRequestException extends \RuntimeException
+class ApiRequestException extends \RuntimeException
 {
     public int $status;
 
