@@ -99,7 +99,7 @@ class FloodReportController extends Controller
         User::query()
             ->where('carnet', $citizenCarnet)
             ->update([
-                'is_banned' => $falseReportsCount >= 3,
+                'is_banned' => $falseReportsCount >= 2,
             ]);
     }
 }

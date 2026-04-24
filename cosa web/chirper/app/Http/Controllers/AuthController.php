@@ -39,10 +39,9 @@ final class AuthController
         if ($intended === '') {
             $intended = (string) $request->session()->pull('intended', '');
         }
-        if ($intended !== '' && str_starts_with($intended, 'http')) {
-            $path = (string) parse_url($intended, PHP_URL_PATH);
-            $query = (string) parse_url($intended, PHP_URL_QUERY);
-            $intended = $query !== '' ? $path.'?'.$query : $path;
+
+        if ($intended !== '' && ! str_starts_with($intended, 'http')) {
+            $intended = url($intended);
         }
 
         try {

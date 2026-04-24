@@ -131,7 +131,7 @@ final class ReportController
         $token = (string) $request->session()->get('api_token', '');
 
         $data = $request->validate([
-            'status' => ['required', 'string', 'in:open,in_progress,resolved,closed'],
+            'status' => ['required', 'string', 'in:open,in_progress,resolved,closed,false_report'],
         ]);
 
         try {
