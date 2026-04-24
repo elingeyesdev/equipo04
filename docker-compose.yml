@@ -24,7 +24,6 @@ services:
       - APP_ENV=local
       - APP_DEBUG=true
       - APP_URL=http://localhost:8001
-      - PHP_CLI_SERVER_WORKERS=8
       - DB_CONNECTION=pgsql
       - DB_HOST=postgres_db
       - DB_PORT=5432
@@ -36,14 +35,7 @@ services:
     depends_on:
       - postgres_db
     command: >
-      bash -c "php artisan config:clear &&
-               php artisan optimize:clear &&
-               rm -f public/hot &&
-               if [ ! -f public/build/manifest.json ]; then
-                 ([ -d node_modules ] || npm install) && npm run build;
-               fi &&
-               php artisan optimize &&
-               exec php -d opcache.enable_cli=1 -d opcache.validate_timestamps=1 artisan serve --host=0.0.0.0 --port=8001 --no-reload"
+      php -d opcache.enable_cli=1 -d opcache.validate_timestamps=0 artisan serve --host=0.0.0.0 --port=8001 --no-reload
     networks:
       - app-network
 

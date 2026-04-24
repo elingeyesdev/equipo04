@@ -7,6 +7,7 @@ use App\Http\Requests\Api\StoreFloodReportRequest;
 use App\Http\Requests\Api\UpdateFloodReportRequest;
 use App\Http\Resources\FloodReportResource;
 use App\Models\FloodReport;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -77,10 +78,28 @@ class FloodReportController extends Controller
         $report->fill($data);
         $report->save();
 
+        if ($user->isAuthority()) {
+            $this->refreshCitizenBanStatus((string) $report->citizen_carnet);
+        }
+
         $report->load(['citizen']);
 
         return response()->json([
             'data' => new FloodReportResource($report),
         ]);
+    }
+
+    private function refreshCitizenBanStatus(string $citizenCarnet): void
+    {
+        $falseReportsCount = FloodReport::query()
+            ->where('citizen_carnet', $citizenCarnet)
+            ->where('status', 'false_report')
+            ->count();
+
+        User::query()
+            ->where('carnet', $citizenCarnet)
+            ->update([
+                'is_banned' => $falseReportsCount >= 3,
+            ]);
     }
 }

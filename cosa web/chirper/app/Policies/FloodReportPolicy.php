@@ -14,7 +14,7 @@ class FloodReportPolicy
 
     public function create(User $user): bool
     {
-        return $user->isCitizen();
+        return $user->isCitizen() && ! $user->isBanned();
     }
 
     public function update(User $user, FloodReport $report): bool

@@ -84,9 +84,10 @@ final class FloodApiClient
      */
     private function requestInternal(string $method, string $path, array $payload = [], ?string $token = null): array
     {
+        $httpMethod = strtoupper($method);
         $uri = '/api/'.ltrim($path, '/');
 
-        if (strtoupper($method) === 'GET' && $payload !== []) {
+        if ($httpMethod === 'GET' && $payload !== []) {
             $uri .= '?'.http_build_query($payload);
         }
 
@@ -99,13 +100,23 @@ final class FloodApiClient
             $server['HTTP_AUTHORIZATION'] = 'Bearer '.$token;
         }
 
+        $content = null;
+        $requestPayload = [];
+
+        if ($httpMethod !== 'GET') {
+            $requestPayload = $payload;
+            $content = $payload !== [] ? (string) json_encode($payload, JSON_THROW_ON_ERROR) : '{}';
+            $server['CONTENT_LENGTH'] = (string) strlen($content);
+        }
+
         $request = Request::create(
             $uri,
-            strtoupper($method),
-            strtoupper($method) === 'GET' ? [] : $payload,
+            $httpMethod,
+            $requestPayload,
             [],
             [],
-            $server
+            $server,
+            $content
         );
 
         $response = $this->kernel->handle($request);

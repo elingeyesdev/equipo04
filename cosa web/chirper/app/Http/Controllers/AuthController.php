@@ -39,6 +39,11 @@ final class AuthController
         if ($intended === '') {
             $intended = (string) $request->session()->pull('intended', '');
         }
+        if ($intended !== '' && str_starts_with($intended, 'http')) {
+            $path = (string) parse_url($intended, PHP_URL_PATH);
+            $query = (string) parse_url($intended, PHP_URL_QUERY);
+            $intended = $query !== '' ? $path.'?'.$query : $path;
+        }
 
         try {
             $result = $this->api->login([
@@ -71,9 +76,11 @@ final class AuthController
         $request->session()->put('api_token', $token);
         $request->session()->put('api_user', $user);
 
-        return $intended !== ''
-            ? redirect()->to($intended)
-            : redirect()->route('reports.index');
+        if ($intended !== '') {
+            return redirect()->to($intended);
+        }
+
+        return redirect()->route('reports.index');
     }
 
     public function showRegister(): View

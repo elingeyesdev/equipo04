@@ -7,6 +7,19 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateFloodReportRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if ($this->all() !== []) {
+            return;
+        }
+
+        $decoded = json_decode((string) $this->getContent(), true);
+
+        if (is_array($decoded)) {
+            $this->merge($decoded);
+        }
+    }
+
     public function authorize(): bool
     {
         return $this->user() !== null;
@@ -23,7 +36,7 @@ class UpdateFloodReportRequest extends FormRequest
         ];
 
         if ($this->user()?->isAuthority()) {
-            $baseRules['status'] = ['sometimes', 'string', 'in:open,in_progress,resolved,closed'];
+            $baseRules['status'] = ['sometimes', 'string', 'in:open,in_progress,resolved,closed,false_report'];
         }
 
         return $baseRules;

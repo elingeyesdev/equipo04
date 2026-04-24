@@ -2,9 +2,16 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 
 <head>
+    @php($apiUser = (array) session('api_user', []))
+    @php($apiRole = (string) ($apiUser['role'] ?? ''))
+
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ config('app.name', 'Flood Reports') }}</title>
+    <meta name="api-user-role" content="{{ $apiRole }}">
+    @if ($apiRole === 'authority')
+        <meta name="reports-notifications-endpoint" content="{{ route('reports.notifications.latest', [], false) }}">
+    @endif
 
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600" rel="stylesheet" />
@@ -17,29 +24,26 @@
 <body class="min-h-screen bg-gray-50 text-gray-900 antialiased">
     <header class="border-b border-gray-200 bg-white">
         <div class="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between gap-4">
-            <a href="{{ route('reports.index') }}"
+            <a href="{{ route('reports.index', [], false) }}"
                 class="font-semibold tracking-tight hover:underline underline-offset-4">
                 {{ config('app.name', 'Flood Reports') }}
             </a>
 
             <nav class="flex items-center gap-1 text-sm">
-                @php($apiUser = (array) session('api_user', []))
-                @php($apiRole = (string) ($apiUser['role'] ?? ''))
-
                 @if (session()->has('api_token'))
-                    <a href="{{ route('reports.index') }}"
+                    <a href="{{ route('reports.index', [], false) }}"
                         class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
                         Reportes
                     </a>
-                    <a href="{{ route('maps.index') }}"
+                    <a href="{{ route('maps.index', [], false) }}"
                         class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
                         Mapas
                     </a>
-                    <a href="{{ route('logistica.index') }}"
+                    <a href="{{ route('logistica.index', [], false) }}"
                         class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
                         Logística
                     </a>
-                    <a href="{{ route('reports.create') }}"
+                    <a href="{{ route('reports.create', [], false) }}"
                         class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
                         Crear
                     </a>
@@ -50,7 +54,7 @@
                             <span class="text-gray-500">{{ $apiRole }}</span>
                         @endif
                     </span>
-                    <form method="POST" action="{{ route('logout') }}">
+                    <form method="POST" action="{{ route('logout', [], false) }}">
                         @csrf
                         <button type="submit"
                             class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
@@ -58,9 +62,9 @@
                         </button>
                     </form>
                 @else
-                    <a href="{{ route('login') }}"
+                    <a href="{{ route('login', [], false) }}"
                         class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">Login</a>
-                    <a href="{{ route('register') }}"
+                    <a href="{{ route('register', [], false) }}"
                         class="rounded-md bg-gray-900 px-3 py-2 font-medium text-white hover:bg-gray-800">Registro</a>
                 @endif
             </nav>

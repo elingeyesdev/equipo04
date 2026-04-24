@@ -21,6 +21,7 @@ class UserResource extends JsonResource
             'address' => $this->address,
             'email' => $this->email,
             'role' => $this->role,
+            'is_banned' => (bool) $this->is_banned,
         ];
     }
 }

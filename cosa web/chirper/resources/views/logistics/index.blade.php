@@ -40,7 +40,7 @@
                 <button type="button" id="cancel_edit_btn" class="hidden text-xs text-red-600 hover:underline font-medium">Cancelar Edición</button>
             </div>
             
-            <form id="logistics_form" action="{{ route('logistica.store') }}" method="POST">
+            <form id="logistics_form" action="{{ route('logistica.store', [], false) }}" method="POST">
                 @csrf
                 <div id="method_field"></div>
                 
@@ -149,7 +149,7 @@
                                       <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                     </svg>
                                 </button>
-                                <form action="{{ route('logistica.destroy', $centro['id_centro']) }}" method="POST" class="inline-block" onsubmit="return confirm('¿Estás seguro de eliminar este centro? Esta acción es irreversible.');">
+                                <form action="{{ route('logistica.destroy', ['id' => $centro['id_centro']], false) }}" method="POST" class="inline-block" onsubmit="return confirm('¿Estás seguro de eliminar este centro? Esta acción es irreversible.');">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 p-2 rounded transition-colors inline-flex items-center" title="Eliminar">
@@ -311,7 +311,7 @@
         document.getElementById('cancel_edit_btn').classList.add("hidden");
         
         document.getElementById('method_field').innerHTML = '';
-        document.getElementById('logistics_form').action = `{{ route('logistica.store') }}`;
+        document.getElementById('logistics_form').action = `{{ route('logistica.store', [], false) }}`;
         document.getElementById('logistics_form').reset();
     });
 

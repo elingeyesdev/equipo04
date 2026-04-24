@@ -9,7 +9,7 @@
             <h1 class="text-xl font-semibold tracking-tight">Reporte #{{ $report['id'] ?? '' }}</h1>
             <p class="mt-1 text-sm text-gray-600">Detalle y seguimiento del reporte.</p>
         </div>
-        <a href="{{ route('reports.index') }}" class="rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">Volver</a>
+        <a href="{{ route('reports.index', [], false) }}" class="rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">Volver</a>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -50,11 +50,38 @@
         <div class="text-sm whitespace-pre-wrap text-gray-800">{{ $report['description'] ?? '' }}</div>
     </div>
 
+    <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm mb-6">
+        <div class="text-sm font-medium mb-3">Predicción básica de llegada</div>
+        @if (!empty($eta))
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                <div class="rounded-md bg-gray-50 p-3">
+                    <div class="text-xs text-gray-600">Centro más cercano</div>
+                    <div class="font-medium">{{ $eta['name'] }}</div>
+                </div>
+                <div class="rounded-md bg-gray-50 p-3">
+                    <div class="text-xs text-gray-600">Distancia aproximada</div>
+                    <div class="font-medium">{{ number_format((float) $eta['distance_km'], 2) }} km</div>
+                </div>
+                <div class="rounded-md bg-gray-50 p-3">
+                    <div class="text-xs text-gray-600">Tiempo estimado</div>
+                    <div class="font-medium">{{ (int) $eta['eta_minutes'] }} min</div>
+                </div>
+            </div>
+            <p class="mt-3 text-xs text-gray-500">
+                Estimación simple basada en distancia en línea recta (sin considerar rutas, tráfico ni bloqueos).
+            </p>
+        @else
+            <div class="text-sm text-gray-600">
+                No se pudo calcular el tiempo de llegada (faltan coordenadas o centros registrados).
+            </div>
+        @endif
+    </div>
+
     @if ($apiRole === 'authority')
         <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm mb-6">
             <div class="font-medium mb-4">Acciones de autoridad</div>
 
-            <form method="POST" action="{{ route('reports.status.update', ['id' => $report['id']]) }}" class="flex items-end gap-3">
+            <form method="POST" action="{{ route('reports.status.update', ['id' => $report['id']], false) }}" class="flex items-end gap-3">
                 @csrf
                 <div class="flex-1">
                     <label class="block text-sm font-medium mb-1" for="status">Cambiar estado</label>
@@ -64,6 +91,7 @@
                         <option value="in_progress" @selected($current === 'in_progress')>in_progress</option>
                         <option value="resolved" @selected($current === 'resolved')>resolved</option>
                         <option value="closed" @selected($current === 'closed')>closed</option>
+                        <option value="false_report" @selected($current === 'false_report')>false_report</option>
                     </select>
                     @error('status')
                         <div class="text-sm text-red-700 mt-1">{{ $message }}</div>
@@ -74,7 +102,7 @@
 
             <div class="border-t border-gray-200 my-4"></div>
 
-            <form method="POST" action="{{ route('reports.responses.store', ['id' => $report['id']]) }}" class="space-y-3">
+            <form method="POST" action="{{ route('reports.responses.store', ['id' => $report['id']], false) }}" class="space-y-3">
                 @csrf
                 <div>
                     <label class="block text-sm font-medium mb-1" for="message">Responder</label>

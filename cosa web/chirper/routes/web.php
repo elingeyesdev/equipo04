@@ -11,8 +11,8 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return session()->has('api_token')
-        ? redirect()->route('reports.index')
-        : redirect()->route('login');
+        ? redirect()->to(route('reports.index', [], false))
+        : redirect()->to(route('login', [], false));
 })->name('home');
 
 Route::middleware(RedirectIfApiAuthenticated::class)->group(function () {
@@ -35,6 +35,7 @@ Route::middleware(ApiAuthenticate::class)->group(function () {
     Route::middleware(EnsureApiAuthority::class)->group(function () {
         Route::post('/reports/{id}/responses', [ReportController::class, 'storeResponse'])->name('reports.responses.store');
         Route::post('/reports/{id}/status', [ReportController::class, 'updateStatus'])->name('reports.status.update');
+        Route::get('/reports/notifications/latest', [ReportController::class, 'latestForNotifications'])->name('reports.notifications.latest');
     });
 
     // Rutas de Logística (Centros de Asistencia)

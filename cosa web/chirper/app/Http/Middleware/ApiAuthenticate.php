@@ -24,7 +24,7 @@ final class ApiAuthenticate
         $token = (string) $request->session()->get('api_token', '');
 
         if ($token === '') {
-            $request->session()->put('intended', $request->fullUrl());
+            $request->session()->put('intended', $request->getRequestUri());
 
             return redirect()->route('login');
         }

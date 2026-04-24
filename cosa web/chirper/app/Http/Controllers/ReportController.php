@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\FloodReport;
 use App\Services\FloodApiClient;
 use App\Services\FloodApiExceptions\ApiRequestException;
 use App\Services\FloodApiExceptions\ApiUnauthorizedException;
 use App\Services\FloodApiExceptions\ApiValidationException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -22,25 +24,25 @@ final class ReportController
 
     public function index(Request $request): View|RedirectResponse
     {
-        $token = (string) $request->session()->get('api_token', '');
-        $page = max(1, (int) $request->query('page', 1));
+        $user = (array) $request->session()->get('api_user', []);
+        $role = (string) ($user['role'] ?? '');
+        $carnet = (string) ($user['carnet'] ?? '');
+        $page = max(1, (int) $request->query('page', '1'));
 
-        try {
-            $result = $this->api->listReports($token, $page);
-        } catch (ApiUnauthorizedException) {
-            $request->session()->forget(['api_token', 'api_user']);
-            return redirect()->route('login');
-        } catch (ApiRequestException $e) {
-            return view('reports.index', [
-                'reports' => [],
-                'meta' => [],
-                'error' => $e->getMessage(),
-            ]);
+        $query = FloodReport::query()->latest();
+
+        if ($role !== 'authority' && $carnet !== '') {
+            $query->where('citizen_carnet', $carnet);
         }
 
+        $reports = $query->paginate(15, ['*'], 'page', $page);
+
         return view('reports.index', [
-            'reports' => (array) Arr::get($result, 'data', []),
-            'meta' => (array) Arr::get($result, 'meta', []),
+            'reports' => $reports->items(),
+            'meta' => [
+                'current_page' => $reports->currentPage(),
+                'last_page' => $reports->lastPage(),
+            ],
             'error' => null,
         ]);
     }
@@ -146,5 +148,31 @@ final class ReportController
         }
 
         return redirect()->route('reports.show', ['id' => $id]);
+    }
+
+    public function latestForNotifications(Request $request): JsonResponse
+    {
+        $user = (array) $request->session()->get('api_user', []);
+        $role = (string) ($user['role'] ?? '');
+        $carnet = (string) ($user['carnet'] ?? '');
+
+        $query = FloodReport::query()->latest();
+
+        if ($role !== 'authority' && $carnet !== '') {
+            $query->where('citizen_carnet', $carnet);
+        }
+
+        $latest = $query->first();
+
+        if (! $latest) {
+            return response()->json(['data' => null], 200);
+        }
+
+        return response()->json([
+            'data' => [
+                'id' => (string) $latest->id,
+                'severity' => (string) $latest->severity,
+            ],
+        ]);
     }
 }
