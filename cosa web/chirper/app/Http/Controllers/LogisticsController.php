@@ -45,7 +45,7 @@ final class LogisticsController
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse|\Illuminate\Http\JsonResponse
     {
         $token = (string) $request->session()->get('api_token', '');
         
@@ -61,15 +61,21 @@ final class LogisticsController
             foreach ($e->errors as $field => $messages) {
                  $validationMessages[$field] = is_array($messages) ? implode(' ', $messages) : $messages;
             }
-            return back()->withInput()->withErrors($validationMessages);
+            return $request->wantsJson()
+                ? response()->json(['errors' => $validationMessages], 422)
+                : back()->withInput()->withErrors($validationMessages);
         } catch (ApiRequestException $e) {
-            return back()->withInput()->withErrors(['apiError' => $e->getMessage()]);
+            return $request->wantsJson()
+                ? response()->json(['error' => $e->getMessage()], 400)
+                : back()->withInput()->withErrors(['apiError' => $e->getMessage()]);
         }
         
-        return redirect()->route('logistica.index')->with('status', 'Centro de asistencia creado exitosamente.');
+        return $request->wantsJson()
+            ? response()->json(['status' => 'success', 'message' => 'Centro de asistencia creado exitosamente.'])
+            : redirect()->route('logistica.index')->with('status', 'Centro de asistencia creado exitosamente.');
     }
 
-    public function update(Request $request, $id): RedirectResponse
+    public function update(Request $request, $id): RedirectResponse|\Illuminate\Http\JsonResponse
     {
         $token = (string) $request->session()->get('api_token', '');
         
@@ -85,26 +91,38 @@ final class LogisticsController
             foreach ($e->errors as $field => $messages) {
                  $validationMessages[$field] = is_array($messages) ? implode(' ', $messages) : $messages;
             }
-            return back()->withInput()->withErrors($validationMessages);
+            return $request->wantsJson()
+                ? response()->json(['errors' => $validationMessages], 422)
+                : back()->withInput()->withErrors($validationMessages);
         } catch (ApiRequestException $e) {
-            return back()->withInput()->withErrors(['apiError' => 'Error al actualizar: ' . $e->getMessage()]);
+            return $request->wantsJson()
+                ? response()->json(['error' => 'Error al actualizar: ' . $e->getMessage()], 400)
+                : back()->withInput()->withErrors(['apiError' => 'Error al actualizar: ' . $e->getMessage()]);
         }
         
-        return redirect()->route('logistica.index')->with('status', 'Centro de asistencia actualizado correctamente.');
+        return $request->wantsJson()
+            ? response()->json(['status' => 'success', 'message' => 'Centro de asistencia actualizado correctamente.'])
+            : redirect()->route('logistica.index')->with('status', 'Centro de asistencia actualizado correctamente.');
     }
 
-    public function destroy(Request $request, $id): RedirectResponse
+    public function destroy(Request $request, $id): RedirectResponse|\Illuminate\Http\JsonResponse
     {
         $token = (string) $request->session()->get('api_token', '');
         
         try {
             $this->api->deleteCentro($token, $id);
-            return redirect()->route('logistica.index')->with('status', 'Centro de asistencia eliminado correctamente.');
+            return $request->wantsJson()
+                ? response()->json(['status' => 'success', 'message' => 'Centro de asistencia eliminado correctamente.'])
+                : redirect()->route('logistica.index')->with('status', 'Centro de asistencia eliminado correctamente.');
         } catch (ApiUnauthorizedException) {
             $request->session()->forget(['api_token', 'api_user']);
-            return redirect()->route('login');
+            return $request->wantsJson()
+                ? response()->json(['error' => 'No autorizado'], 401)
+                : redirect()->route('login');
         } catch (ApiRequestException $e) {
-            return back()->withErrors(['apiError' => 'Error al eliminar: ' . $e->getMessage()]);
+            return $request->wantsJson()
+                ? response()->json(['error' => 'Error al eliminar: ' . $e->getMessage()], 400)
+                : back()->withErrors(['apiError' => 'Error al eliminar: ' . $e->getMessage()]);
         }
     }
 }
