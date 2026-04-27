@@ -9,6 +9,11 @@
         </div>
     </div>
 
+    <div class="mb-6 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+        <h3 class="text-sm font-semibold text-gray-800 mb-3">Buscar Centros por Ubicación</h3>
+        <x-location-filter formAction="{{ route('logistica.index', [], false) }}" />
+    </div>
+
     @if (session('status'))
         <div class="mb-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700">
             {{ session('status') }}
@@ -47,6 +52,10 @@
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Nombre del Centro *</label>
                     <input type="text" id="nombre" name="nombre" value="{{ old('nombre') }}" required class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                </div>
+
+                <div class="mb-4 bg-gray-50 p-3 rounded-md border border-gray-200">
+                    <x-location-filter idPrefix="form" />
                 </div>
 
                 <div class="grid grid-cols-2 gap-4 mb-4">
@@ -260,19 +269,120 @@
              .addTo(map);
         });
 
-        // 2. Click en el mapa para el Formulario
+        // 2. Cargar geometrías
         @if($isAdmin)
+        let santaCruzPolygon = null;
+        let provincesData = null;
+        let municipalitiesData = null;
+        let highlightLayer = null;
+
+        // Cargar frontera
+        fetch('/santacruz_boundary.json')
+            .then(res => res.json())
+            .then(geoJson => {
+                santaCruzPolygon = geoJson;
+                L.geoJSON(santaCruzPolygon, {
+                    style: { color: '#3B82F6', weight: 2, opacity: 0.6, fillOpacity: 0.05 },
+                    interactive: false
+                }).addTo(map);
+            });
+
+        // Cargar provincias y municipios para el point-in-polygon y el resaltado
+        fetch('/provinces.geojson').then(res => res.json()).then(data => provincesData = data);
+        fetch('/municipalities.geojson').then(res => res.json()).then(data => municipalitiesData = data);
+
+        // Auto-seleccionar y validar en click
         map.on('click', function(e) {
+            if (!santaCruzPolygon || typeof turf === 'undefined' || !provincesData || !municipalitiesData) {
+                alert("Cargando fronteras geográficas, por favor espera un momento.");
+                return;
+            }
+
+            const pt = turf.point([e.latlng.lng, e.latlng.lat]);
+            
+            // Validar si está en Santa Cruz
+            if (!turf.booleanPointInPolygon(pt, santaCruzPolygon)) {
+                alert("¡Fuera de límite! Por favor seleccione una ubicación dentro del departamento de Santa Cruz.");
+                return;
+            }
+
             document.getElementById('lat').value = e.latlng.lat.toFixed(7);
             document.getElementById('lng').value = e.latlng.lng.toFixed(7);
 
-            // Mover el pin temporal
             if (mapMarker) {
                 mapMarker.setLatLng(e.latlng);
             } else {
                 mapMarker = L.marker(e.latlng).addTo(map);
             }
+
+            // Detectar provincia y municipio
+            let foundProv = null;
+            let foundMuni = null;
+
+            for (let feature of provincesData.features) {
+                if (turf.booleanPointInPolygon(pt, feature)) {
+                    foundProv = feature.properties.name;
+                    break;
+                }
+            }
+
+            for (let feature of municipalitiesData.features) {
+                if (turf.booleanPointInPolygon(pt, feature)) {
+                    foundMuni = feature.properties.name;
+                    break;
+                }
+            }
+
+            // Actualizar select de Formulario
+            if (foundProv) {
+                const provSelect = document.getElementById('form_provincia');
+                if (provSelect) {
+                    provSelect.value = foundProv;
+                    provSelect.dispatchEvent(new Event('change'));
+                    
+                    // Esperar un momento a que los municipios carguen y setearlo
+                    if (foundMuni) {
+                        setTimeout(() => {
+                            const munSelect = document.getElementById('form_municipio');
+                            if (munSelect) {
+                                munSelect.value = foundMuni;
+                                munSelect.dispatchEvent(new Event('change'));
+                            }
+                        }, 100);
+                    }
+                }
+            }
         });
+
+        // Escuchar el evento de filtro de ambos forms (filter_ y form_)
+        window.addEventListener('locationFilterChanged', function(e) {
+            const { idPrefix, provincia, municipio } = e.detail;
+            
+            // Solo nos interesa reaccionar visualmente si es el filtro principal (filter_provincia) o el de form, pero evitamos doble dibujado si ambos se mueven. Preferiremos cualquier cambio.
+            if (highlightLayer) {
+                map.removeLayer(highlightLayer);
+                highlightLayer = null;
+            }
+
+            if (municipio && municipalitiesData) {
+                const feature = municipalitiesData.features.find(f => f.properties.name === municipio);
+                if (feature) {
+                    highlightLayer = L.geoJSON(feature, {
+                        style: { color: '#EF4444', weight: 3, opacity: 0.9, fillOpacity: 0.1 }
+                    }).addTo(map);
+                    map.fitBounds(highlightLayer.getBounds());
+                }
+            } else if (provincia && provincesData) {
+                const feature = provincesData.features.find(f => f.properties.name === provincia);
+                if (feature) {
+                    highlightLayer = L.geoJSON(feature, {
+                        style: { color: '#F97316', weight: 3, opacity: 0.9, fillOpacity: 0.1 }
+                    }).addTo(map);
+                    map.fitBounds(highlightLayer.getBounds());
+                }
+            }
+        });
+
         @endif
     }
 
@@ -319,5 +429,7 @@
 <!-- LEAFLET CDN -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<!-- TURF.JS CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 
 @endsection

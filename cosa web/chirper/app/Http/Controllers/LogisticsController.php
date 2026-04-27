@@ -26,7 +26,7 @@ final class LogisticsController
         
         try {
             // Este método en ApiClient devuelve el array puro
-            $centros = $this->api->listCentros($token);
+            $centros = $this->api->listCentros($token, 1, $request->query('provincia'), $request->query('municipio'));
         } catch (ApiUnauthorizedException) {
             $request->session()->forget(['api_token', 'api_user']);
             return redirect()->route('login');

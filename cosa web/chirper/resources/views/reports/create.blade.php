@@ -31,7 +31,10 @@
                     @enderror
                 </div>
             </div>
-            
+            <div class="mb-4 bg-gray-50 p-3 rounded-md border border-gray-200">
+                <x-location-filter idPrefix="form" />
+            </div>
+
             <div class="-mt-1">
                 <p id="locationStatus" class="text-sm text-gray-600"></p>
             </div>
@@ -80,6 +83,18 @@
             const lngInput = document.getElementById('longitude');
             const locStatus = document.getElementById('locationStatus');
 
+            let santaCruzPolygon = null;
+            let provincesData = null;
+            let municipalitiesData = null;
+
+            fetch('/santacruz_boundary.json')
+                .then(res => res.json())
+                .then(geoJson => {
+                    santaCruzPolygon = geoJson;
+                });
+            fetch('/provinces.geojson').then(res => res.json()).then(data => provincesData = data);
+            fetch('/municipalities.geojson').then(res => res.json()).then(data => municipalitiesData = data);
+
             function fetchLocation() {
                 if (!navigator.geolocation) {
                     locStatus.textContent = "Tu navegador no soporta geolocalización.";
@@ -92,12 +107,60 @@
                 locStatus.className = "text-sm text-gray-600";
                 
                 navigator.geolocation.getCurrentPosition(function(position) {
-                    latInput.value = position.coords.latitude;
-                    lngInput.value = position.coords.longitude;
-                    locStatus.textContent = "Ubicación obtenida exitosamente.";
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    let foundProv = null;
+                    let foundMuni = null;
+                    
+                    if (santaCruzPolygon && typeof turf !== 'undefined') {
+                        const pt = turf.point([lng, lat]);
+                        if (!turf.booleanPointInPolygon(pt, santaCruzPolygon)) {
+                            locStatus.textContent = "Estás fuera de Santa Cruz. Por favor, selecciona una ubicación dentro del departamento.";
+                            locStatus.classList.replace('text-gray-600', 'text-red-600');
+                            enableInputs();
+                            return;
+                        }
+
+                        if (provincesData && municipalitiesData) {
+                            for (let feature of provincesData.features) {
+                                if (turf.booleanPointInPolygon(pt, feature)) {
+                                    foundProv = feature.properties.name;
+                                    break;
+                                }
+                            }
+                            for (let feature of municipalitiesData.features) {
+                                if (turf.booleanPointInPolygon(pt, feature)) {
+                                    foundMuni = feature.properties.name;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    latInput.value = lat;
+                    lngInput.value = lng;
+                    locStatus.textContent = "Ubicación obtenida exitosamente dentro de Santa Cruz.";
                     locStatus.classList.replace('text-gray-600', 'text-green-600');
+
+                    if (foundProv) {
+                        const provSelect = document.getElementById('form_provincia');
+                        if (provSelect) {
+                            provSelect.value = foundProv;
+                            provSelect.dispatchEvent(new Event('change'));
+                            
+                            if (foundMuni) {
+                                setTimeout(() => {
+                                    const munSelect = document.getElementById('form_municipio');
+                                    if (munSelect) {
+                                        munSelect.value = foundMuni;
+                                        munSelect.dispatchEvent(new Event('change'));
+                                    }
+                                }, 100);
+                            }
+                        }
+                    }
                 }, function(error) {
-                    locStatus.textContent = "Error al obtener ubicación. Puedes ingresarla manualmente.";
+                    locStatus.textContent = "Error al obtener ubicación. Puedes ingresarla manualmente (asegúrate de que sea en Santa Cruz).";
                     locStatus.classList.replace('text-gray-600', 'text-red-600');
                     enableInputs();
                 }, {
@@ -118,4 +181,5 @@
             }
         });
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 @endsection
