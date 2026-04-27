@@ -297,10 +297,7 @@
                         @if($isAdmin)
                             <button onclick='editCentro(${JSON.stringify(centro).replace(/'/g, "&apos;")})' class="mt-2 w-full py-1 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold rounded border border-gray-300 transition-colors">✏️ Editar Centro</button>
                         @endif
-                    <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}" 
-   target="_blank" 
-   rel="noopener noreferrer" 
-   class="mt-2 block w-full text-center py-2 bg-blue-600 hover:bg-blue-700 !text-white !no-underline text-xs font-bold rounded shadow-sm transition-all">📍 Ver ruta en Maps</a>
+                    <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}" target="_blank" rel="noopener noreferrer" class="mt-2 block w-full text-center py-2 bg-blue-600 hover:bg-blue-700 !text-white !no-underline text-xs font-bold rounded shadow-sm transition-all">📍 Ver ruta en Maps</a>
                 </div>`;
 
                     const marker = L.marker([lat, lng], { icon: customIcon })
