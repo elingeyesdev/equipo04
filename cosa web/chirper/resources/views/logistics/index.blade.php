@@ -11,7 +11,7 @@
 
     <div class="mb-6 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
         <h3 class="text-sm font-semibold text-gray-800 mb-3">Buscar Centros por Ubicación</h3>
-        <x-location-filter formAction="{{ route('logistica.index', [], false) }}" :showEstado="true" />
+        <x-location-filter formAction="{{ route('logistica.index', [], false) }}" :showEstado="true" :showSearch="true" />
     </div>
 
     @if (session('status'))
@@ -135,7 +135,7 @@
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     @forelse($centros as $centro)
-                        <tr id="tr-centro-{{ $centro['id_centro'] }}" class="hover:bg-gray-50 transition-colors center-row" data-provincia="{{ $centro['provincia'] ?? '' }}" data-municipio="{{ $centro['municipio'] ?? '' }}">
+                        <tr id="tr-centro-{{ $centro['id_centro'] }}" class="hover:bg-gray-50 transition-colors center-row" data-provincia="{{ $centro['provincia'] ?? '' }}" data-municipio="{{ $centro['municipio'] ?? '' }}" data-nombre="{{ $centro['nombre'] ?? '' }}">
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm font-medium text-gray-900">{{ $centro['nombre'] }}</div>
                             </td>
@@ -253,9 +253,9 @@
                 <p class="text-xs text-gray-700 mb-1"><b>Horario:</b> ${horaAperturaStr} a ${horaCierreStr}</p>
                 ${centro.contacto ? `<p class="text-xs text-gray-700 mb-1"><b>Cel:</b> ${centro.contacto}</p>` : ''}
                 ${centro.direccion ? `<p class="text-xs text-gray-700 mb-1"><b>Dir:</b> ${centro.direccion}</p>` : ''}
-                @if($isAdmin)
+                    @if($isAdmin)
                 <button onclick='editCentro(${JSON.stringify(centro).replace(/'/g, "&apos;")})' class="mt-2 w-full py-1 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold rounded border border-gray-300 transition-colors">✏️ Editar Centro</button>
-                @endif
+                    @endif
             </div>`;
             
             const marker = L.marker([lat, lng], { icon: customIcon })
@@ -269,11 +269,15 @@
     }
 
         // 2. Cargar geometrías
-        @if($isAdmin)
-        let santaCruzPolygon = null;
         let provincesData = null;
         let municipalitiesData = null;
         let highlightLayer = null;
+
+        fetch('/provinces.geojson').then(res => res.json()).then(data => provincesData = data);
+        fetch('/municipalities.geojson').then(res => res.json()).then(data => municipalitiesData = data);
+
+        @if($isAdmin)
+        let santaCruzPolygon = null;
 
         // Cargar frontera
         fetch('/santacruz_boundary.json')
@@ -285,11 +289,6 @@
                     interactive: false
                 }).addTo(map);
             });
-
-        // Cargar provincias y municipios para el point-in-polygon y el resaltado
-        fetch('/provinces.geojson').then(res => res.json()).then(data => provincesData = data);
-        fetch('/municipalities.geojson').then(res => res.json()).then(data => municipalitiesData = data);
-
         // Auto-seleccionar y validar en click
         map.on('click', function(e) {
             if (!santaCruzPolygon || typeof turf === 'undefined' || !provincesData || !municipalitiesData) {
@@ -352,10 +351,11 @@
                 }
             }
         });
+        @endif
 
         // Escuchar el evento de filtro de ambos forms (filter_ y form_)
         window.addEventListener('locationFilterChanged', function(e) {
-            const { idPrefix, provincia, municipio, estado } = e.detail;
+            const { idPrefix, provincia, municipio, estado, nombre } = e.detail;
             let filteredCentros = window.centros;
             
             // Si el evento viene del filtro principal, aplicamos filtrado local a mapa y tabla
@@ -365,6 +365,7 @@
                     if (municipio && c.municipio !== municipio) return false;
                     if (estado && estado === 'abierto' && c.is_open === false) return false;
                     if (estado && estado === 'cerrado' && c.is_open === true) return false;
+                    if (nombre && !c.nombre.toLowerCase().includes(nombre.toLowerCase())) return false;
                     return true;
                 });
                 
@@ -375,10 +376,12 @@
                     const dProv = tr.dataset.provincia;
                     const dMun = tr.dataset.municipio;
                     const dEst = tr.dataset.estado;
+                    const dNom = tr.dataset.nombre || '';
                     let show = true;
                     if (provincia && dProv !== provincia) show = false;
                     if (municipio && dMun !== municipio) show = false;
                     if (estado && estado !== dEst) show = false;
+                    if (nombre && !dNom.toLowerCase().includes(nombre.toLowerCase())) show = false;
                     tr.style.display = show ? '' : 'none';
                 });
             }
@@ -412,8 +415,6 @@
                 map.setView([-17.783325, -63.182111], 12);
             }
         });
-
-        @endif
     }
 
     document.addEventListener("DOMContentLoaded", initLogisticsMap);

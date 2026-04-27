@@ -19,6 +19,29 @@
     @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     @endif
+
+    <script>
+        window.normalizeGeoName = function(name) {
+            let n = name.replace(/(Provincia|Municipio)\s+/i, '').trim().toLowerCase();
+            const dict = {
+                'velasco': 'josé miguel de velasco',
+                'warnes': 'ignacio warnes',
+                'manuel m. caballero': 'manuel maría caballero',
+                'ascención de guarayos': 'ascensión de guarayos',
+                'san antonio de lomerio': 'san antonio de lomerío',
+                'san rafael': 'san rafael de velasco',
+                'charagua': 'charagua iyambae',
+                'gutiérrez': 'kereimba iyaambae',
+                'san juan': 'san juan de yapacaní',
+                'pampa grande': 'pampagrande',
+                'postrer valle': 'postrervalle',
+                'pucará': 'pucara',
+                'trigal': 'el trigal',
+                'porongo (ayacucho)': 'porongo'
+            };
+            return dict[n] || n;
+        };
+    </script>
 </head>
 
 <body class="min-h-screen bg-gray-50 text-gray-900 antialiased">
