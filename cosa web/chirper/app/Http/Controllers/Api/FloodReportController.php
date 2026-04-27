@@ -24,6 +24,14 @@ class FloodReportController extends Controller
             $query->where('citizen_carnet', $user->carnet);
         }
 
+        if ($request->filled('provincia')) {
+            $query->where('provincia', $request->provincia);
+        }
+
+        if ($request->filled('municipio')) {
+            $query->where('municipio', $request->municipio);
+        }
+
         $reports = $query->paginate(15);
 
         return FloodReportResource::collection($reports);
@@ -41,6 +49,8 @@ class FloodReportController extends Controller
             'citizen_carnet' => $user->carnet,
             'latitude' => $data['latitude'],
             'longitude' => $data['longitude'],
+            'provincia' => $data['provincia'],
+            'municipio' => $data['municipio'],
             'address' => $data['address'] ?? null,
             'description' => $data['description'],
             'severity' => $data['severity'],

@@ -29,6 +29,8 @@ class StoreFloodReportRequest extends FormRequest
         return [
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'provincia' => ['required', 'string', 'max:255'],
+            'municipio' => ['required', 'string', 'max:255'],
             'address' => ['nullable', 'string', 'max:255'],
             'description' => ['required', 'string'],
             'severity' => ['required', 'string', 'in:low,medium,high'],

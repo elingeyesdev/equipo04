@@ -9,6 +9,11 @@
         </div>
     </div>
 
+    <div class="mb-6 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+        <h3 class="text-sm font-semibold text-gray-800 mb-3">Buscar Reportes por Ubicación</h3>
+        <x-location-filter formAction="{{ route('maps.index', [], false) }}" />
+    </div>
+
     @if ($error)
         <div class="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm">
             {{ $error }}
@@ -90,6 +95,43 @@
             L.marker([lat, lng], { icon: customIcon })
              .bindPopup(contentStr, { minWidth: 200 })
              .addTo(map);
+        });
+
+        // Lógica de resaltado de fronteras dinámico
+        let provincesData = null;
+        let municipalitiesData = null;
+        let highlightLayer = null;
+
+        fetch('/provinces.geojson').then(res => res.json()).then(data => provincesData = data);
+        fetch('/municipalities.geojson').then(res => res.json()).then(data => municipalitiesData = data);
+
+        window.addEventListener('locationFilterChanged', function(e) {
+            const { provincia, municipio } = e.detail;
+            
+            if (highlightLayer) {
+                map.removeLayer(highlightLayer);
+                highlightLayer = null;
+            }
+
+            if (municipio && municipalitiesData) {
+                const feature = municipalitiesData.features.find(f => f.properties.name === municipio);
+                if (feature) {
+                    highlightLayer = L.geoJSON(feature, {
+                        style: { color: '#EF4444', weight: 3, opacity: 0.9, fillOpacity: 0.1 },
+                        interactive: false
+                    }).addTo(map);
+                    map.fitBounds(highlightLayer.getBounds());
+                }
+            } else if (provincia && provincesData) {
+                const feature = provincesData.features.find(f => f.properties.name === provincia);
+                if (feature) {
+                    highlightLayer = L.geoJSON(feature, {
+                        style: { color: '#F97316', weight: 3, opacity: 0.9, fillOpacity: 0.1 },
+                        interactive: false
+                    }).addTo(map);
+                    map.fitBounds(highlightLayer.getBounds());
+                }
+            }
         });
     }
 

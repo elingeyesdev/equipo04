@@ -190,11 +190,13 @@ final class FloodApiClient
     /**
      * @return array{data:array<int,mixed>,meta:array<string,mixed>,links:array<string,mixed>}
      */
-    public function listReports(string $token, int $page = 1): array
+    public function listReports(string $token, int $page = 1, ?string $provincia = null, ?string $municipio = null): array
     {
-        $response = $this->request('GET', '/reports', [
-            'page' => $page,
-        ], $token);
+        $params = ['page' => $page];
+        if ($provincia) $params['provincia'] = $provincia;
+        if ($municipio) $params['municipio'] = $municipio;
+
+        $response = $this->request('GET', '/reports', $params, $token);
 
         $this->throwIfError($response);
 
@@ -267,11 +269,13 @@ final class FloodApiClient
     /**
      * @return array<int,mixed>
      */
-    public function listCentros(string $token, int $page = 1): array
+    public function listCentros(string $token, int $page = 1, ?string $provincia = null, ?string $municipio = null): array
     {
-        $response = $this->request('GET', '/centros', [
-            'page' => $page,
-        ], $token);
+        $params = ['page' => $page];
+        if ($provincia) $params['provincia'] = $provincia;
+        if ($municipio) $params['municipio'] = $municipio;
+
+        $response = $this->request('GET', '/centros', $params, $token);
 
         $this->throwIfError($response);
 

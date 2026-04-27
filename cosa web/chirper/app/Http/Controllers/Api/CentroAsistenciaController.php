@@ -13,12 +13,20 @@ class CentroAsistenciaController extends Controller
      * Retorna la lista de centros de asistencia.
      * Si fuera a crecer mucho, consideraríamos paginación, pero para visualización de mapas solemos retornar un batch completo.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $centros = CentroAsistencia::all();
-        
+        $query = CentroAsistencia::query();
+
+        if ($request->filled('provincia')) {
+            $query->where('provincia', $request->provincia);
+        }
+
+        if ($request->filled('municipio')) {
+            $query->where('municipio', $request->municipio);
+        }
+
         return response()->json([
-            'data' => $centros
+            'data' => $query->get()
         ]);
     }
 
@@ -33,6 +41,8 @@ class CentroAsistenciaController extends Controller
 
         $validated = $request->validate([
             'nombre' => 'required|string|max:255',
+            'provincia' => 'required|string|max:255',
+            'municipio' => 'required|string|max:255',
             'direccion' => 'nullable|string|max:255',
             'latitud' => 'required|numeric',
             'longitud' => 'required|numeric',
@@ -63,6 +73,8 @@ class CentroAsistenciaController extends Controller
 
         $validated = $request->validate([
             'nombre' => 'sometimes|required|string|max:255',
+            'provincia' => 'sometimes|required|string|max:255',
+            'municipio' => 'sometimes|required|string|max:255',
             'direccion' => 'nullable|string|max:255',
             'latitud' => 'sometimes|required|numeric',
             'longitud' => 'sometimes|required|numeric',

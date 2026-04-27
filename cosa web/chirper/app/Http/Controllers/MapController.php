@@ -25,7 +25,7 @@ final class MapController
         $page = 1; 
 
         try {
-            $result = $this->api->listReports($token, $page);
+            $result = $this->api->listReports($token, $page, $request->query('provincia'), $request->query('municipio'));
         } catch (ApiUnauthorizedException) {
             $request->session()->forget(['api_token', 'api_user']);
             return redirect()->route('login');

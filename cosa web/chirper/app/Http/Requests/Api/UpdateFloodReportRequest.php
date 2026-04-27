@@ -30,6 +30,8 @@ class UpdateFloodReportRequest extends FormRequest
         $baseRules = [
             'latitude' => ['sometimes', 'numeric', 'between:-90,90'],
             'longitude' => ['sometimes', 'numeric', 'between:-180,180'],
+            'provincia' => ['sometimes', 'string', 'max:255'],
+            'municipio' => ['sometimes', 'string', 'max:255'],
             'address' => ['sometimes', 'nullable', 'string', 'max:255'],
             'description' => ['sometimes', 'string'],
             'severity' => ['sometimes', 'string', 'in:low,medium,high'],

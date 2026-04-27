@@ -37,6 +37,8 @@ class CentroAsistencia extends Model
         'direccion',
         'latitud',
         'longitud',
+        'provincia',
+        'municipio',
         'hora_apertura',
         'hora_cierre',
         'contacto',

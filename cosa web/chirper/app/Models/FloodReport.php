@@ -15,6 +15,8 @@ class FloodReport extends Model
         'citizen_carnet',
         'latitude',
         'longitude',
+        'provincia',
+        'municipio',
         'address',
         'description',
         'severity',
