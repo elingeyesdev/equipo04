@@ -1,0 +1,65 @@
+{
+  "departamento": "Santa Cruz",
+  "provincias": [
+    {
+      "nombre": "Andrés Ibáñez",
+      "municipios": ["Santa Cruz de la Sierra", "Cotoca", "Porongo", "La Guardia", "El Torno"]
+    },
+    {
+      "nombre": "Ignacio Warnes",
+      "municipios": ["Warnes", "Okinawa Uno"]
+    },
+    {
+      "nombre": "Obispo Santistevan",
+      "municipios": ["Montero", "General Saavedra", "Mineros", "Fernández Alonso", "San Pedro"]
+    },
+    {
+      "nombre": "Sara",
+      "municipios": ["Portachuelo", "Santa Rosa del Sara", "Colpa Bélgica"]
+    },
+    {
+      "nombre": "Ichilo",
+      "municipios": ["Buena Vista", "San Carlos", "Yapacaní", "San Juan de Yapacaní"]
+    },
+    {
+      "nombre": "Chiquitos",
+      "municipios": ["San José de Chiquitos", "Pailón", "Roboré"]
+    },
+    {
+      "nombre": "Guarayos",
+      "municipios": ["Ascensión de Guarayos", "Urubichá", "El Puente"]
+    },
+    {
+      "nombre": "José Miguel de Velasco",
+      "municipios": ["San Ignacio de Velasco", "San Miguel de Velasco", "San Rafael de Velasco"]
+    },
+    {
+      "nombre": "Ñuflo de Chávez",
+      "municipios": ["Concepción", "San Javier", "San Ramón", "San Julián", "San Antonio de Lomerío", "Cuatro Cañadas"]
+    },
+    {
+      "nombre": "Ángel Sandóval",
+      "municipios": ["San Matías"]
+    },
+    {
+      "nombre": "Germán Busch",
+      "municipios": ["Puerto Suárez", "Puerto Quijarro", "El Carmen Rivero Tórrez"]
+    },
+    {
+      "nombre": "Cordillera",
+      "municipios": ["Lagunillas", "Cabezas", "Camiri", "Cuevo", "Boyuibe", "Charagua Iyambae", "Kereimba Iyaambae"]
+    },
+    {
+      "nombre": "Florida",
+      "municipios": ["Samaipata", "Pampagrande", "Mairana", "Quirusillas"]
+    },
+    {
+      "nombre": "Vallegrande",
+      "municipios": ["Vallegrande", "El Trigal", "Moro Moro", "Postrervalle", "Pucara"]
+    },
+    {
+      "nombre": "Manuel María Caballero",
+      "municipios": ["Comarapa", "Saipina"]
+    }
+  ]
+}

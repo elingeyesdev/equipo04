@@ -127,7 +127,7 @@
             }
 
             if (municipio && municipalitiesData) {
-                const feature = municipalitiesData.features.find(f => f.properties.name === municipio);
+                const feature = municipalitiesData.features.find(f => window.normalizeGeoName(f.properties.name) === municipio.toLowerCase());
                 if (feature) {
                     highlightLayer = L.geoJSON(feature, {
                         style: { color: '#EF4444', weight: 3, opacity: 0.9, fillOpacity: 0.1 },
@@ -136,7 +136,7 @@
                     map.fitBounds(highlightLayer.getBounds());
                 }
             } else if (provincia && provincesData) {
-                const feature = provincesData.features.find(f => f.properties.name === provincia);
+                const feature = provincesData.features.find(f => window.normalizeGeoName(f.properties.name) === provincia.toLowerCase());
                 if (feature) {
                     highlightLayer = L.geoJSON(feature, {
                         style: { color: '#F97316', weight: 3, opacity: 0.9, fillOpacity: 0.1 },
