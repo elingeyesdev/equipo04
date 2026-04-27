@@ -31,7 +31,8 @@ services:
       - DB_USERNAME=sail
       - DB_PASSWORD=password
       - FLOOD_API_BASE_URL=http://localhost:8001/api
-      - FLOOD_API_INTERNAL=true
+      - FLOOD_API_INTERNAL=false
+      - PHP_CLI_SERVER_WORKERS=4
     depends_on:
       - postgres_db
     command: >

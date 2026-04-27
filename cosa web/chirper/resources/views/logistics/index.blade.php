@@ -11,7 +11,7 @@
 
     <div class="mb-6 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
         <h3 class="text-sm font-semibold text-gray-800 mb-3">Buscar Centros por Ubicación</h3>
-        <x-location-filter formAction="{{ route('logistica.index', [], false) }}" />
+        <x-location-filter formAction="{{ route('logistica.index', [], false) }}" :showEstado="true" />
     </div>
 
     @if (session('status'))
@@ -135,7 +135,7 @@
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     @forelse($centros as $centro)
-                        <tr class="hover:bg-gray-50 transition-colors">
+                        <tr id="tr-centro-{{ $centro['id_centro'] }}" class="hover:bg-gray-50 transition-colors center-row" data-provincia="{{ $centro['provincia'] ?? '' }}" data-municipio="{{ $centro['municipio'] ?? '' }}">
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm font-medium text-gray-900">{{ $centro['nombre'] }}</div>
                             </td>
@@ -158,7 +158,7 @@
                                       <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                     </svg>
                                 </button>
-                                <form action="{{ route('logistica.destroy', ['id' => $centro['id_centro']], false) }}" method="POST" class="inline-block" onsubmit="return confirm('¿Estás seguro de eliminar este centro? Esta acción es irreversible.');">
+                                <form action="{{ route('logistica.destroy', ['id' => $centro['id_centro']], false) }}" method="POST" class="inline-block" onsubmit="deleteCentroAjax(event, this.action)">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 p-2 rounded transition-colors inline-flex items-center" title="Eliminar">
@@ -186,8 +186,8 @@
 <script>
     window.centros = @json($centros ?? []);
     let mapMarker = null;
-    let map = null;
-    
+    let markersLayer = null;
+
     function initLogisticsMap() { 
         const defaultLocation = [-17.783325, -63.182111]; // Santa Cruz, Bolivia
         
@@ -197,11 +197,17 @@
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        // 1. Mostrar puntos registrados
-        window.centros.forEach(centro => {
+        markersLayer = L.layerGroup().addTo(map);
+
+        renderMarkers(window.centros);
+
+        // 2. Cargar geometrías
+
+    function renderMarkers(centrosData) {
+        markersLayer.clearLayers();
+        centrosData.forEach(centro => {
             const lat = parseFloat(centro.latitud);
             const lng = parseFloat(centro.longitud);
-
             if (isNaN(lat) || isNaN(lng)) return;
 
             // Lógica de Estado Abierto / Cerrado basado en horario
@@ -211,63 +217,56 @@
             // Obtener MS desde medianoche
             const now = new Date();
             const currentMs = now.getHours() * 3600000 + now.getMinutes() * 60000;
-            
             const apParts = horaAperturaStr.split(':');
             const ciParts = horaCierreStr.split(':');
-            
             const apMs = parseInt(apParts[0] || 0) * 3600000 + parseInt(apParts[1] || 0) * 60000;
             const ciMs = parseInt(ciParts[0] || 0) * 3600000 + parseInt(ciParts[1] || 0) * 60000;
-            
             let isOpen = false;
-            
             if (ciMs < apMs) {
-                // El centro cierra al día siguiente (ej. 20:00 a 02:00)
                 if (currentMs >= apMs || currentMs <= ciMs) isOpen = true;
             } else {
                 if (currentMs >= apMs && currentMs <= ciMs) isOpen = true;
             }
-            
-            let markerColor = isOpen ? "#34A853" : "#EA4335"; // Verde o Rojo
-            
+            centro.is_open = isOpen; // cache the status
+
+            // Actualizamos la fila de la tabla con el estado
+            const tr = document.getElementById(`tr-centro-${centro.id_centro}`);
+            if (tr) {
+                tr.dataset.estado = isOpen ? 'abierto' : 'cerrado';
+            }
+
+            let markerColor = isOpen ? "#34A853" : "#EA4335";
             const customIcon = L.divIcon({
                 className: 'custom-leaflet-marker',
-                html: `<div style="
-                    background-color: ${markerColor};
-                    width: 20px;
-                    height: 20px;
-                    border-radius: 50%;
-                    border: 2px solid white;
-                    box-shadow: 0 0 4px rgba(0,0,0,0.5);
-                "></div>`,
+                html: `<div style="background-color: ${markerColor}; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>`,
                 iconSize: [20, 20],
                 iconAnchor: [10, 10]
             });
 
-            const statusBadge = isOpen 
-                ? `<span class="bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded">ABIERTO AHORA</span>` 
-                : `<span class="bg-red-100 text-red-800 text-xs font-semibold px-2 py-0.5 rounded">CERRADO</span>`;
+            const statusBadge = isOpen ? `<span class="bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded">ABIERTO AHORA</span>` : `<span class="bg-red-100 text-red-800 text-xs font-semibold px-2 py-0.5 rounded">CERRADO</span>`;
 
-            const contentStr = `
-                <div class="max-w-[200px] p-1">
-                    <div class="flex items-center justify-between mb-2">
-                       <h3 class="font-bold text-sm m-0">${centro.nombre}</h3>
-                    </div>
-                    <p class="text-xs text-gray-700 mb-1"><b>Estado:</b> ${statusBadge}</p>
-                    <p class="text-xs text-gray-700 mb-1"><b>Horario:</b> ${horaAperturaStr} a ${horaCierreStr}</p>
-                    ${centro.contacto ? `<p class="text-xs text-gray-700 mb-1"><b>Cel:</b> ${centro.contacto}</p>` : ''}
-                    ${centro.direccion ? `<p class="text-xs text-gray-700 mb-1"><b>Dir:</b> ${centro.direccion}</p>` : ''}
-                    @if($isAdmin)
-                    <button onclick='editCentro(${JSON.stringify(centro).replace(/'/g, "&apos;")})' class="mt-2 w-full py-1 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold rounded border border-gray-300 transition-colors">
-                        ✏️ Editar Centro
-                    </button>
-                    @endif
+            const contentStr = `<div class="max-w-[200px] p-1">
+                <div class="flex items-center justify-between mb-2">
+                   <h3 class="font-bold text-sm m-0">${centro.nombre}</h3>
                 </div>
-            `;
+                <p class="text-xs text-gray-700 mb-1"><b>Estado:</b> ${statusBadge}</p>
+                <p class="text-xs text-gray-700 mb-1"><b>Horario:</b> ${horaAperturaStr} a ${horaCierreStr}</p>
+                ${centro.contacto ? `<p class="text-xs text-gray-700 mb-1"><b>Cel:</b> ${centro.contacto}</p>` : ''}
+                ${centro.direccion ? `<p class="text-xs text-gray-700 mb-1"><b>Dir:</b> ${centro.direccion}</p>` : ''}
+                @if($isAdmin)
+                <button onclick='editCentro(${JSON.stringify(centro).replace(/'/g, "&apos;")})' class="mt-2 w-full py-1 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold rounded border border-gray-300 transition-colors">✏️ Editar Centro</button>
+                @endif
+            </div>`;
             
-            L.marker([lat, lng], { icon: customIcon })
+            const marker = L.marker([lat, lng], { icon: customIcon })
              .bindPopup(contentStr)
-             .addTo(map);
+             .on('click', function() {
+                 map.flyTo([lat, lng], 15, { animate: true, duration: 1 });
+             });
+             
+            markersLayer.addLayer(marker);
         });
+    }
 
         // 2. Cargar geometrías
         @if($isAdmin)
@@ -356,9 +355,35 @@
 
         // Escuchar el evento de filtro de ambos forms (filter_ y form_)
         window.addEventListener('locationFilterChanged', function(e) {
-            const { idPrefix, provincia, municipio } = e.detail;
+            const { idPrefix, provincia, municipio, estado } = e.detail;
+            let filteredCentros = window.centros;
             
-            // Solo nos interesa reaccionar visualmente si es el filtro principal (filter_provincia) o el de form, pero evitamos doble dibujado si ambos se mueven. Preferiremos cualquier cambio.
+            // Si el evento viene del filtro principal, aplicamos filtrado local a mapa y tabla
+            if (idPrefix === 'filter') {
+                filteredCentros = window.centros.filter(c => {
+                    if (provincia && c.provincia !== provincia) return false;
+                    if (municipio && c.municipio !== municipio) return false;
+                    if (estado && estado === 'abierto' && c.is_open === false) return false;
+                    if (estado && estado === 'cerrado' && c.is_open === true) return false;
+                    return true;
+                });
+                
+                renderMarkers(filteredCentros);
+                
+                // Filtrar tabla
+                document.querySelectorAll('.center-row').forEach(tr => {
+                    const dProv = tr.dataset.provincia;
+                    const dMun = tr.dataset.municipio;
+                    const dEst = tr.dataset.estado;
+                    let show = true;
+                    if (provincia && dProv !== provincia) show = false;
+                    if (municipio && dMun !== municipio) show = false;
+                    if (estado && estado !== dEst) show = false;
+                    tr.style.display = show ? '' : 'none';
+                });
+            }
+
+            // Reaccionar visualmente con las capas de resaltado
             if (highlightLayer) {
                 map.removeLayer(highlightLayer);
                 highlightLayer = null;
@@ -368,7 +393,8 @@
                 const feature = municipalitiesData.features.find(f => f.properties.name === municipio);
                 if (feature) {
                     highlightLayer = L.geoJSON(feature, {
-                        style: { color: '#EF4444', weight: 3, opacity: 0.9, fillOpacity: 0.1 }
+                        style: { color: '#EF4444', weight: 3, opacity: 0.9, fillOpacity: 0.1 },
+                        interactive: false
                     }).addTo(map);
                     map.fitBounds(highlightLayer.getBounds());
                 }
@@ -376,10 +402,14 @@
                 const feature = provincesData.features.find(f => f.properties.name === provincia);
                 if (feature) {
                     highlightLayer = L.geoJSON(feature, {
-                        style: { color: '#F97316', weight: 3, opacity: 0.9, fillOpacity: 0.1 }
+                        style: { color: '#F97316', weight: 3, opacity: 0.9, fillOpacity: 0.1 },
+                        interactive: false
                     }).addTo(map);
                     map.fitBounds(highlightLayer.getBounds());
                 }
+            } else if (idPrefix === 'filter' && filteredCentros && filteredCentros.length > 0) {
+                // Si limpiaron todo, restablecer vista
+                map.setView([-17.783325, -63.182111], 12);
             }
         });
 
@@ -425,6 +455,113 @@
         document.getElementById('logistics_form').reset();
     });
 
+    // --- FORMULARIO AJAX ---
+    const form = document.getElementById('logistics_form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const submitBtn = document.getElementById('submit_btn');
+            const originalText = submitBtn.innerText;
+            submitBtn.innerText = "Procesando...";
+            submitBtn.disabled = true;
+
+            const formData = new FormData(this);
+            const action = this.action;
+
+            fetch(action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(async response => {
+                if (!response.ok) {
+                    const data = await response.json();
+                    let msg = "Error al guardar el centro.";
+                    if (data.errors) {
+                        msg = Object.values(data.errors).map(arr => Array.isArray(arr) ? arr.join(' ') : arr).join('\n');
+                    } else if (data.error) {
+                        msg = data.error;
+                    }
+                    throw new Error(msg);
+                }
+                return response.json();
+            })
+            .then(data => {
+                alert(data.message || "Guardado exitosamente.");
+                // Limpiamos el form
+                document.getElementById('logistics_form').reset();
+                document.getElementById('method_field').innerHTML = '';
+                document.getElementById('logistics_form').action = `{{ route('logistica.store', [], false) }}`;
+                document.getElementById('form_title').innerText = "Registrar Nuevo Centro";
+                submitBtn.innerText = "Registrar Centro";
+                submitBtn.classList.replace("bg-indigo-600", "bg-blue-600");
+                submitBtn.classList.replace("hover:bg-indigo-500", "hover:bg-blue-500");
+                document.getElementById('cancel_edit_btn').classList.add("hidden");
+                
+                // Actualización visual SPA: quitamos el marcador de temp y si hay un centro retornado, lo pintamos
+                if (mapMarker) {
+                    map.removeLayer(mapMarker);
+                    mapMarker = null;
+                }
+                
+                // En vez de recargar, si quisieramos inyectar la fila lo haríamos aquí, pero como Blade tiene lógica en el render,
+                // la forma más sencilla SPA sin frameworks reactivos es hacer un fetch de los centros o recargar la tabla usando HTMX.
+                // Como workaround temporal sin recargar el marco del mapa:
+                fetch("{{ route('logistica.index', [], false) }}", { headers: {'X-Requested-With': 'XMLHttpRequest'} })
+                    .then(res => res.text())
+                    .then(html => {
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(html, 'text/html');
+                        // Reemplazar tabla
+                        const newTable = doc.querySelector('.mt-10.bg-white.rounded-lg');
+                        const oldTable = document.querySelector('.mt-10.bg-white.rounded-lg');
+                        if (newTable && oldTable) {
+                            oldTable.innerHTML = newTable.innerHTML;
+                        }
+                        // Aquí podríamos también actualizar window.centros y re-dibujar pines, pero es un poco más complejo.
+                    });
+                submitBtn.disabled = false;
+            })
+            .catch(error => {
+                alert(error.message);
+                submitBtn.innerText = originalText;
+                submitBtn.disabled = false;
+            });
+        });
+    }
+
+    // --- ELIMINAR AJAX ---
+    function deleteCentroAjax(event, url) {
+        event.preventDefault();
+        if (!confirm('¿Estás seguro de eliminar este centro? Esta acción es irreversible.')) return;
+
+        fetch(url, {
+            method: 'POST',
+            body: new URLSearchParams({
+                '_token': '{{ csrf_token() }}',
+                '_method': 'DELETE'
+            }),
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(async response => {
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || "Error al eliminar");
+            }
+            return response.json();
+        })
+        .then(data => {
+            alert(data.message || "Eliminado correctamente");
+            event.target.closest('tr').remove();
+        })
+        .catch(error => alert(error.message));
+    }
 </script>
 <!-- LEAFLET CDN -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>

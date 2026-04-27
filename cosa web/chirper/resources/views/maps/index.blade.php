@@ -55,47 +55,48 @@
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
-        // 3. Pintar Reportes
-        window.floodReports.forEach(report => {
-            const lat = parseFloat(report.latitude);
-            const lng = parseFloat(report.longitude);
+        let markersLayer = L.layerGroup().addTo(map);
 
-            if (isNaN(lat) || isNaN(lng)) return;
+        function renderReports(reportsData) {
+            markersLayer.clearLayers();
+            reportsData.forEach(report => {
+                const lat = parseFloat(report.latitude);
+                const lng = parseFloat(report.longitude);
 
-            // Determinar color de Severity CSS
-            let markerColor = "#4285F4"; // Default Blue
-            if (report.severity === 'high') markerColor = "#EA4335"; // Red
-            if (report.severity === 'medium') markerColor = "#FBBC05"; // Yellow
-            if (report.severity === 'low') markerColor = "#34A853"; // Green
+                if (isNaN(lat) || isNaN(lng)) return;
 
-            // Crear un Icono HTML (DivIcon) de Leaflet usando CSS para pintar el círculo
-            const customIcon = L.divIcon({
-                className: 'custom-leaflet-marker',
-                html: `<div style="
-                    background-color: ${markerColor};
-                    width: 20px;
-                    height: 20px;
-                    border-radius: 50%;
-                    border: 2px solid white;
-                    box-shadow: 0 0 4px rgba(0,0,0,0.5);
-                "></div>`,
-                iconSize: [20, 20],
-                iconAnchor: [10, 10]
+                let markerColor = "#4285F4"; // Default Blue
+                if (report.severity === 'high') markerColor = "#EA4335"; // Red
+                if (report.severity === 'medium') markerColor = "#FBBC05"; // Yellow
+                if (report.severity === 'low') markerColor = "#34A853"; // Green
+
+                const customIcon = L.divIcon({
+                    className: 'custom-leaflet-marker',
+                    html: `<div style="background-color: ${markerColor}; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>`,
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10]
+                });
+
+                const contentStr = `
+                    <div class="max-w-xs">
+                        <p class="font-semibold text-sm mb-1">${report.description.substring(0, 100) + (report.description.length > 100 ? '...' : '')}</p>
+                        <p class="text-xs text-gray-600 mb-2"><b>Severidad:</b> ${report.severity} | <b>Estado:</b> ${report.status}</p>
+                        <a href="/reports/${report.id}" class="text-xs text-blue-600 hover:underline">Ver detalle completo →</a>
+                    </div>
+                `;
+                
+                const marker = L.marker([lat, lng], { icon: customIcon })
+                 .bindPopup(contentStr, { minWidth: 200 })
+                 .on('click', function() {
+                     map.flyTo([lat, lng], 15, { animate: true, duration: 1 });
+                 });
+                 
+                markersLayer.addLayer(marker);
             });
+        }
 
-            // Reemplazando marker.addListener con bindPopup estático
-            const contentStr = `
-                <div class="max-w-xs">
-                    <p class="font-semibold text-sm mb-1">${report.description.substring(0, 100) + (report.description.length > 100 ? '...' : '')}</p>
-                    <p class="text-xs text-gray-600 mb-2"><b>Severidad:</b> ${report.severity} | <b>Estado:</b> ${report.status}</p>
-                    <a href="/reports/${report.id}" class="text-xs text-blue-600 hover:underline">Ver detalle completo →</a>
-                </div>
-            `;
-            
-            L.marker([lat, lng], { icon: customIcon })
-             .bindPopup(contentStr, { minWidth: 200 })
-             .addTo(map);
-        });
+        // 3. Pintar Reportes
+        renderReports(window.floodReports);
 
         // Lógica de resaltado de fronteras dinámico
         let provincesData = null;
@@ -106,8 +107,20 @@
         fetch('/municipalities.geojson').then(res => res.json()).then(data => municipalitiesData = data);
 
         window.addEventListener('locationFilterChanged', function(e) {
-            const { provincia, municipio } = e.detail;
+            const { idPrefix, provincia, municipio } = e.detail;
             
+            // Filtrado local SPA para reportes de inundación
+            if (idPrefix === 'filter') {
+                const filtered = window.floodReports.filter(r => {
+                    // Si el backend no envió provincia, no podemos filtrar perfecto localmente,
+                    // pero asumiendo que FloodReport Resource sí lo expone:
+                    if (provincia && r.provincia && r.provincia !== provincia) return false;
+                    if (municipio && r.municipio && r.municipio !== municipio) return false;
+                    return true;
+                });
+                renderReports(filtered);
+            }
+
             if (highlightLayer) {
                 map.removeLayer(highlightLayer);
                 highlightLayer = null;
@@ -131,6 +144,8 @@
                     }).addTo(map);
                     map.fitBounds(highlightLayer.getBounds());
                 }
+            } else if (idPrefix === 'filter') {
+                map.setView([-17.783325, -63.182111], 12);
             }
         });
     }
