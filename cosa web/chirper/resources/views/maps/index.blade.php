@@ -98,14 +98,26 @@
         // 3. Pintar Reportes
         renderReports(window.floodReports);
 
-        // Lógica de resaltado de fronteras dinámico
+        // ─────────────────────────────────────────────────────────────
+        // Cargar geometrías GeoJSON para resaltado de fronteras.
+        // NOTA: A diferencia de logistics/index, aquí NO hay clic para registrar;
+        // estos datos solo se usan para el resaltado visual del filtro.
+        // Las funciones de traducción (normalizeProvName, normalizeMuniName) están
+        // definidas globalmente en layouts/app.blade.php y disponibles en toda la app.
+        // ─────────────────────────────────────────────────────────────
         let provincesData = null;
         let municipalitiesData = null;
-        let highlightLayer = null;
+        let highlightLayer = null; // Capa activa de resaltado (naranja=provincia, rojo=municipio)
 
         fetch('/provinces.geojson').then(res => res.json()).then(data => provincesData = data);
         fetch('/municipalities.geojson').then(res => res.json()).then(data => municipalitiesData = data);
 
+        // ─────────────────────────────────────────────────────────────
+        // EVENTO CENTRAL DE FILTRADO: locationFilterChanged
+        // ─────────────────────────────────────────────────────────────
+        // Igual al de logistics, pero más simple: solo filtra los marcadores
+        // de reportes y actualiza la capa de resaltado geográfico.
+        // No hay filtro de "Estado" (abierto/cerrado) porque es de centros de acopio.
         window.addEventListener('locationFilterChanged', function(e) {
             const { idPrefix, provincia, municipio } = e.detail;
             
@@ -127,7 +139,10 @@
             }
 
             if (municipio && municipalitiesData) {
-                const feature = municipalitiesData.features.find(f => window.normalizeGeoName(f.properties.name) === municipio.toLowerCase());
+                // Buscar el polígono del municipio seleccionado (rojo #EF4444)
+                // normalizeMuniName traduce el nombre crudo del GeoJSON ("Municipio Warnes")
+                // al formato oficial limpio ("warnes") para compararlo con el valor del filtro.
+                const feature = municipalitiesData.features.find(f => window.normalizeMuniName(f.properties.name) === municipio.toLowerCase());
                 if (feature) {
                     highlightLayer = L.geoJSON(feature, {
                         style: { color: '#EF4444', weight: 3, opacity: 0.9, fillOpacity: 0.1 },
@@ -136,7 +151,9 @@
                     map.fitBounds(highlightLayer.getBounds());
                 }
             } else if (provincia && provincesData) {
-                const feature = provincesData.features.find(f => window.normalizeGeoName(f.properties.name) === provincia.toLowerCase());
+                // Buscar el polígono de la provincia seleccionada (naranja #F97316)
+                // normalizeProvName maneja aliases como "Velasco" → "José Miguel de Velasco"
+                const feature = provincesData.features.find(f => window.normalizeProvName(f.properties.name) === provincia.toLowerCase());
                 if (feature) {
                     highlightLayer = L.geoJSON(feature, {
                         style: { color: '#F97316', weight: 3, opacity: 0.9, fillOpacity: 0.1 },
