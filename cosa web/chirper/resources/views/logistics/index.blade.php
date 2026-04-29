@@ -310,10 +310,18 @@
                 });
             }
 
-            // 2. Cargar geometrías
+            // ─────────────────────────────────────────────────────────────
+            // 2. Cargar geometrías GeoJSON
+            // Estos dos archivos contienen los polígonos de los límites
+            // geográficos del departamento de Santa Cruz. Se cargan de forma
+            // asíncrona al iniciar el mapa y se usan para:
+            //   a) Resaltar la provincia/municipio seleccionado en el filtro
+            //   b) Detectar automáticamente en qué provincia/municipio
+            //      cayó el clic del admin al registrar un nuevo centro
+            // ─────────────────────────────────────────────────────────────
             let provincesData = null;
             let municipalitiesData = null;
-            let highlightLayer = null;
+            let highlightLayer = null; // Capa activa de resaltado (naranja=provincia, rojo=municipio)
 
             fetch('/provinces.geojson').then(res => res.json()).then(data => provincesData = data);
             fetch('/municipalities.geojson').then(res => res.json()).then(data => municipalitiesData = data);
@@ -355,20 +363,47 @@
                         mapMarker = L.marker(e.latlng).addTo(map);
                     }
 
-                    // Detectar provincia y municipio
-                    let foundProv = null;
-                    let foundMuni = null;
-
+                    // ─── DETECCIÓN DE PROVINCIA ───────────────────────────────────
+                    // Iteramos cada feature de provinces.geojson y verificamos si
+                    // el punto clickeado (pt) está dentro del polígono (turf).
+                    // IMPORTANTE: Los nombres en el GeoJSON son distintos a los nombres
+                    // oficiales usados en el select. Ej: GeoJSON tiene "Provincia Warnes"
+                    // pero el select tiene "Ignacio Warnes". Por eso usamos
+                    // window.normalizeProvName() — definido en layouts/app.blade.php —
+                    // para traducir antes de buscar la opción correcta.
                     for (let feature of provincesData.features) {
                         if (turf.booleanPointInPolygon(pt, feature)) {
-                            foundProv = feature.properties.name;
+                            // Traducir nombre del GeoJSON al nombre oficial
+                            const geoNorm = window.normalizeProvName(feature.properties.name);
+                            const provSelect = document.getElementById('form_provincia');
+                            if (provSelect) {
+                                for (let opt of provSelect.options) {
+                                    if (opt.value && opt.value.toLowerCase() === geoNorm) {
+                                        foundProv = opt.value; // guardamos el valor exacto del select
+                                        break;
+                                    }
+                                }
+                            }
+                            if (!foundProv) foundProv = feature.properties.name; // fallback al nombre crudo
                             break;
                         }
                     }
 
+                    // ─── DETECCIÓN DE MUNICIPIO ───────────────────────────────────
+                    // Igual que el anterior, pero usando window.normalizeMuniName().
+                    // Nota crítica: normalizeMuniName y normalizeProvName son DISTINTAS
+                    // porque un mismo nombre puede significar cosas diferentes:
+                    // Ej: "Warnes" en GeoJSON de provincias = "Ignacio Warnes" (provincia)
+                    //     "Warnes" en GeoJSON de municipios = "Warnes" (municipio, igual)
+                    // Si usáramos una sola función para ambos, el municipio "Warnes"
+                    // se convertiría incorrectamente al nombre de la provincia.
                     for (let feature of municipalitiesData.features) {
                         if (turf.booleanPointInPolygon(pt, feature)) {
-                            foundMuni = feature.properties.name;
+                            // Traducir nombre del GeoJSON al nombre oficial
+                            const geoNorm = window.normalizeMuniName(feature.properties.name);
+                            const munSelectTmp = document.getElementById('form_municipio');
+                            // Guardamos normalizado; el setTimeout hará la comparación
+                            foundMuni = geoNorm;
                             break;
                         }
                     }
@@ -380,22 +415,45 @@
                             provSelect.value = foundProv;
                             provSelect.dispatchEvent(new Event('change'));
 
-                            // Esperar un momento a que los municipios carguen y setearlo
+                            // Esperar a que carguen las opciones del municipio y seleccionar
                             if (foundMuni) {
                                 setTimeout(() => {
                                     const munSelect = document.getElementById('form_municipio');
                                     if (munSelect) {
-                                        munSelect.value = foundMuni;
+                                        for (let opt of munSelect.options) {
+                                            if (opt.value && opt.value.toLowerCase() === foundMuni) {
+                                                munSelect.value = opt.value;
+                                                break;
+                                            }
+                                        }
                                         munSelect.dispatchEvent(new Event('change'));
                                     }
-                                }, 100);
+                                }, 150);
                             }
                         }
                     }
                 });
             @endif
 
-            // Escuchar el evento de filtro de ambos forms (filter_ y form_)
+            // ─────────────────────────────────────────────────────────────
+            // EVENTO CENTRAL DE FILTRADO: locationFilterChanged
+            // ─────────────────────────────────────────────────────────────
+            // Este evento es despachado por el componente location-filter.blade.php
+            // cada vez que el usuario cambia un selector (provincia, municipio,
+            // estado o nombre). No recarga la página (SPA).
+            //
+            // El evento lleva en e.detail:
+            //   - idPrefix:  "filter" (filtro principal) o "form" (formulario de registro)
+            //   - provincia: nombre oficial seleccionado en el select
+            //   - municipio: nombre oficial seleccionado en el select
+            //   - estado:    "abierto" | "cerrado" | "" (todos)
+            //   - nombre:    texto libre de búsqueda
+            //
+            // Al recibirlo aquí hacemos DOS cosas:
+            //   1) Filtrar los marcadores del mapa y las filas de la tabla
+            //   2) Dibujar/actualizar la capa de resaltado geográfico
+            //      (naranja para provincia, rojo para municipio)
+            // ─────────────────────────────────────────────────────────────
             window.addEventListener('locationFilterChanged', function (e) {
                 const { idPrefix, provincia, municipio, estado, nombre } = e.detail;
                 let filteredCentros = window.centros;
@@ -428,14 +486,23 @@
                     });
                 }
 
-                // Reaccionar visualmente con las capas de resaltado
+                // ─── RESALTADO GEOGRÁFICO ─────────────────────────────────────
+                // Limpiamos la capa anterior y buscamos el polígono que corresponde
+                // al filtro activo. La búsqueda usa normalizeProvName / normalizeMuniName
+                // (definidas en layouts/app.blade.php) para convertir los nombres crudos
+                // del GeoJSON ("Provincia Ichilo", "Municipio Warnes") al formato oficial
+                // limpio ("ichilo", "warnes") y compararlo con el valor del filtro.
+                // Prioridad: municipio > provincia > reset de vista
+
+                // Eliminar la capa de resaltado anterior antes de dibujar la nueva
                 if (highlightLayer) {
                     map.removeLayer(highlightLayer);
                     highlightLayer = null;
                 }
 
                 if (municipio && municipalitiesData) {
-                    const feature = municipalitiesData.features.find(f => f.properties.name === municipio);
+                    // Buscar el polígono del municipio seleccionado (rojo)
+                    const feature = municipalitiesData.features.find(f => window.normalizeMuniName(f.properties.name) === municipio.toLowerCase());
                     if (feature) {
                         highlightLayer = L.geoJSON(feature, {
                             style: { color: '#EF4444', weight: 3, opacity: 0.9, fillOpacity: 0.1 },
@@ -444,7 +511,8 @@
                         map.fitBounds(highlightLayer.getBounds());
                     }
                 } else if (provincia && provincesData) {
-                    const feature = provincesData.features.find(f => f.properties.name === provincia);
+                    // Buscar el polígono de la provincia seleccionada (naranja)
+                    const feature = provincesData.features.find(f => window.normalizeProvName(f.properties.name) === provincia.toLowerCase());
                     if (feature) {
                         highlightLayer = L.geoJSON(feature, {
                             style: { color: '#F97316', weight: 3, opacity: 0.9, fillOpacity: 0.1 },

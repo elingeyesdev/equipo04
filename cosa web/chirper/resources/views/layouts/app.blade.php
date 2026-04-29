@@ -21,26 +21,38 @@
     @endif
 
     <script>
-        window.normalizeGeoName = function(name) {
-            let n = name.replace(/(Provincia|Municipio)\s+/i, '').trim().toLowerCase();
+        // Normaliza nombre de PROVINCIA desde el GeoJSON al nombre oficial
+        window.normalizeProvName = function(name) {
+            let n = name.replace(/Provincia\s+/i, '').trim().toLowerCase();
             const dict = {
-                'velasco': 'josé miguel de velasco',
-                'warnes': 'ignacio warnes',
-                'manuel m. caballero': 'manuel maría caballero',
-                'ascención de guarayos': 'ascensión de guarayos',
-                'san antonio de lomerio': 'san antonio de lomerío',
-                'san rafael': 'san rafael de velasco',
-                'charagua': 'charagua iyambae',
-                'gutiérrez': 'kereimba iyaambae',
-                'san juan': 'san juan de yapacaní',
-                'pampa grande': 'pampagrande',
-                'postrer valle': 'postrervalle',
-                'pucará': 'pucara',
-                'trigal': 'el trigal',
-                'porongo (ayacucho)': 'porongo'
+                'velasco':            'josé miguel de velasco',
+                'warnes':             'ignacio warnes',
+                'manuel m. caballero':'manuel maría caballero'
             };
             return dict[n] || n;
         };
+
+        // Normaliza nombre de MUNICIPIO desde el GeoJSON al nombre oficial
+        window.normalizeMuniName = function(name) {
+            let n = name.replace(/Municipio\s+/i, '').trim().toLowerCase();
+            const dict = {
+                'ascención de guarayos': 'ascensión de guarayos',
+                'san antonio de lomerio':'san antonio de lomerío',
+                'san rafael':            'san rafael de velasco',
+                'charagua':              'charagua iyambae',
+                'gutiérrez':             'kereimba iyaambae',
+                'san juan':              'san juan de yapacaní',
+                'pampa grande':          'pampagrande',
+                'postrer valle':         'postrervalle',
+                'pucará':                'pucara',
+                'trigal':                'el trigal',
+                'porongo (ayacucho)':    'porongo'
+            };
+            return dict[n] || n;
+        };
+
+        // Mantener compatibilidad con código antiguo que use normalizeGeoName
+        window.normalizeGeoName = window.normalizeMuniName;
     </script>
 </head>
 
