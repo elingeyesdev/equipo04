@@ -309,6 +309,10 @@
                     markersLayer.addLayer(marker);
                 });
             }
+            // Exponer globalmente para que el handler AJAX (fuera de initLogisticsMap)
+            // pueda llamarla después de crear/editar un centro sin recargar la página.
+            // La declaración "function renderMarkers" sigue siendo hoisteada normalmente.
+            window.renderMarkers = renderMarkers;
 
             // ─────────────────────────────────────────────────────────────
             // 2. Cargar geometrías GeoJSON
@@ -458,30 +462,36 @@
                 const { idPrefix, provincia, municipio, estado, nombre } = e.detail;
                 let filteredCentros = window.centros;
 
+                // Normalización para comparación: minúsculas y sin espacios extra
+                const provF  = provincia  ? provincia.toLowerCase().trim()  : '';
+                const muniF  = municipio  ? municipio.toLowerCase().trim()  : '';
+                const nombreF = nombre    ? nombre.toLowerCase().trim()     : '';
+
                 // Si el evento viene del filtro principal, aplicamos filtrado local a mapa y tabla
                 if (idPrefix === 'filter') {
                     filteredCentros = window.centros.filter(c => {
-                        if (provincia && c.provincia !== provincia) return false;
-                        if (municipio && c.municipio !== municipio) return false;
+                        // Comparación case-insensitive: el valor del dropdown y el de la BD pueden tener distinta capitalización
+                        if (provF  && (c.provincia  || '').toLowerCase().trim() !== provF)  return false;
+                        if (muniF  && (c.municipio  || '').toLowerCase().trim() !== muniF)  return false;
                         if (estado && estado === 'abierto' && c.is_open === false) return false;
-                        if (estado && estado === 'cerrado' && c.is_open === true) return false;
-                        if (nombre && !c.nombre.toLowerCase().includes(nombre.toLowerCase())) return false;
+                        if (estado && estado === 'cerrado' && c.is_open === true)  return false;
+                        if (nombreF && !(c.nombre || '').toLowerCase().includes(nombreF))    return false;
                         return true;
                     });
 
                     renderMarkers(filteredCentros);
 
-                    // Filtrar tabla
+                    // Filtrar tabla con la misma lógica case-insensitive
                     document.querySelectorAll('.center-row').forEach(tr => {
-                        const dProv = tr.dataset.provincia;
-                        const dMun = tr.dataset.municipio;
-                        const dEst = tr.dataset.estado;
-                        const dNom = tr.dataset.nombre || '';
+                        const dProv = (tr.dataset.provincia || '').toLowerCase().trim();
+                        const dMun  = (tr.dataset.municipio  || '').toLowerCase().trim();
+                        const dEst  = tr.dataset.estado;
+                        const dNom  = (tr.dataset.nombre || '').toLowerCase();
                         let show = true;
-                        if (provincia && dProv !== provincia) show = false;
-                        if (municipio && dMun !== municipio) show = false;
-                        if (estado && estado !== dEst) show = false;
-                        if (nombre && !dNom.toLowerCase().includes(nombre.toLowerCase())) show = false;
+                        if (provF  && dProv !== provF)  show = false;
+                        if (muniF  && dMun  !== muniF)  show = false;
+                        if (estado && estado !== dEst)  show = false;
+                        if (nombreF && !dNom.includes(nombreF)) show = false;
                         tr.style.display = show ? '' : 'none';
                     });
                 }
@@ -602,7 +612,8 @@
                     })
                     .then(data => {
                         alert(data.message || "Guardado exitosamente.");
-                        // Limpiamos el form
+
+                        // --- Limpiar el formulario ---
                         document.getElementById('logistics_form').reset();
                         document.getElementById('method_field').innerHTML = '';
                         document.getElementById('logistics_form').action = `{{ route('logistica.store', [], false) }}`;
@@ -612,29 +623,47 @@
                         submitBtn.classList.replace("hover:bg-indigo-500", "hover:bg-blue-500");
                         document.getElementById('cancel_edit_btn').classList.add("hidden");
 
-                        // Actualización visual SPA: quitamos el marcador de temp y si hay un centro retornado, lo pintamos
+                        // --- Eliminar marcador temporal del mapa ---
                         if (mapMarker) {
                             map.removeLayer(mapMarker);
                             mapMarker = null;
                         }
 
-                        // En vez de recargar, si quisieramos inyectar la fila lo haríamos aquí, pero como Blade tiene lógica en el render,
-                        // la forma más sencilla SPA sin frameworks reactivos es hacer un fetch de los centros o recargar la tabla usando HTMX.
-                        // Como workaround temporal sin recargar el marco del mapa:
-                        fetch("{{ route('logistica.index', [], false) }}", { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                        // --- Re-fetch SPA: actualizar mapa + tabla sin recargar la página ---
+                        // Pedimos la página al servidor, extraemos el JSON de centros del HTML
+                        // y llamamos renderMarkers() para refrescar los pines del mapa.
+                        fetch("{{ route('logistica.index', [], false) }}", {
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                        })
                             .then(res => res.text())
                             .then(html => {
                                 const parser = new DOMParser();
                                 const doc = parser.parseFromString(html, 'text/html');
-                                // Reemplazar tabla
+
+                                // 1. Extraer el array window.centros del script del HTML recibido
+                                const scripts = doc.querySelectorAll('script');
+                                for (const s of scripts) {
+                                    const match = s.textContent.match(/window\.centros\s*=\s*(\[[\s\S]*?\]);/);
+                                    if (match) {
+                                        try {
+                                            window.centros = JSON.parse(match[1]);
+                                            window.renderMarkers(window.centros); // Refrescar pines del mapa
+                                        } catch(parseErr) {
+                                            console.warn('No se pudo parsear window.centros:', parseErr);
+                                        }
+                                        break;
+                                    }
+                                }
+
+                                // 2. Actualizar la tabla de registros
                                 const newTable = doc.querySelector('.mt-10.bg-white.rounded-lg');
                                 const oldTable = document.querySelector('.mt-10.bg-white.rounded-lg');
                                 if (newTable && oldTable) {
                                     oldTable.innerHTML = newTable.innerHTML;
                                 }
-                                // Aquí podríamos también actualizar window.centros y re-dibujar pines, pero es un poco más complejo.
-                            });
-                        submitBtn.disabled = false;
+                            })
+                            .catch(err => console.warn('Error al refrescar centros:', err))
+                            .finally(() => { submitBtn.disabled = false; });
                     })
                     .catch(error => {
                         alert(error.message);
