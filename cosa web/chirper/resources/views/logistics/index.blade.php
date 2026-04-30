@@ -341,7 +341,24 @@
                     return;
                 }
 
-                // Fórmula haversine para distancia en km entre dos coordenadas
+                // Paso 1: Limpiar todos los filtros activos.
+                // Es CRÍTICO hacerlo antes de buscar porque si hay un filtro activo
+                // (ej: provincia seleccionada), window.centroMarkers solo tiene los
+                // markers de esa provincia y el centro más cercano podría no estar en él.
+                // resetBtn.click() es sincrónico: dispara change → locationFilterChanged
+                // → renderMarkers(window.centros) → window.centroMarkers queda completo.
+                const resetBtn = document.getElementById('filter_reset');
+                if (resetBtn) {
+                    resetBtn.click();
+                } else {
+                    // Fallback si el botón no existe: disparar el evento manualmente
+                    window.dispatchEvent(new CustomEvent('locationFilterChanged', {
+                        detail: { idPrefix: 'filter', provincia: '', municipio: '', estado: '', nombre: '' }
+                    }));
+                }
+
+                // Paso 2: Calcular distancia haversine a cada centro y encontrar el más cercano.
+                // Usamos haversine (no distancia euclidiana) para precisión real en km.
                 function haversine(lat1, lng1, lat2, lng2) {
                     const R = 6371;
                     const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -354,7 +371,6 @@
 
                 let closest = null;
                 let minDist = Infinity;
-
                 window.centros.forEach(c => {
                     const lat = parseFloat(c.latitud);
                     const lng = parseFloat(c.longitud);
@@ -368,10 +384,13 @@
                     return;
                 }
 
+                // Paso 3: Volar al centro más cercano y abrir su popup.
+                // Como el reset ya restauró todos los markers, window.centroMarkers
+                // tiene el marker del centro más cercano garantizado.
                 const marker = window.centroMarkers[closest.id_centro];
                 if (marker) {
                     map.flyTo([parseFloat(closest.latitud), parseFloat(closest.longitud)], 16, { animate: true, duration: 1.2 });
-                    setTimeout(() => marker.openPopup(), 1300); // esperar a que termine el vuelo
+                    setTimeout(() => marker.openPopup(), 1300); // esperar fin del vuelo
                 }
             }
 
