@@ -89,6 +89,13 @@
                             <span class="text-gray-500">{{ $apiRole }}</span>
                         @endif
                     </span>
+                    {{-- Botón de geolocalización: pide la ubicación 1 sola vez y la guarda en localStorage --}}
+                    {{-- Queda disponible para todos los módulos (Logística, Mapas, Reportes) via window.getUserLocation() --}}
+                    <button id="btn-geolocate"
+                        class="rounded-md px-2 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center gap-1 text-sm"
+                        title="Guardar mi ubicación para encontrar centros cercanos">
+                        <span id="geo-btn-icon">📍</span>
+                    </button>
                     <form method="POST" action="{{ route('logout', [], false) }}">
                         @csrf
                         <button type="submit"
@@ -127,5 +134,71 @@
         @yield('content')
     </main>
 </body>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+// Geolocalización global (layouts/app.blade.php)
+// ─────────────────────────────────────────────────────────────
+// La ubicación se pide UNA sola vez mediante el botón 📍 del nav.
+// Se persiste en localStorage con las claves 'app_user_lat' y 'app_user_lng'
+// para que cualquier módulo (Logística, Reportes, Mapas) la consuma
+// sin volver a pedirla al usuario.
+//
+// API pública expuesta:
+//   window.getUserLocation() → { lat, lng } | null
+// ─────────────────────────────────────────────────────────────
+(function () {
+    const LAT_KEY = 'app_user_lat';
+    const LNG_KEY = 'app_user_lng';
+
+    // Lee la ubicación guardada; devuelve {lat, lng} o null si no existe
+    window.getUserLocation = function () {
+        const lat = parseFloat(localStorage.getItem(LAT_KEY));
+        const lng = parseFloat(localStorage.getItem(LNG_KEY));
+        if (isNaN(lat) || isNaN(lng)) return null;
+        return { lat, lng };
+    };
+
+    const btn = document.getElementById('btn-geolocate');
+    if (!btn) return; // no hay sesión activa
+
+    function updateBtnState() {
+        const loc = window.getUserLocation();
+        if (loc) {
+            btn.title    = 'Ubicación guardada ✓ — clic para actualizar';
+            btn.querySelector('#geo-btn-icon').textContent = '✅';
+        } else {
+            btn.title    = 'Guardar mi ubicación para encontrar centros cercanos';
+            btn.querySelector('#geo-btn-icon').textContent = '📍';
+        }
+    }
+
+    updateBtnState(); // estado inicial al cargar la página
+
+    btn.addEventListener('click', function () {
+        if (!navigator.geolocation) {
+            alert('Tu navegador no soporta geolocalización.');
+            return;
+        }
+        btn.disabled = true;
+        btn.querySelector('#geo-btn-icon').textContent = '⏳';
+
+        navigator.geolocation.getCurrentPosition(
+            function (pos) {
+                localStorage.setItem(LAT_KEY, pos.coords.latitude);
+                localStorage.setItem(LNG_KEY, pos.coords.longitude);
+                btn.disabled = false;
+                updateBtnState();
+            },
+            function (err) {
+                alert('No se pudo obtener la ubicación: ' + err.message);
+                btn.disabled = false;
+                updateBtnState();
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    });
+})();
+</script>
 
 </html>

@@ -10,7 +10,15 @@
         </div>
 
         <div class="mb-6 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-            <h3 class="text-sm font-semibold text-gray-800 mb-3">Buscar Centros por Ubicación</h3>
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-semibold text-gray-800">Buscar Centros por Ubicación</h3>
+                {{-- Botón de centros cercanos: sólo funciona si el usuario ya guardó su ubicación --}}
+                <button id="btn-nearest-center"
+                    class="flex items-center gap-1 rounded-md bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors"
+                    title="Encontrar y seleccionar el centro de acopio más cercano a tu ubicación">
+                    📍 Centro más cercano
+                </button>
+            </div>
             <x-location-filter formAction="{{ route('logistica.index', [], false) }}" :showEstado="true"
                 :showSearch="true" />
         </div>
@@ -226,8 +234,12 @@
 
     <script>
         window.centros = @json($centros ?? []);
+        // Dict para acceder a los markers de Leaflet por id_centro
+        // Se repopula cada vez que renderMarkers() se ejecuta
+        window.centroMarkers = {};
         let mapMarker = null;
         let markersLayer = null;
+        let map = null;
 
         function initLogisticsMap() {
             const defaultLocation = [-17.783325, -63.182111]; // Santa Cruz, Bolivia
@@ -306,13 +318,66 @@
                             map.flyTo([lat, lng], 15, { animate: true, duration: 1 });
                         });
 
+                    // Guardar referencia al marker por id para acceso externo (ej: Centro más cercano)
+                    window.centroMarkers[centro.id_centro] = marker;
                     markersLayer.addLayer(marker);
                 });
             }
             // Exponer globalmente para que el handler AJAX (fuera de initLogisticsMap)
-            // pueda llamarla después de crear/editar un centro sin recargar la página.
-            // La declaración "function renderMarkers" sigue siendo hoisteada normalmente.
+            // pueda llamarla tras crear/editar un centro sin recargar la página.
             window.renderMarkers = renderMarkers;
+
+            // ─────────────────────────────────────────────────────────────
+            // Función: Encontrar y seleccionar el centro más cercano
+            // ─────────────────────────────────────────────────────────────
+            // Usa la ubicación guardada en localStorage (window.getUserLocation).
+            // Calcula la distancia haversine desde el usuario a cada centro
+            // y vuela el mapa al más cercano abriendo su popup automáticamente.
+            // ─────────────────────────────────────────────────────────────
+            function findNearestCenter() {
+                const loc = window.getUserLocation ? window.getUserLocation() : null;
+                if (!loc) {
+                    alert('Primero guarda tu ubicación haciendo clic en el botón 📍 del menú superior.');
+                    return;
+                }
+
+                // Fórmula haversine para distancia en km entre dos coordenadas
+                function haversine(lat1, lng1, lat2, lng2) {
+                    const R = 6371;
+                    const dLat = (lat2 - lat1) * Math.PI / 180;
+                    const dLng = (lng2 - lng1) * Math.PI / 180;
+                    const a = Math.sin(dLat / 2) ** 2 +
+                              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                              Math.sin(dLng / 2) ** 2;
+                    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                }
+
+                let closest = null;
+                let minDist = Infinity;
+
+                window.centros.forEach(c => {
+                    const lat = parseFloat(c.latitud);
+                    const lng = parseFloat(c.longitud);
+                    if (isNaN(lat) || isNaN(lng)) return;
+                    const d = haversine(loc.lat, loc.lng, lat, lng);
+                    if (d < minDist) { minDist = d; closest = c; }
+                });
+
+                if (!closest) {
+                    alert('No hay centros registrados con coordenadas válidas.');
+                    return;
+                }
+
+                const marker = window.centroMarkers[closest.id_centro];
+                if (marker) {
+                    map.flyTo([parseFloat(closest.latitud), parseFloat(closest.longitud)], 16, { animate: true, duration: 1.2 });
+                    setTimeout(() => marker.openPopup(), 1300); // esperar a que termine el vuelo
+                }
+            }
+
+            // Conectar el botón al handler
+            const btnNearest = document.getElementById('btn-nearest-center');
+            if (btnNearest) btnNearest.addEventListener('click', findNearestCenter);
 
             // ─────────────────────────────────────────────────────────────
             // 2. Cargar geometrías GeoJSON
