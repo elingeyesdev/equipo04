@@ -127,12 +127,32 @@
 
             <!-- Panel Derecho: Mapa -->
             <div class="{{ $isAdmin ? 'lg:col-span-2' : 'lg:col-span-3' }}">
-                <div class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden relative"
+                @if(!$isAdmin)
+                {{-- Botón para plegar/desplegar el mapa (solo ciudadano) --}}
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs text-gray-500">Mapa de centros de acopio</span>
+                    <button id="btn-toggle-map"
+                        class="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-md transition-colors"
+                        title="Mostrar u ocultar el mapa">
+                        <svg id="icon-map-show" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.641 0-8.58-3.007-9.964-7.178Z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                        </svg>
+                        <svg id="icon-map-hide" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 hidden">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                        </svg>
+                        <span id="lbl-toggle-map">Ocultar mapa</span>
+                    </button>
+                </div>
+                @endif
+                <div id="map-wrapper" class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden relative"
                     style="height: 700px;">
                     <div id="logistics_map" class="absolute inset-0 z-0"></div>
                 </div>
+                @if($isAdmin)
                 <p class="text-xs text-gray-500 mt-2 text-right">💡 Haz clic sobre el mapa para autocompletar las
                     coordenadas del formulario.</p>
+                @endif
             </div>
         </div>
 
@@ -171,9 +191,14 @@
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         @forelse($centros as $centro)
-                            <tr id="tr-centro-{{ $centro['id_centro'] }}" class="hover:bg-gray-50 transition-colors center-row"
+                            <tr id="tr-centro-{{ $centro['id_centro'] }}"
+                                class="transition-colors center-row {{ !$isAdmin ? 'hover:bg-blue-50 cursor-pointer' : 'hover:bg-gray-50' }}"
+                                data-lat="{{ $centro['latitud'] ?? '' }}"
+                                data-lng="{{ $centro['longitud'] ?? '' }}"
+                                data-id="{{ $centro['id_centro'] }}"
                                 data-provincia="{{ $centro['provincia'] ?? '' }}"
-                                data-municipio="{{ $centro['municipio'] ?? '' }}" data-nombre="{{ $centro['nombre'] ?? '' }}">
+                                data-municipio="{{ $centro['municipio'] ?? '' }}" data-nombre="{{ $centro['nombre'] ?? '' }}"
+                                @if(!$isAdmin) onclick="flyToCenter(this.dataset.id, this.dataset.lat, this.dataset.lng)" @endif>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="text-sm font-medium text-gray-900">{{ $centro['nombre'] }}</div>
                                 </td>
@@ -193,6 +218,15 @@
                                 </td>
                                 @if($isAdmin)
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        {{-- Botón ojito: volar al punto en el mapa (solo autoridad) --}}
+                                        <button onclick="flyToCenter('{{ $centro['id_centro'] }}', '{{ $centro['latitud'] ?? '' }}', '{{ $centro['longitud'] ?? '' }}')" 
+                                            class="text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 p-2 rounded transition-colors mr-1 inline-flex items-center"
+                                            title="Ver en mapa">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.641 0-8.58-3.007-9.964-7.178Z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                            </svg>
+                                        </button>
                                         <button onclick='editCentro(@json($centro))'
                                             class="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 p-2 rounded transition-colors mr-1 inline-flex items-center"
                                             title="Editar">
@@ -240,6 +274,29 @@
         let mapMarker = null;
         let markersLayer = null;
         let map = null;
+
+        // ─── flyToCenter ────────────────────────────────────────────────────────
+        // Compartida por ciudadano (click en fila) y autoridad (botón ojito).
+        // Si el mapa está oculto (ciudadano), lo muestra primero antes de volar.
+        window.flyToCenter = function(id, lat, lng) {
+            const latF = parseFloat(lat);
+            const lngF = parseFloat(lng);
+            if (isNaN(latF) || isNaN(lngF)) return;
+
+            // Si el mapa está oculto, abrirlo antes de volar
+            const mapWrapper = document.getElementById('map-wrapper');
+            if (mapWrapper && mapWrapper.style.display === 'none') {
+                const btn = document.getElementById('btn-toggle-map');
+                if (btn) btn.click(); // reutiliza la lógica del botón
+            }
+
+            if (!map) return;
+            map.flyTo([latF, lngF], 16, { animate: true, duration: 1.2 });
+
+            // Abrir el popup del marker correspondiente tras el vuelo
+            const marker = window.centroMarkers[id];
+            if (marker) setTimeout(() => marker.openPopup(), 1300);
+        };
 
         function initLogisticsMap() {
             const defaultLocation = [-17.783325, -63.182111]; // Santa Cruz, Bolivia
@@ -621,7 +678,41 @@
             });
         }
 
-        document.addEventListener("DOMContentLoaded", initLogisticsMap);
+        document.addEventListener("DOMContentLoaded", function() {
+            initLogisticsMap();
+
+            // ─── Botón plegar/desplegar mapa (solo ciudadano) ────────────────────────
+            // Al ocultar/mostrar el contenedor del mapa, Leaflet pierde el tamaño
+            // y no dibuja los tiles correctamente. Se llama map.invalidateSize()
+            // después de mostrar para forzar el recálculo de dimensiones.
+            // Se inicializa aquí (dentro de DOMContentLoaded) igual que initLogisticsMap
+            // para garantizar que el botón y el wrapper ya existen en el DOM.
+            const toggleBtn = document.getElementById('btn-toggle-map');
+            if (toggleBtn) {
+                const wrapper  = document.getElementById('map-wrapper');
+                const iconShow = document.getElementById('icon-map-show');
+                const iconHide = document.getElementById('icon-map-hide');
+                const lbl      = document.getElementById('lbl-toggle-map');
+                let isVisible  = true;
+
+                toggleBtn.addEventListener('click', function () {
+                    isVisible = !isVisible;
+                    if (isVisible) {
+                        wrapper.style.display = '';
+                        iconShow.classList.remove('hidden');
+                        iconHide.classList.add('hidden');
+                        lbl.textContent = 'Ocultar mapa';
+                        // Forzar re-render de tiles de Leaflet tras mostrar el div
+                        if (map) setTimeout(() => map.invalidateSize(), 50);
+                    } else {
+                        wrapper.style.display = 'none';
+                        iconShow.classList.add('hidden');
+                        iconHide.classList.remove('hidden');
+                        lbl.textContent = 'Mostrar mapa';
+                    }
+                });
+            }
+        });
 
         // Lógica para cambiar dinámicamente entre Registrar / Editar
         window.editCentro = function (centro) {
