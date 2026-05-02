@@ -159,8 +159,8 @@
         <!-- Panel Inferior: Tabla de Registros -->
         <div class="mt-10 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-                <h2 class="text-lg font-semibold text-gray-800">Directorio de Centros Registrados</h2>
-                <span
+                <h2 id="table_dir_title" class="text-lg font-semibold text-gray-800">Directorio de Centros Registrados</h2>
+                <span id="table_dir_total"
                     class="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
                     Total: {{ count($centros) }}
                 </span>
@@ -423,20 +423,20 @@
                     return;
                 }
 
-                // Paso 1: Limpiar todos los filtros activos.
-                // Es CRÍTICO hacerlo antes de buscar porque si hay un filtro activo
-                // (ej: provincia seleccionada), window.centroMarkers solo tiene los
-                // markers de esa provincia y el centro más cercano podría no estar en él.
-                // resetBtn.click() es sincrónico: dispara change → locationFilterChanged
-                // → renderMarkers(window.centros) → window.centroMarkers queda completo.
-                const resetBtn = document.getElementById('filter_reset');
-                if (resetBtn) {
-                    resetBtn.click();
-                } else {
-                    // Fallback si el botón no existe: disparar el evento manualmente
-                    window.dispatchEvent(new CustomEvent('locationFilterChanged', {
-                        detail: { idPrefix: 'filter', provincia: '', municipio: '', estado: '', nombre: '' }
-                    }));
+                // Paso 1: Obtener los centros actualmente visibles según los filtros.
+                // Si no hay filtro activo, usará todos (window.centros).
+                const centrosToSearch = window.currentFilteredCentros || window.centros;
+                
+                if (centrosToSearch.length === 0) {
+                    alert('No hay centros visibles con los filtros actuales para buscar.');
+                    return;
+                }
+
+                // Asegurar que el mapa esté visible si estaba oculto
+                const mapWrapper = document.getElementById('map-wrapper');
+                if (mapWrapper && mapWrapper.style.display === 'none') {
+                    const toggleBtn = document.getElementById('btn-toggle-map');
+                    if (toggleBtn) toggleBtn.click();
                 }
 
                 // Paso 2: Calcular distancia haversine a cada centro y encontrar el más cercano.
@@ -453,7 +453,7 @@
 
                 let closest = null;
                 let minDist = Infinity;
-                window.centros.forEach(c => {
+                centrosToSearch.forEach(c => {
                     const lat = parseFloat(c.latitud);
                     const lng = parseFloat(c.longitud);
                     if (isNaN(lat) || isNaN(lng)) return;
@@ -467,8 +467,6 @@
                 }
 
                 // Paso 3: Volar al centro más cercano y abrir su popup.
-                // Como el reset ya restauró todos los markers, window.centroMarkers
-                // tiene el marker del centro más cercano garantizado.
                 const marker = window.centroMarkers[closest.id_centro];
                 if (marker) {
                     map.flyTo([parseFloat(closest.latitud), parseFloat(closest.longitud)], 16, { animate: true, duration: 1.2 });
@@ -645,6 +643,9 @@
                         return true;
                     });
 
+                    // Guardar los centros filtrados actualmente para uso de "Centro más cercano"
+                    window.currentFilteredCentros = filteredCentros;
+
                     renderMarkers(filteredCentros);
 
                     // Filtrar tabla con la misma lógica case-insensitive
@@ -660,6 +661,24 @@
                         if (nombreF && !dNom.includes(nombreF)) show = false;
                         tr.style.display = show ? '' : 'none';
                     });
+
+                    // Actualizar título de la tabla y contador total
+                    const titleEl = document.getElementById('table_dir_title');
+                    const totalEl = document.getElementById('table_dir_total');
+                    
+                    if (titleEl) {
+                        if (municipio) {
+                            titleEl.textContent = `Directorio de Centros Registrados en ${municipio}`;
+                        } else if (provincia) {
+                            titleEl.textContent = `Directorio de Centros Registrados en ${provincia}`;
+                        } else {
+                            titleEl.textContent = 'Directorio de Centros Registrados';
+                        }
+                    }
+                    
+                    if (totalEl) {
+                        totalEl.textContent = `Total: ${filteredCentros.length}`;
+                    }
                 }
 
                 // ─── RESALTADO GEOGRÁFICO ─────────────────────────────────────
