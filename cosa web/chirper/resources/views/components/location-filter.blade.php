@@ -6,7 +6,8 @@
     'selectedProvincia' => request('provincia'),
     'selectedMunicipio' => request('municipio'),
     'showEstado' => false,
-    'showSearch' => false
+    'showSearch' => false,
+    'resetBelow' => false,  {{-- Si true: botón Restablecer debajo de los selects --}}
 ])
 
 <div class="location-filter-container w-full">
@@ -16,7 +17,7 @@
     <div class="flex flex-col gap-4">
     @endif
         
-        <div class="flex flex-col sm:flex-row items-end gap-4 w-full">
+        <div class="flex flex-col sm:flex-row items-start gap-4 w-full">
             <div class="flex-1 w-full">
                 <label for="{{ $idPrefix }}_provincia" class="block text-sm font-medium text-gray-700 mb-1">Provincia</label>
                 <select id="{{ $idPrefix }}_provincia" name="provincia" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" {{ !$formAction ? 'required' : '' }}>
@@ -42,10 +43,20 @@
             </div>
             @endif
             
+            @if(!$resetBelow)
+            {{-- Botón Restablecer inline (comportamiento por defecto para el filtro) --}}
             <div class="w-full sm:w-auto mt-2 sm:mt-0 flex items-center justify-center h-[38px]">
                 <button type="button" id="{{ $idPrefix }}_reset" class="text-sm text-blue-500 hover:text-blue-700 underline whitespace-nowrap" style="display: none;">Restablecer</button>
             </div>
+            @endif
         </div>
+
+        @if($resetBelow)
+        {{-- Botón Restablecer debajo de los selects (para formularios donde el espacio vertical es preferible) --}}
+        <div class="mt-1 flex justify-start">
+            <button type="button" id="{{ $idPrefix }}_reset" class="text-sm text-blue-500 hover:text-blue-700 underline whitespace-nowrap" style="display: none;">Restablecer</button>
+        </div>
+        @endif
 
         @if($showSearch)
         <div class="w-full sm:w-2/3 lg:w-1/2">
@@ -144,6 +155,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else if (!p) {
                         munSelect.innerHTML = '<option value="">-- Seleccione primero una provincia --</option>';
                     }
+
+                    // Sincronizar el div de display del municipio (si existe — formulario readonly).
+                    // munSelect.innerHTML cambia pero no dispara 'change', por eso lo actualizamos aquí.
+                    const munDisplay = document.getElementById('{{ $idPrefix }}_municipio_display');
+                    if (munDisplay) {
+                        munDisplay.textContent = munSelect.value || '\u2014';
+                    }
+
                     dispatchFilterChange();
                 });
 

@@ -66,7 +66,7 @@
                         </div>
 
                         <div class="mb-4 bg-gray-50 p-3 rounded-md border border-gray-200">
-                            <x-location-filter idPrefix="form" />
+                            <x-location-filter idPrefix="form" :resetBelow="true" />
                         </div>
 
                         <div class="grid grid-cols-2 gap-4 mb-4">
@@ -166,26 +166,17 @@
                 </span>
             </div>
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th scope="col"
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Nombre</th>
-                            <th scope="col"
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Horario</th>
-                            <th scope="col"
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Contacto</th>
-                            <th scope="col"
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Dirección</th>
-                            <th scope="col"
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Encargado</th>
+                            <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">Nombre</th>
+                            <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Ubicación</th>
+                            <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Horario</th>
+                            <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Contacto</th>
+                            <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-36">Dirección</th>
+                            <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Encargado</th>
                             @if($isAdmin)
-                                <th scope="col" class="relative px-6 py-3"><span class="sr-only">Acciones</span></th>
+                                <th scope="col" class="relative px-3 py-3 w-24"><span class="sr-only">Acciones</span></th>
                             @endif
                         </tr>
                     </thead>
@@ -199,28 +190,62 @@
                                 data-provincia="{{ $centro['provincia'] ?? '' }}"
                                 data-municipio="{{ $centro['municipio'] ?? '' }}" data-nombre="{{ $centro['nombre'] ?? '' }}"
                                 @if(!$isAdmin) onclick="flyToCenter(this.dataset.id, this.dataset.lat, this.dataset.lng)" @endif>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm font-medium text-gray-900">{{ $centro['nombre'] }}</div>
+
+                                {{-- Nombre --}}
+                                <td class="px-3 py-3">
+                                    <div class="font-medium text-gray-900 break-words">
+                                        {{ $centro['nombre'] }}
+                                    </div>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <span class="text-xs text-gray-600">{{ $centro['hora_apertura'] ?? '08:00' }} -
-                                        {{ $centro['hora_cierre'] ?? '18:00' }}</span>
+
+                                {{-- Ubicación: provincia + municipio apilados --}}
+                                <td class="px-3 py-3">
+                                    <div>
+                                        @if(!empty($centro['provincia']))
+                                            <span class="block text-xs font-medium text-blue-700">
+                                                {{ $centro['provincia'] }}
+                                            </span>
+                                        @endif
+                                        @if(!empty($centro['municipio']))
+                                            <span class="block text-xs text-gray-500">
+                                                {{ $centro['municipio'] }}
+                                            </span>
+                                        @endif
+                                        @if(empty($centro['provincia']) && empty($centro['municipio']))
+                                            <span class="text-xs text-gray-400">—</span>
+                                        @endif
+                                    </div>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
+
+                                {{-- Horario --}}
+                                <td class="px-3 py-3 whitespace-nowrap">
+                                    <span class="text-xs text-gray-600">
+                                        {{ substr($centro['hora_apertura'] ?? '08:00', 0, 5) }} – {{ substr($centro['hora_cierre'] ?? '18:00', 0, 5) }}
+                                    </span>
+                                </td>
+
+                                {{-- Contacto --}}
+                                <td class="px-3 py-3 whitespace-nowrap">
                                     <span class="text-xs text-gray-600">{{ $centro['contacto'] ?? 'N/A' }}</span>
                                 </td>
-                                <td class="px-6 py-4">
-                                    <div class="text-sm text-gray-500 max-w-xs truncate"
-                                        title="{{ $centro['direccion'] ?? 'N/A' }}">{{ $centro['direccion'] ?? 'N/A' }}</div>
+
+                                {{-- Dirección (con wrap natural) --}}
+                                <td class="px-3 py-3">
+                                    <div class="text-xs text-gray-500 break-words">{{ $centro['direccion'] ?? 'N/A' }}</div>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {{ $centro['encargado'] ?? 'N/A' }}
+
+                                {{-- Encargado --}}
+                                <td class="px-3 py-3">
+                                    <span class="text-xs text-gray-500 break-words">
+                                        {{ $centro['encargado'] ?? 'N/A' }}
+                                    </span>
                                 </td>
+
                                 @if($isAdmin)
-                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <td class="px-3 py-3 whitespace-nowrap text-right text-sm font-medium">
                                         {{-- Botón ojito: volar al punto en el mapa (solo autoridad) --}}
-                                        <button onclick="flyToCenter('{{ $centro['id_centro'] }}', '{{ $centro['latitud'] ?? '' }}', '{{ $centro['longitud'] ?? '' }}')" 
-                                            class="text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 p-2 rounded transition-colors mr-1 inline-flex items-center"
+                                        <button onclick="flyToCenter('{{ $centro['id_centro'] }}', '{{ $centro['latitud'] ?? '' }}', '{{ $centro['longitud'] ?? '' }}')"
+                                            class="text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 p-1.5 rounded transition-colors mr-0.5 inline-flex items-center"
                                             title="Ver en mapa">
                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.641 0-8.58-3.007-9.964-7.178Z" />
@@ -228,7 +253,7 @@
                                             </svg>
                                         </button>
                                         <button onclick='editCentro(@json($centro))'
-                                            class="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 p-2 rounded transition-colors mr-1 inline-flex items-center"
+                                            class="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 p-1.5 rounded transition-colors mr-0.5 inline-flex items-center"
                                             title="Editar">
                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                                 stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
@@ -241,7 +266,7 @@
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit"
-                                                class="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 p-2 rounded transition-colors inline-flex items-center"
+                                                class="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 p-1.5 rounded transition-colors inline-flex items-center"
                                                 title="Eliminar">
                                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                                     stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
@@ -255,7 +280,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="px-6 py-10 text-center text-gray-500 text-sm">
+                                <td colspan="7" class="px-6 py-10 text-center text-gray-500 text-sm">
                                     No se encontraron centros registrados. Empieza registrando uno arriba.
                                 </td>
                             </tr>
@@ -712,6 +737,48 @@
                     }
                 });
             }
+
+            // ─── Provincia y Municipio: display de solo-texto (igual que lat/lng readonly) ──────
+            // Reemplaza visualmente cada select por un <div> de texto plano (wrappable, sin flecha
+            // de dropdown, sin selección). El select queda oculto pero en el DOM para:
+            //   a) Que el formulario envíe los valores correctamente (name="provincia/municipio")
+            //   b) Que la detección GeoJSON y editCentro() puedan seguir usando getElementById
+            // La sincronización ocurre via el evento 'change' que siempre se dispara
+            // programáticamente al cambiar el valor.
+            function makeReadonlyDisplay(id) {
+                const sel = document.getElementById(id);
+                if (!sel) return;
+
+                // Div con estilo idéntico al input readonly de lat/lng
+                const display = document.createElement('div');
+                display.id    = id + '_display';
+                display.style.cssText = [
+                    'width:100%',
+                    'border-radius:0.375rem',
+                    'border:1px solid #d1d5db',
+                    'background-color:#f9fafb',
+                    'padding:0.5rem 0.75rem',
+                    'font-size:0.875rem',
+                    'color:#374151',
+                    'min-height:38px',
+                    'word-break:break-word',
+                    'white-space:normal',
+                    'line-height:1.5',
+                    'box-sizing:border-box'
+                ].join(';');
+                display.textContent = sel.value || '—';
+
+                // Insertar el div delante del select y ocultar el select
+                sel.parentNode.insertBefore(display, sel);
+                sel.style.display = 'none';
+
+                // Sincronizar texto cada vez que el select cambia (GeoJSON, editCentro)
+                sel.addEventListener('change', function () {
+                    display.textContent = this.value || '—';
+                });
+            }
+            makeReadonlyDisplay('form_provincia');
+            makeReadonlyDisplay('form_municipio');
         });
 
         // Lógica para cambiar dinámicamente entre Registrar / Editar
@@ -727,7 +794,7 @@
             document.getElementById('method_field').innerHTML = '<input type="hidden" name="_method" value="PATCH">';
             document.getElementById('logistics_form').action = `/logistica/${centro.id_centro}`;
 
-            // Rellenar campos existenes
+            // Rellenar campos existentes
             document.getElementById('nombre').value = centro.nombre || '';
             document.getElementById('hora_apertura').value = (centro.hora_apertura || '08:00:00').substring(0, 5);
             document.getElementById('hora_cierre').value = (centro.hora_cierre || '18:00:00').substring(0, 5);
@@ -736,6 +803,48 @@
             document.getElementById('lng').value = centro.longitud;
             document.getElementById('contacto').value = centro.contacto || '';
             document.getElementById('encargado').value = centro.encargado || '';
+
+            // ─── Provincia y Municipio ────────────────────────────────────────────
+            // El select de provincia (#form_provincia) se llena via fetch asíncrono
+            // en el componente location-filter. Una vez se selecciona la provincia,
+            // el componente reacciona al evento 'change' y carga los municipios.
+            // 1. Seleccionamos la provincia y disparamos 'change' para cargar municipios.
+            // 2. Esperamos con setTimeout a que las <option> de municipio estén en el DOM.
+            // ─────────────────────────────────────────────────────────────────────
+            const provSelect = document.getElementById('form_provincia');
+            const munSelect  = document.getElementById('form_municipio');
+
+            if (provSelect && centro.provincia) {
+                // Si la opción ya existe (JSON ya cargó), seleccionar inmediatamente
+                // Si no, esperar hasta que cargue (puede tardar el primer fetch)
+                function trySetProvincia(attemptsLeft) {
+                    const opt = Array.from(provSelect.options).find(o => o.value === centro.provincia);
+                    if (opt) {
+                        provSelect.value = centro.provincia;
+                        // Disparar change para que el componente cargue los municipios de esta provincia
+                        provSelect.dispatchEvent(new Event('change'));
+
+                        // Esperar a que las opciones de municipio se poblen y luego seleccionar
+                        if (munSelect && centro.municipio) {
+                            function trySetMunicipio(munAttemptsLeft) {
+                                const munOpt = Array.from(munSelect.options).find(o => o.value === centro.municipio);
+                                if (munOpt) {
+                                    munSelect.value = centro.municipio;
+                                    // Disparar 'change' para que el div display sincronice el texto
+                                    munSelect.dispatchEvent(new Event('change'));
+                                } else if (munAttemptsLeft > 0) {
+                                    setTimeout(() => trySetMunicipio(munAttemptsLeft - 1), 100);
+                                }
+                            }
+                            setTimeout(() => trySetMunicipio(10), 150); // dar tiempo al listener de 'change' de provincia
+                        }
+                    } else if (attemptsLeft > 0) {
+                        // El JSON todavía no cargó, reintentar
+                        setTimeout(() => trySetProvincia(attemptsLeft - 1), 100);
+                    }
+                }
+                trySetProvincia(15); // hasta 1.5s de espera total
+            }
         };
 
         document.getElementById('cancel_edit_btn').addEventListener('click', function () {
