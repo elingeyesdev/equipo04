@@ -448,7 +448,7 @@
                                                 @endforeach
                                             </select>
                                         </div>
-                                        <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-sm transition-colors">
+                                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-sm transition-colors">
                                             <span wire:loading.remove wire:target="updateEstadoValidacion({{ $rep->id }})">Guardar Cambios</span>
                                             <span wire:loading wire:target="updateEstadoValidacion({{ $rep->id }})">Guardando...</span>
                                         </button>
