@@ -5,24 +5,34 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<div class="command-center-container bg-slate-900 text-slate-100 min-h-screen -mt-6 -mx-4 p-4 lg:p-6 flex flex-col font-sans">
+<div class="command-center-container bg-gray-50 text-gray-900 min-h-screen -mt-6 -mx-4 p-4 lg:p-6 flex flex-col font-sans">
     
     <div class="flex items-center justify-between mb-6">
         <div>
-            <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-                <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+            <h1 class="text-2xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                 Actualizar Uso de Donación #{{ $donacion->id }}
             </h1>
-            <p class="mt-1 text-sm text-slate-400">Entrega esta donación vinculándola a una inundación en el mapa interactivo.</p>
+            <p class="mt-1 text-sm text-gray-500">Entrega esta donación vinculándola a una inundación en el mapa interactivo.</p>
         </div>
-        <a href="{{ route('donaciones.index') }}" class="text-sm font-medium text-slate-400 hover:text-white transition-colors bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg border border-slate-700">
+        <a href="{{ route('donaciones.index') }}" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors bg-white hover:bg-gray-100 px-4 py-2 rounded-lg border border-gray-300">
             &larr; Volver
         </a>
     </div>
 
+    @if ($donacion->edit_count >= 2)
+    <div class="mb-6 bg-red-50 border-l-4 border-red-500 text-red-800 p-4 rounded shadow-sm">
+        <div class="font-bold flex items-center gap-2 text-red-900">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            Edición Bloqueada
+        </div>
+        <p class="mt-1 text-sm">Esta donación ha alcanzado el límite máximo de ediciones permitidas (2). Por razones de transparencia, no puede ser modificada nuevamente.</p>
+    </div>
+    @endif
+
     <!-- Alert for validation errors -->
     @if ($errors->any())
-    <div class="mb-6 bg-red-900/50 border border-red-500/50 text-red-200 px-4 py-3 rounded-xl flex flex-col gap-1 text-sm">
+    <div class="mb-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl flex flex-col gap-1 text-sm">
         <div class="font-bold flex items-center gap-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             Error al guardar
@@ -38,42 +48,42 @@
     <div class="flex flex-col lg:flex-row gap-6 flex-1">
         
         <!-- Panel Izquierdo: Info de Donación -->
-        <div class="w-full lg:w-1/3 bg-slate-800 rounded-xl shadow-xl border border-slate-700 p-5 flex flex-col h-fit">
-            <h2 class="text-lg font-semibold text-slate-200 mb-4 border-b border-slate-700 pb-2">Información Original</h2>
+        <div class="w-full lg:w-1/3 bg-white rounded-xl shadow-md border border-gray-200 p-5 flex flex-col h-fit">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4 border-b border-gray-100 pb-2">Información Original</h2>
             
-            <div class="space-y-4 text-sm text-slate-300">
+            <div class="space-y-4 text-sm text-gray-600">
                 <div>
-                    <span class="block text-xs text-slate-500 uppercase font-bold mb-1">Descripción</span>
-                    <p class="text-white bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">{{ $donacion->items_description }}</p>
+                    <span class="block text-xs text-gray-500 uppercase font-bold mb-1">Descripción</span>
+                    <p class="text-gray-800 bg-gray-50 p-3 rounded-lg border border-gray-200">{{ $donacion->items_description }}</p>
                 </div>
                 
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <span class="block text-xs text-slate-500 uppercase font-bold mb-1">Estado Previo</span>
-                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider bg-slate-700 text-slate-300 border border-slate-600">
+                        <span class="block text-xs text-gray-500 uppercase font-bold mb-1">Estado Previo</span>
+                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider bg-gray-200 text-gray-700 border border-gray-300">
                             {{ str_replace('_', ' ', $donacion->status) }}
                         </span>
                     </div>
                     <div>
-                        <span class="block text-xs text-slate-500 uppercase font-bold mb-1">Fecha Registro</span>
-                        <p class="text-slate-300">{{ $donacion->created_at->format('d/m/Y H:i') }}</p>
+                        <span class="block text-xs text-gray-500 uppercase font-bold mb-1">Fecha Registro</span>
+                        <p class="text-gray-700">{{ $donacion->created_at->format('d/m/Y H:i') }}</p>
                     </div>
                 </div>
 
                 <div>
-                    <span class="block text-xs text-slate-500 uppercase font-bold mb-1">Centro de Acopio</span>
-                    <p class="text-slate-300 flex items-center gap-2">
-                        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                    <span class="block text-xs text-gray-500 uppercase font-bold mb-1">Centro de Acopio</span>
+                    <p class="text-gray-700 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
                         {{ $donacion->centro->nombre ?? 'Desconocido' }}
                     </p>
                 </div>
                 
                 <div>
-                    <span class="block text-xs text-slate-500 uppercase font-bold mb-1">Donante</span>
-                    <p class="text-slate-300 flex items-center gap-2">
-                        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                    <span class="block text-xs text-gray-500 uppercase font-bold mb-1">Donante</span>
+                    <p class="text-gray-700 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                         @if($donacion->is_anonymous)
-                            <span class="italic text-slate-400">Anónimo</span>
+                            <span class="italic text-gray-400">Anónimo</span>
                         @else
                             {{ $donacion->donor->name ?? 'Desconocido' }} ({{ $donacion->donor_carnet }})
                         @endif
@@ -82,16 +92,47 @@
 
                 @if($donacion->photo_path)
                 <div>
-                    <span class="block text-xs text-slate-500 uppercase font-bold mb-1">Evidencia Previa</span>
-                    <img src="{{ asset('storage/' . $donacion->photo_path) }}" alt="Foto comprobante" class="w-full h-32 object-cover rounded-lg border border-slate-700 opacity-80 hover:opacity-100 transition-opacity">
+                    <span class="block text-xs text-gray-500 uppercase font-bold mb-1">Evidencia Previa</span>
+                    <img src="{{ asset('storage/' . $donacion->photo_path) }}" alt="Foto comprobante" class="w-full h-32 object-cover rounded-lg border border-gray-200">
+                </div>
+                @endif
+                
+                @if(is_array($donacion->edit_log) && count($donacion->edit_log) > 0)
+                <div class="mt-6 pt-4 border-t border-gray-200">
+                    <span class="block text-xs text-gray-500 uppercase font-bold mb-3 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Historial de Cambios ({{ $donacion->edit_count }}/2)
+                    </span>
+                    <div class="space-y-3">
+                        @foreach($donacion->edit_log as $log)
+                        <div class="bg-gray-50 p-2 rounded border border-gray-200 text-xs">
+                            <div class="font-bold text-gray-700 mb-1 border-b border-gray-200 pb-1">{{ \Carbon\Carbon::parse($log['date'])->format('d/m/Y H:i') }}</div>
+                            <ul class="space-y-1">
+                                @foreach($log['changes'] as $field => $change)
+                                    <li>
+                                        <span class="font-semibold capitalize text-gray-600">{{ str_replace('_', ' ', $field) }}:</span>
+                                        <span class="text-red-500 line-through">{{ $change['from'] ?: 'N/A' }}</span> &rarr;
+                                        <span class="text-green-600">{{ $change['to'] ?: 'N/A' }}</span>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                        @endforeach
+                    </div>
                 </div>
                 @endif
             </div>
         </div>
 
         <!-- Panel Derecho: Formulario de Actualización -->
-        <div class="w-full lg:w-2/3 bg-slate-800 rounded-xl shadow-xl border border-slate-700 p-6 flex flex-col">
-            <h2 class="text-lg font-semibold text-slate-200 mb-6 border-b border-slate-700 pb-2">Destino de la Donación (Entregar)</h2>
+        <div class="w-full lg:w-2/3 bg-white rounded-xl shadow-md border border-gray-200 p-6 flex flex-col relative">
+            
+            @if ($donacion->edit_count >= 2)
+                <!-- Overlay for disabled form -->
+                <div class="absolute inset-0 bg-white/50 backdrop-blur-[2px] z-50 rounded-xl cursor-not-allowed"></div>
+            @endif
+
+            <h2 class="text-lg font-semibold text-gray-800 mb-6 border-b border-gray-100 pb-2">Destino de la Donación (Entregar)</h2>
 
             <form action="{{ route('donaciones.update', $donacion->id) }}" method="POST" enctype="multipart/form-data" class="flex-1 flex flex-col">
                 @csrf
@@ -105,34 +146,34 @@
                         
                         <!-- Flood Picker (Inundación) -->
                         <div>
-                            <label class="block text-xs font-medium text-slate-400 mb-1">Inundación Vinculada en el Mapa (Obligatoria)</label>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Inundación Vinculada en el Mapa (Obligatoria)</label>
                             <input type="hidden" name="inundacion_id" id="update_inundacion_id" value="{{ old('inundacion_id', $donacion->inundacion_id) }}">
                             
-                            <button type="button" onclick="openFloodDrawer()" class="w-full flex items-center justify-between bg-slate-900 hover:bg-slate-800 border border-slate-600 text-slate-300 rounded-lg p-3 transition-colors group shadow-inner">
+                            <button type="button" onclick="openFloodDrawer()" class="w-full flex items-center justify-between bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 rounded-lg p-3 transition-colors group shadow-sm">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center group-hover:bg-blue-900/50 transition-colors border border-slate-700 group-hover:border-blue-500/30 overflow-hidden relative">
+                                    <div class="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center group-hover:bg-blue-50 transition-colors border border-gray-200 group-hover:border-blue-200 overflow-hidden relative">
                                         <div id="selected-flood-minimap" class="absolute inset-0 z-0"></div>
-                                        <svg id="selected-flood-icon" class="w-5 h-5 text-blue-400 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                                        <svg id="selected-flood-icon" class="w-5 h-5 text-blue-500 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                                     </div>
                                     <div class="text-left flex-1">
-                                        <span id="update_inundacion_preview" class="block text-sm font-bold text-white truncate max-w-[200px]">
+                                        <span id="update_inundacion_preview" class="block text-sm font-bold text-gray-900 truncate max-w-[200px]">
                                             @if($donacion->inundacion)
                                                 Inundación #{{ $donacion->inundacion_id }}
                                             @else
                                                 Seleccionar en el Mapa...
                                             @endif
                                         </span>
-                                        <span class="block text-[10px] text-slate-400 mt-0.5">Abre el explorador geográfico</span>
+                                        <span class="block text-[10px] text-gray-500 mt-0.5">Abre el explorador geográfico</span>
                                     </div>
                                 </div>
-                                <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                             </button>
                         </div>
                         
                         <!-- Víctima -->
                         <div>
-                            <label class="block text-xs font-medium text-slate-400 mb-1">Víctima Específica (Opcional)</label>
-                            <select name="victima_id" id="update_victima_id" class="w-full bg-slate-800 border border-slate-600 text-white rounded-lg p-2.5 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-inner">
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Víctima Específica (Opcional)</label>
+                            <select name="victima_id" id="update_victima_id" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg p-2.5 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm">
                                 <option value="">Ninguna víctima en específico...</option>
                                 @foreach($victimas as $v)
                                     <option value="{{ $v->id }}" {{ old('victima_id', $donacion->victima_id) == $v->id ? 'selected' : '' }}>
@@ -144,80 +185,82 @@
                         
                         <!-- Detalles -->
                         <div>
-                            <label class="block text-xs font-medium text-slate-300 mb-1">Detalles de la entrega</label>
-                            <textarea name="usage_details" id="update-details" rows="3" placeholder="Explica detalladamente a quién o qué zona se entregó esta donación..." class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg p-3 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-inner resize-none custom-scrollbar">{{ old('usage_details', $donacion->usage_details) }}</textarea>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Detalles de la entrega</label>
+                            <textarea name="usage_details" id="update-details" rows="3" placeholder="Explica detalladamente a quién o qué zona se entregó esta donación..." class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg p-3 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm resize-none custom-scrollbar">{{ old('usage_details', $donacion->usage_details) }}</textarea>
                         </div>
                     </div>
 
                     <div class="space-y-5">
                         
                         <!-- Mapa Principal Interactivo -->
-                        <div class="bg-slate-900/50 p-3 rounded-xl border border-slate-700 h-full flex flex-col">
-                            <label class="block text-xs font-medium text-slate-400 mb-2">Vista Satelital del Destino</label>
-                            <div id="main-interactive-map" class="w-full flex-1 min-h-[200px] rounded-lg border border-slate-600 bg-slate-800 z-[1000]"></div>
-                            <p class="text-[10px] text-slate-500 mt-2 text-center">El mapa se actualizará al seleccionar una inundación.</p>
+                        <div class="bg-gray-50 p-3 rounded-xl border border-gray-200 h-full flex flex-col">
+                            <label class="block text-xs font-medium text-gray-600 mb-2">Vista Satelital del Destino</label>
+                            <div id="main-interactive-map" class="w-full flex-1 min-h-[200px] rounded-lg border border-gray-300 bg-gray-100 z-[1000]"></div>
+                            <p class="text-[10px] text-gray-500 mt-2 text-center">El mapa se actualizará al seleccionar una inundación.</p>
                         </div>
                         
                     </div>
                 </div>
                 
                 <!-- Foto obligatoria -->
-                <div class="mb-6 bg-slate-900/50 p-4 rounded-xl border border-slate-700">
-                    <label class="block text-xs font-medium text-slate-300 mb-2">
+                <div class="mb-6 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                    <label class="block text-xs font-medium text-gray-600 mb-2">
                         Foto de Evidencia de Entrega 
                         @if($donacion->status !== 'entregado')
-                            <span class="text-red-400 font-bold">(Obligatoria)</span>
+                            <span class="text-red-500 font-bold">(Obligatoria)</span>
                         @else
-                            <span class="text-slate-500 font-normal">(Opcional si no desea cambiarla)</span>
+                            <span class="text-gray-500 font-normal">(Opcional si no desea cambiarla)</span>
                         @endif
                     </label>
-                    <input type="file" name="photo" id="update_photo" accept="image/*" class="w-full text-sm text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 border border-slate-600 rounded-lg p-1.5 cursor-pointer bg-slate-800 shadow-inner transition-colors">
+                    <input type="file" name="photo" id="update_photo" accept="image/*" class="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 border border-gray-300 rounded-lg p-1.5 cursor-pointer bg-white shadow-sm transition-colors">
                 </div>
 
-                <div class="mt-auto pt-4 border-t border-slate-700 flex justify-end gap-3">
-                    <a href="{{ route('donaciones.index') }}" class="px-5 py-2.5 text-sm font-medium text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors">Cancelar</a>
-                    <button type="submit" class="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-lg shadow-lg hover:shadow-blue-500/25 transition-all flex items-center gap-2">
+                <div class="mt-auto pt-4 border-t border-gray-200 flex justify-end gap-3 relative z-10">
+                    <a href="{{ route('donaciones.index') }}" class="px-5 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors">Cancelar</a>
+                    @if ($donacion->edit_count < 2)
+                    <button type="submit" class="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-all flex items-center gap-2">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                         Registrar Entrega
                     </button>
+                    @endif
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-<!-- Drawer (Flood Picker Dark Mode con Mapas) -->
-<div id="fp-drawer-backdrop" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[2500] hidden transition-opacity duration-300 opacity-0" onclick="closeFloodDrawer()"></div>
-<div id="fp-drawer" class="fixed inset-y-0 right-0 w-full max-w-sm bg-slate-800 border-l border-slate-700 shadow-[0_0_40px_rgba(0,0,0,0.5)] z-[2501] flex flex-col translate-x-full transition-transform duration-300 ease-in-out font-sans">
-    <div class="flex items-center justify-between px-5 py-4 border-b border-slate-700 bg-slate-900/50">
-        <h3 class="text-base font-bold text-white flex items-center gap-2">
-            <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
+<!-- Drawer (Flood Picker Light Mode con Mapas) -->
+<div id="fp-drawer-backdrop" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-[2500] hidden transition-opacity duration-300 opacity-0" onclick="closeFloodDrawer()"></div>
+<div id="fp-drawer" class="fixed inset-y-0 right-0 w-full max-w-sm bg-white border-l border-gray-200 shadow-2xl z-[2501] flex flex-col translate-x-full transition-transform duration-300 ease-in-out font-sans">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200 bg-gray-50">
+        <h3 class="text-base font-bold text-gray-900 flex items-center gap-2">
+            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
             Mapa de Inundaciones
         </h3>
-        <button type="button" onclick="closeFloodDrawer()" class="text-slate-400 hover:text-white transition-colors bg-slate-800 hover:bg-slate-700 p-1.5 rounded-lg">
+        <button type="button" onclick="closeFloodDrawer()" class="text-gray-400 hover:text-gray-600 transition-colors bg-white hover:bg-gray-100 p-1.5 rounded-lg border border-transparent hover:border-gray-200">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
     </div>
-    <div class="p-4 border-b border-slate-700 space-y-3 bg-slate-800">
+    <div class="p-4 border-b border-gray-200 space-y-3 bg-white">
         <div class="relative">
-            <svg class="w-4 h-4 text-slate-500 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-            <input type="text" id="fp_search" placeholder="Buscar por ID..." class="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm rounded-lg pl-9 pr-3 py-2 focus:border-blue-500 focus:outline-none" oninput="renderFloodList()">
+            <svg class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            <input type="text" id="fp_search" placeholder="Buscar por ID..." class="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg pl-9 pr-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" oninput="renderFloodList()">
         </div>
         <div class="flex gap-2">
-            <select id="fp_provincia" class="w-1/2 bg-slate-900 border border-slate-600 text-slate-300 text-xs rounded-lg px-2 py-1.5 focus:border-blue-500 focus:outline-none" onchange="updateMunicipiosDropdown(); renderFloodList()">
+            <select id="fp_provincia" class="w-1/2 bg-white border border-gray-300 text-gray-700 text-xs rounded-lg px-2 py-1.5 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" onchange="updateMunicipiosDropdown(); renderFloodList()">
                 <option value="">Cualquier Provincia</option>
             </select>
-            <select id="fp_municipio" class="w-1/2 bg-slate-900 border border-slate-600 text-slate-300 text-xs rounded-lg px-2 py-1.5 focus:border-blue-500 focus:outline-none" onchange="renderFloodList()">
+            <select id="fp_municipio" class="w-1/2 bg-white border border-gray-300 text-gray-700 text-xs rounded-lg px-2 py-1.5 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" onchange="renderFloodList()">
                 <option value="">Cualquier Municipio</option>
             </select>
         </div>
         <div class="flex items-center gap-2">
-            <input type="date" id="fp_date_from" class="w-1/2 bg-slate-900 border border-slate-600 text-slate-400 text-xs rounded-lg px-2 py-1.5 focus:border-blue-500 focus:outline-none" onchange="renderFloodList()">
-            <span class="text-slate-500 text-xs">-</span>
-            <input type="date" id="fp_date_to" class="w-1/2 bg-slate-900 border border-slate-600 text-slate-400 text-xs rounded-lg px-2 py-1.5 focus:border-blue-500 focus:outline-none" onchange="renderFloodList()">
+            <input type="date" id="fp_date_from" class="w-1/2 bg-white border border-gray-300 text-gray-600 text-xs rounded-lg px-2 py-1.5 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" onchange="renderFloodList()">
+            <span class="text-gray-400 text-xs">-</span>
+            <input type="date" id="fp_date_to" class="w-1/2 bg-white border border-gray-300 text-gray-600 text-xs rounded-lg px-2 py-1.5 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" onchange="renderFloodList()">
         </div>
     </div>
-    <div id="fp_results" class="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-3 bg-slate-900/30">
+    <div id="fp_results" class="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-3 bg-gray-50">
         <!-- JS Cards -->
     </div>
 </div>
@@ -225,8 +268,8 @@
 <style>
     .custom-scrollbar::-webkit-scrollbar { width: 6px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
-    .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: #64748b; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: #94a3b8; }
 </style>
 
 <script>
@@ -259,10 +302,10 @@
     document.addEventListener('DOMContentLoaded', () => {
         populateLocationDropdowns();
         
-        // Setup main map
+        // Setup main map (OSM Light Theme)
         mainMap = L.map('main-interactive-map').setView([-17.7833, -63.1821], 6);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; CartoDB', maxZoom: 19
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
         }).addTo(mainMap);
         
         renderAllMapMarkers();
@@ -319,7 +362,7 @@
             thumbMap = L.map('selected-flood-minimap', {
                 zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false
             }).setView([lat, lon], 12);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(thumbMap);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(thumbMap);
             L.marker([lat, lon], {icon: redIcon}).addTo(thumbMap);
         }
     }
@@ -341,7 +384,7 @@
                     zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false
                 }).setView([lat, lon], 12);
                 
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
                 L.marker([lat, lon], {icon: redIcon}).addTo(map);
                 
                 leafMaps.push({ map: map, lat: lat, lon: lon });
@@ -415,7 +458,7 @@
         });
 
         if (filtered.length === 0) {
-            resultsEl.innerHTML = '<div class="text-center py-6"><p class="text-xs text-slate-500">No se encontraron resultados.</p></div>';
+            resultsEl.innerHTML = '<div class="text-center py-6"><p class="text-xs text-gray-500">No se encontraron resultados.</p></div>';
             return;
         }
 
@@ -424,27 +467,27 @@
             const div = document.createElement('div');
             const isExp = fpExpandedId === f.id;
             
-            div.className = `bg-slate-800 border ${isExp ? 'border-blue-500 bg-slate-700/50 shadow-md' : 'border-slate-700'} hover:border-slate-500 rounded-lg p-3 cursor-pointer transition-all overflow-hidden flex items-start`;
+            div.className = `bg-white border ${isExp ? 'border-blue-400 shadow-md ring-1 ring-blue-400' : 'border-gray-200'} hover:border-blue-300 rounded-lg p-3 cursor-pointer transition-all overflow-hidden flex items-start`;
             
             // Thumbnail container
-            const thumbHtml = `<div id="drawer-map-${f.id}" data-lat="${f.latitud}" data-lon="${f.longitud}" class="mini-map-container w-14 h-14 shrink-0 bg-slate-900 rounded-lg border border-slate-600 mr-3 pointer-events-none"></div>`;
+            const thumbHtml = `<div id="drawer-map-${f.id}" data-lat="${f.latitud}" data-lon="${f.longitud}" class="mini-map-container w-14 h-14 shrink-0 bg-gray-100 rounded-lg border border-gray-200 mr-3 pointer-events-none"></div>`;
             
             const infoHtml = `
                 <div class="flex-1 min-w-0">
                     <div class="flex justify-between items-start mb-1">
                         <div class="truncate pr-2">
-                            <span class="font-bold text-white text-sm">#${f.id}</span>
-                            <span class="text-xs text-slate-400 ml-1 truncate">· ${f.municipio?.nombre || 'Desconocido'}</span>
+                            <span class="font-bold text-gray-900 text-sm">#${f.id}</span>
+                            <span class="text-xs text-gray-500 ml-1 truncate">· ${f.municipio?.nombre || 'Desconocido'}</span>
                         </div>
                     </div>
                     <div class="flex justify-between items-center mt-1">
-                        <div class="text-[11px] text-slate-400">Estado: <span class="${f.estado === 'activa' ? 'text-emerald-400' : 'text-slate-500'} font-medium uppercase">${f.estado}</span></div>
-                        <span class="text-[10px] text-slate-500">${dateStr}</span>
+                        <div class="text-[11px] text-gray-500">Estado: <span class="${f.estado === 'activa' ? 'text-green-600' : 'text-gray-500'} font-medium uppercase">${f.estado}</span></div>
+                        <span class="text-[10px] text-gray-400">${dateStr}</span>
                     </div>
                     
                     ${isExp ? `
-                        <div class="mt-3 pt-3 border-t border-slate-600">
-                            <button type="button" onclick="confirmSelection(${f.id}, '${f.municipio?.nombre || 'Desconocida'}', ${f.latitud}, ${f.longitud}); event.stopPropagation();" class="w-full bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2 rounded transition-colors text-center shadow-lg">
+                        <div class="mt-3 pt-3 border-t border-gray-100">
+                            <button type="button" onclick="confirmSelection(${f.id}, '${f.municipio?.nombre || 'Desconocida'}', ${f.latitud}, ${f.longitud}); event.stopPropagation();" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 rounded transition-colors text-center shadow-sm">
                                 Vincular a esta Inundación
                             </button>
                         </div>

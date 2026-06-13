@@ -91,6 +91,10 @@ class DonacionController extends Controller
     {
         $donacion = Donacion::findOrFail($id);
 
+        if ($donacion->edit_count >= 2) {
+            return redirect()->route('donaciones.index')->withErrors(['error' => 'No se puede editar esta donación, ya alcanzó el límite de ediciones.']);
+        }
+
         $rules = [
             'status'        => 'required|string|in:en_inventario,entregado',
             'usage_details' => 'nullable|string',
@@ -108,6 +112,31 @@ class DonacionController extends Controller
 
         if ($request->hasFile('photo')) {
             $validated['photo_path'] = $request->file('photo')->store('donaciones', 'public');
+        }
+
+        // Registrar cambios
+        $changes = [];
+        foreach (['status', 'usage_details', 'inundacion_id', 'victima_id'] as $field) {
+            if (array_key_exists($field, $validated) && $donacion->$field != $validated[$field]) {
+                $changes[$field] = [
+                    'from' => $donacion->$field,
+                    'to' => $validated[$field]
+                ];
+            }
+        }
+        
+        if ($request->hasFile('photo')) {
+            $changes['photo_path'] = ['from' => 'Old Photo', 'to' => 'New Photo'];
+        }
+
+        if (!empty($changes)) {
+            $currentLog = is_array($donacion->edit_log) ? $donacion->edit_log : [];
+            $currentLog[] = [
+                'date' => now()->toDateTimeString(),
+                'changes' => $changes
+            ];
+            $validated['edit_log'] = $currentLog;
+            $validated['edit_count'] = $donacion->edit_count + 1;
         }
 
         $donacion->update($validated);

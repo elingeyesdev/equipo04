@@ -21,10 +21,13 @@ class Donacion extends Model
         'inundacion_id',
         'victima_id',
         'photo_path',
+        'edit_count',
+        'edit_log',
     ];
 
     protected $casts = [
         'is_anonymous' => 'boolean',
+        'edit_log' => 'array',
     ];
 
     public function centro()
