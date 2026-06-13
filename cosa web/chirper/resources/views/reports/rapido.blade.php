@@ -237,7 +237,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (response.ok) {
                 document.getElementById('successMessage').classList.remove('hidden');
                 setTimeout(() => {
-                    window.location.href = '/maps';
+                    window.location.href = '/login';
                 }, 2000);
             } else {
                 alert('Error: ' + (result.message || 'Error desconocido'));

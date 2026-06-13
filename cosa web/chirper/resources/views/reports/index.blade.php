@@ -84,7 +84,7 @@
                             <tbody class="divide-y divide-slate-200/50">
                                 @forelse(($misReportes ?? []) as $rep)
                                     <tr class="transition-colors duration-200">
-                                        <td class="px-4 py-3 font-semibold text-slate-700">#{{ $rep->id }}</td>
+                                        <td class="px-4 py-3 font-semibold text-slate-700">N°{{ $rep->id }}</td>
                                         <td class="px-4 py-3">
                                             @php($estadoVal = (string) $rep->estado_validacion)
                                             <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold shadow-sm
@@ -131,7 +131,7 @@
                             <div class="p-5 flex flex-wrap items-center justify-between gap-4 cursor-pointer hover:bg-white/30 transition-colors" onclick="toggleDetails({{ $id }})">
                                 <div class="flex items-center gap-4">
                                     <div class="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 text-slate-700 font-bold text-lg shadow-sm">
-                                        #{{ $id }}
+                                        N°{{ $id }}
                                     </div>
                                     <div>
                                         <div class="flex items-center gap-2 mb-1">
@@ -155,14 +155,14 @@
                                     <div class="text-right">
                                         <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Quórum Global</p>
                                         <p class="text-lg font-extrabold {{ $confirmada ? 'text-teal-600' : 'text-slate-700' }}">
-                                            {{ $quorum }} pts @if($confirmada) <span class="text-teal-500 ml-1">✓</span> @endif
+                                            {{ $quorum }} pts @if($confirmada) <svg class="w-3 h-3 fill-current inline-block ml-1 text-teal-500" viewBox="0 0 640 640"><path d="M530.8 134.1C545.1 144.5 548.3 164.5 537.9 178.8L281.9 530.8C276.4 538.4 267.9 543.1 258.5 543.9C249.1 544.7 240 541.2 233.4 534.6L105.4 406.6C92.9 394.1 92.9 373.8 105.4 361.3C117.9 348.8 138.2 348.8 150.7 361.3L252.2 462.8L486.2 141.1C496.6 126.8 516.6 123.6 530.9 134z"/></svg> @endif
                                         </p>
                                     </div>
                                     
                                     <div class="flex items-center gap-3">
                                         @if(isset($role) && $role === 'authority' && $estado === 'activa')
                                             <form method="POST" action="{{ route('reports.desactivar', ['id' => $id], false) }}"
-                                                  onsubmit="return confirm('¿Desactivar la inundación #{{ $id }}? Pasará a estado Terminada.')" onclick="event.stopPropagation()">
+                                                  onsubmit="return confirm('¿Desactivar la inundación N°{{ $id }}? Pasará a estado Terminada.')" onclick="event.stopPropagation()">
                                                 @csrf
                                                 <button type="submit" class="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 transition-colors shadow-sm" title="Finalizar Inundación">
                                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>
@@ -181,7 +181,7 @@
                                 <div class="flex flex-col md:flex-row gap-6">
                                     <div class="flex-1">
                                         <h4 class="font-bold text-sm text-indigo-900 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                            📍 Reportes Vinculados (Últimas 3h)
+                                            <svg class="w-4 h-4 fill-current inline-block mr-1" viewBox="0 0 640 640"><path d="M541.9 139.5C546.4 127.7 543.6 114.3 534.7 105.4C525.8 96.5 512.4 93.6 500.6 98.2L84.6 258.2C71.9 263 63.7 275.2 64 288.7C64.3 302.2 73.1 314.1 85.9 318.3L262.7 377.2L321.6 554C325.9 566.8 337.7 575.6 351.2 575.9C364.7 576.2 376.9 568 381.8 555.4L541.8 139.4z"/></svg> Reportes Vinculados (Últimas 3h)
                                         </h4>
                                         @php($reportesActivos = data_get($inundacion, 'reportes_activos', []))
                                         @if(count($reportesActivos) > 0)
@@ -190,7 +190,7 @@
                                                     <div class="bg-white/70 border border-white rounded-xl p-3 shadow-sm flex items-start justify-between group hover:border-indigo-200 transition-colors">
                                                         <div>
                                                             <div class="flex items-center gap-2 mb-1">
-                                                                <span class="font-bold text-slate-700 text-sm">#{{ $rep['id'] }}</span>
+                                                                <span class="font-bold text-slate-700 text-sm">N°{{ $rep['id'] }}</span>
                                                                 <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase
                                                                     {{ $rep['intensidad_propuesta'] === 'alta' ? 'bg-rose-100 text-rose-700' : ($rep['intensidad_propuesta'] === 'media' ? 'bg-amber-100 text-amber-700' : 'bg-teal-100 text-teal-700') }}">
                                                                     {{ $rep['intensidad_propuesta'] }}
@@ -220,14 +220,14 @@
                                         @php($reportesInactivos = data_get($inundacion, 'reportes_inactivos', []))
                                         @if(count($reportesInactivos) > 0)
                                             <h4 class="font-bold text-sm text-slate-500 uppercase tracking-wide mt-6 mb-3 flex items-center gap-2 border-t border-slate-200/60 pt-4">
-                                                ⏳ Reportes Inactivos (TTL Caducado)
+                                                <svg class="w-4 h-4 fill-current inline-block mr-1" viewBox="0 0 640 640"><path d="M128 96C128 78.3 142.3 64 160 64L480 64C497.7 64 512 78.3 512 96C512 113.7 497.7 128 480 128L480 139C480 181.4 463.1 222.1 433.1 252.1L365.2 320L433.1 387.9C463.1 417.9 480 458.6 480 501L480 512C497.7 512 512 526.3 512 544C512 561.7 497.7 576 480 576L160 576C142.3 576 128 561.7 128 544C128 526.3 142.3 512 160 512L160 501C160 458.6 176.9 417.9 206.9 387.9L274.8 320L206.9 252.1C176.9 222.1 160 181.4 160 139L160 128C142.3 128 128 113.7 128 96zM224 128L224 139C224 164.5 234.1 188.9 252.1 206.9L320 274.8L387.9 206.9C405.9 188.9 416 164.5 416 139L416 128L224 128zM224 512L416 512L416 501C416 475.5 405.9 451.1 387.9 433.1L320 365.2L252.1 433.1C234.1 451.1 224 475.5 224 501L224 512z"/></svg> Reportes Inactivos (TTL Caducado)
                                             </h4>
                                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 opacity-75 grayscale-[30%]">
                                                 @foreach($reportesInactivos as $rep)
                                                     <div class="bg-white/40 border border-slate-200/50 rounded-xl p-3 shadow-sm flex items-start justify-between group hover:border-slate-300 transition-colors">
                                                         <div>
                                                             <div class="flex items-center gap-2 mb-1">
-                                                                <span class="font-bold text-slate-500 text-sm">#{{ $rep['id'] }}</span>
+                                                                <span class="font-bold text-slate-500 text-sm">N°{{ $rep['id'] }}</span>
                                                                 <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase
                                                                     {{ $rep['intensidad_propuesta'] === 'alta' ? 'bg-rose-50 text-rose-500' : ($rep['intensidad_propuesta'] === 'media' ? 'bg-amber-50 text-amber-500' : 'bg-teal-50 text-teal-500') }}">
                                                                     {{ $rep['intensidad_propuesta'] }}
@@ -330,7 +330,7 @@
                                 <div class="p-5 flex flex-col flex-grow">
                                     <div class="flex justify-between items-start mb-3">
                                         <div>
-                                            <h3 class="font-bold text-slate-800 text-lg">Reporte Rápido #{{ $rep->id }}</h3>
+                                            <h3 class="font-bold text-slate-800 text-lg">Reporte Rápido N°{{ $rep->id }}</h3>
                                             <p class="text-xs font-semibold text-slate-400 mt-0.5">{{ $rep->created_at->format('d M, Y H:i') }}</p>
                                         </div>
                                         <div class="flex flex-col items-end">
@@ -352,7 +352,7 @@
                                         </div>
                                     @else
                                         <div class="mb-4 w-full h-32 rounded-xl bg-slate-100 flex flex-col items-center justify-center border border-dashed border-slate-300">
-                                            <span class="text-3xl opacity-50 mb-1">📷</span>
+                                            <svg class="w-8 h-8 opacity-50 mb-1 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                                             <span class="text-xs font-bold text-slate-400 uppercase">Sin foto adjunta</span>
                                         </div>
                                     @endif
@@ -366,7 +366,7 @@
                                             <div class="flex border border-blue-200 rounded-xl overflow-hidden w-full shadow-sm mt-2">
                                                 <select id="select-vincular-{{ $rep->id }}" class="text-xs border-0 py-2.5 pl-3 pr-8 bg-blue-50 text-blue-900 focus:ring-0 flex-grow font-medium truncate">
                                                     @foreach($rep->cercanas as $activa)
-                                                        <option value="{{ $activa->id }}">A Inundación #{{ $activa->id }}</option>
+                                                        <option value="{{ $activa->id }}">A Inundación N°{{ $activa->id }}</option>
                                                     @endforeach
                                                 </select>
                                                 <button onclick="validarRapido({{ $rep->id }}, 'vincular', document.getElementById('select-vincular-{{ $rep->id }}').value)" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 text-xs font-bold transition-colors whitespace-nowrap">
@@ -409,14 +409,14 @@
                                     <img src="{{ asset('storage/' . $rep->foto_path) }}" alt="Foto" onclick="openImageModal('{{ asset('storage/' . $rep->foto_path) }}')" class="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity">
                                 @else
                                     <div class="flex flex-col items-center justify-center">
-                                        <span class="text-3xl opacity-20 mb-1">📷</span>
+                                        <svg class="w-8 h-8 opacity-20 mb-1 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                                         <span class="text-[9px] font-bold text-slate-400 uppercase text-center leading-tight px-2">Sin foto<br>adjunta</span>
                                     </div>
                                 @endif
                             </div>
                             
                             <div class="flex-grow grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-slate-600">
-                                <div><span class="block text-[10px] font-bold text-slate-400 uppercase">ID</span><span class="font-semibold text-slate-800">#{{ $rep->id }}</span></div>
+                                <div><span class="block text-[10px] font-bold text-slate-400 uppercase">ID</span><span class="font-semibold text-slate-800">N°{{ $rep->id }}</span></div>
                                 <div><span class="block text-[10px] font-bold text-slate-400 uppercase">Intensidad</span>
                                     <span class="inline-block mt-0.5 px-2 py-0.5 bg-rose-100 text-rose-700 font-bold text-[10px] rounded uppercase">{{ $rep->intensidad_propuesta }}</span>
                                 </div>
@@ -441,7 +441,7 @@
                                                 <option value="">Ninguna</option>
                                                 @foreach(($inundacionesActivasParaVincular ?? []) as $inundacionActiva)
                                                     <option value="{{ $inundacionActiva->id }}" {{ (int) ($rep->inundacion_id ?? 0) === (int) $inundacionActiva->id ? 'selected' : '' }}>
-                                                        Inundación #{{ $inundacionActiva->id }}
+                                                        Inundación N°{{ $inundacionActiva->id }}
                                                     </option>
                                                 @endforeach
                                             </select>
@@ -481,7 +481,7 @@
                         <div class="bg-white/40 rounded-xl m-2 overflow-hidden hover:bg-white/60 transition-colors">
                             <div class="flex items-center justify-between p-4 cursor-pointer" onclick="toggleDetails('term-{{ $tid }}')">
                                 <div class="flex items-center gap-4">
-                                    <div class="w-10 h-10 rounded-lg bg-slate-200 flex items-center justify-center font-bold text-slate-600">#{{ $tid }}</div>
+                                    <div class="w-10 h-10 rounded-lg bg-slate-200 flex items-center justify-center font-bold text-slate-600">N°{{ $tid }}</div>
                                     <div>
                                         <div class="flex gap-2">
                                             @if($totalQ > 0)
@@ -509,7 +509,7 @@
                                         @foreach($repsVinc as $rv)
                                             <div class="bg-white rounded-lg p-2.5 text-xs border border-slate-100 shadow-sm flex justify-between items-center">
                                                 <div>
-                                                    <span class="font-bold text-slate-700">#{{ $rv['id'] }}</span>
+                                                    <span class="font-bold text-slate-700">N°{{ $rv['id'] }}</span>
                                                     <span class="ml-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase {{ $rv['intensidad_propuesta'] === 'alta' ? 'bg-rose-50 text-rose-700' : ($rv['intensidad_propuesta'] === 'media' ? 'bg-amber-50 text-amber-700' : 'bg-teal-50 text-teal-700') }}">{{ $rv['intensidad_propuesta'] }}</span>
                                                 </div>
                                                 <span class="text-slate-400 font-medium">{{ $rv['peso'] }}pts</span>

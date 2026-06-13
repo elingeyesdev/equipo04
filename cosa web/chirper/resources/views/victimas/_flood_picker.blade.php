@@ -24,6 +24,8 @@
 @once
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script src="{{ asset('js/smart-heatmap.js') }}"></script>
 @endonce
 
 {{-- ─── Input hidden real (va en el form) ───────────────────────────────── --}}
@@ -68,7 +70,7 @@
                 <p class="text-xs text-blue-500 font-medium">Inundación seleccionada</p>
                 <p id="fp-chip-label" class="text-sm font-semibold text-blue-800 truncate">
                     @if($selectedInun)
-                        #{{ $selectedInun['id'] }} · {{ $selectedInun['municipio'] }} · {{ $selectedInun['created_at'] }}
+                        N°{{ $selectedInun['id'] }} · {{ $selectedInun['municipio'] }} · {{ $selectedInun['created_at'] }}
                     @endif
                 </p>
             </div>
@@ -120,7 +122,7 @@
             </svg>
             <input type="text" id="fp-search"
                    placeholder="Buscar por ID, municipio o provincia..."
-                   class="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                   class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
         </div>
 
         {{-- Status chips + date range --}}
@@ -145,11 +147,11 @@
             <span class="text-xs text-gray-400 mx-1">|</span>
 
             <input type="date" id="fp-date-from"
-                   class="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                   class="text-xs border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                    placeholder="Desde" title="Desde">
             <span class="text-xs text-gray-400">—</span>
             <input type="date" id="fp-date-to"
-                   class="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                   class="text-xs border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                    placeholder="Hasta" title="Hasta">
         </div>
     </div>
@@ -261,6 +263,15 @@
         const selId   = hiddenInput.value ? parseInt(hiddenInput.value) : null;
         countLabel.textContent = list.length;
 
+        // Limpiar los mapas antes de re-renderizar para evitar referencias rotas al DOM (Error del minimapa congelado)
+        for (let key in miniMaps) {
+            if (miniMaps[key]) {
+                miniMaps[key].remove();
+            }
+        }
+        miniMaps = {};
+        expandedId = null;
+
         if (list.length === 0) {
             resultsEl.innerHTML = '';
             resultsEl.classList.add('hidden');
@@ -298,19 +309,22 @@
                     scrollWheelZoom: false,
                     dragging: false,
                 }).setView([lat, lng], 13);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
-                const icon = L.divIcon({
-                    className: '',
-                    html: '<div style="background:#3B82F6;width:14px;height:14px;border-radius:50%;border:2.5px solid white;box-shadow:0 0 8px rgba(59,130,246,0.8);"></div>',
-                    iconSize: [14, 14], iconAnchor: [7, 7],
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 20 }).addTo(m);
+                const flood = FLOODS.find(f => f.id === id);
+                let heatData = (flood && flood.reportes && flood.reportes.length > 0) 
+                    ? flood.reportes 
+                    : [{ lat: lat, lng: lng, intensidad: 'media' }];
+                
+                window.createSmartHeatmap(m, heatData, {
+                    heatOptions: { radius: 25, blur: 15 } // Ajustado para minimapa
                 });
-                L.marker([lat, lng], { icon }).addTo(m);
-                L.circle([lat, lng], {
-                    radius: 300, color: '#3B82F6', fillColor: '#3B82F6',
-                    fillOpacity: 0.1, weight: 1.5, dashArray: '4 4',
-                }).addTo(m);
+                
                 miniMaps[id] = m;
+                // Forzar redibujo tras la transición CSS (duration-200)
+                setTimeout(() => m.invalidateSize(), 250);
             }, 50);
+        } else if (miniMaps[id]) {
+            setTimeout(() => miniMaps[id].invalidateSize(), 250);
         }
     }
 
@@ -365,17 +379,15 @@
                 zoomControl: false, attributionControl: false,
                 scrollWheelZoom: false,
             }).setView([lat, lng], 13);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(chipLeafletMap);
-            const icon = L.divIcon({
-                className: '',
-                html: '<div style="background:#2563EB;width:14px;height:14px;border-radius:50%;border:2.5px solid white;box-shadow:0 0 8px rgba(37,99,235,0.8);"></div>',
-                iconSize: [14, 14], iconAnchor: [7, 7],
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 20 }).addTo(chipLeafletMap);
+            
+            let heatData = (flood && flood.reportes && flood.reportes.length > 0) 
+                ? flood.reportes 
+                : [{ lat: lat, lng: lng, intensidad: 'media' }];
+            
+            window.createSmartHeatmap(chipLeafletMap, heatData, {
+                heatOptions: { radius: 25, blur: 15 }
             });
-            L.marker([lat, lng], { icon }).addTo(chipLeafletMap);
-            L.circle([lat, lng], {
-                radius: 300, color: '#2563EB', fillColor: '#2563EB',
-                fillOpacity: 0.1, weight: 1.5, dashArray: '4 4',
-            }).addTo(chipLeafletMap);
         }, 100);
 
         closeDrawer();
@@ -437,13 +449,15 @@
                     zoomControl: false, attributionControl: false,
                     scrollWheelZoom: false,
                 }).setView([flood.latitud, flood.longitud], 13);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(chipLeafletMap);
-                const icon = L.divIcon({
-                    className: '',
-                    html: '<div style="background:#2563EB;width:14px;height:14px;border-radius:50%;border:2.5px solid white;box-shadow:0 0 8px rgba(37,99,235,0.8);"></div>',
-                    iconSize: [14, 14], iconAnchor: [7, 7],
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 20 }).addTo(chipLeafletMap);
+                
+                let heatData = (flood && flood.reportes && flood.reportes.length > 0) 
+                    ? flood.reportes 
+                    : [{ lat: flood.latitud, lng: flood.longitud, intensidad: 'media' }];
+                
+                window.createSmartHeatmap(chipLeafletMap, heatData, {
+                    heatOptions: { radius: 25, blur: 15 }
                 });
-                L.marker([flood.latitud, flood.longitud], { icon }).addTo(chipLeafletMap);
             }, 300);
         }
     }

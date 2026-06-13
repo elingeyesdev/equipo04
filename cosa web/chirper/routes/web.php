@@ -3,7 +3,6 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ReportController;
-use App\Http\Controllers\MapController;
 use App\Http\Controllers\LogisticsController;
 use App\Http\Controllers\VehiculoController;
 use App\Http\Controllers\VictimaController;
@@ -43,7 +42,6 @@ Route::get('/api/elevation', [\App\Http\Controllers\ElevationController::class, 
 
 Route::middleware(ApiAuthenticate::class)->group(function () {
     Route::get('/reports', \App\Livewire\ReportsIndex::class)->name('reports.index');
-    Route::get('/maps', [MapController::class, 'index'])->name('maps.index');
     Route::get('/reports/create', [ReportController::class, 'create'])->name('reports.create');
     Route::post('/reports', [ReportController::class, 'store'])->name('reports.store');
     Route::get('/reports/notifications/feed', [ReportController::class, 'notificationsFeed'])->name('reports.notifications.feed');

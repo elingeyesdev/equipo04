@@ -272,20 +272,17 @@ final class ReportController
 
     public function show(Request $request, int|string $id): View|RedirectResponse
     {
-        $token = (string) $request->session()->get('api_token', '');
+        $inundacion = Inundacion::with(['reportes', 'victimas'])->findOrFail($id);
 
-        try {
-            $report = $this->api->getReport($token, $id);
-        } catch (ApiUnauthorizedException) {
-            $request->session()->forget(['api_token', 'api_user']);
-            return redirect()->route('login');
-        } catch (ApiRequestException $e) {
-            abort($e->status, $e->getMessage());
-        }
+        $reportArray = [
+            'latitude' => $inundacion->latitud,
+            'longitude' => $inundacion->longitud,
+        ];
 
         return view('reports.show', [
-            'report' => $report,
-            'eta'    => $this->calculateEta($report),
+            'inundacion' => $inundacion,
+            'eta'        => $this->calculateEta($reportArray),
+            'role'       => (string) ($request->session()->get('api_user')['role'] ?? ''),
         ]);
     }
 

@@ -14,9 +14,9 @@
                 <h3 class="text-sm font-semibold text-gray-800">Buscar Centros por Ubicación</h3>
                 {{-- Botón de centros cercanos: sólo funciona si el usuario ya guardó su ubicación --}}
                 <button id="btn-nearest-center"
-                    class="flex items-center gap-1 rounded-md bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors"
+                    class="flex items-center gap-1 rounded-md bg-blue-700 hover:bg-blue-800 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors"
                     title="Encontrar y seleccionar el centro de acopio más cercano a tu ubicación">
-                    📍 Centro más cercano
+                    Centro más cercano
                 </button>
             </div>
             <x-location-filter formAction="{{ route('logistica.index', [], false) }}" :showEstado="true"
@@ -180,13 +180,13 @@
                             </div>
                         </div>
                         <p class="mt-3 text-[10px] text-gray-400 text-center italic">Datos de OpenWeatherMap</p>
-                        <button type="button" onclick="map.setView([-17.78, -63.18], 7)" class="mt-2 text-xs bg-blue-50 text-blue-600 px-2 py-1.5 rounded w-full border border-blue-100 hover:bg-blue-100 pointer-events-auto transition-colors font-medium">
-                            🌍 Alejar para ver completo
+                        <button type="button" onclick="map.setView([-17.78, -63.18], 7)" class="mt-2 text-xs bg-gray-100 text-gray-800 px-2 py-1.5 rounded w-full border border-gray-300 hover:bg-gray-200 pointer-events-auto transition-colors font-medium">
+                            Alejar para ver completo
                         </button>
                     </div>
                 </div>
                 @if($isAdmin)
-                <p class="text-xs text-gray-500 mt-2 text-right">💡 Haz clic sobre el mapa para autocompletar las
+                <p class="text-xs text-gray-500 mt-2 text-right">Haz clic sobre el mapa para autocompletar las
                     coordenadas del formulario.</p>
                 @endif
             </div>
@@ -386,7 +386,6 @@
             const baseMaps = {
                 "Mapa Normal (OSM)": osmLayer,
                 "Satelital (Esri)": satelliteLayer,
-                "Topográfico (OpenTopoMap)": topoLayer,
             };
 
             const overlayMaps = {};
@@ -408,7 +407,6 @@
                 maxZoom: 18,
                 zIndex: 5,
             });
-            layerControl.addOverlay(reliefOverlay, "Relieve del Terreno (ESRI)");
 
             // 4. Capas Meteorológicas (OpenWeatherMap)
             const precipLayer = L.layerGroup();
@@ -440,7 +438,7 @@
 
             // Eventos para mostrar/ocultar la leyenda del radar de lluvia
             map.on('overlayadd', function(e) {
-                if (e.name === "Radar de Lluvia (OpenWeather)" || e.name === "☁️ Nubes (OpenWeather)") {
+                if (e.name === "Radar de Lluvia (OpenWeather)" || e.name === "Nubes (OpenWeather)") {
                     const legend = document.getElementById('radar-legend-logistics');
                     if (legend) legend.classList.remove('hidden');
 
@@ -456,7 +454,7 @@
                 }
             });
             map.on('overlayremove', function(e) {
-                if (e.name === "Radar de Lluvia (OpenWeather)" || e.name === "☁️ Nubes (OpenWeather)") {
+                if (e.name === "Radar de Lluvia (OpenWeather)" || e.name === "Nubes (OpenWeather)") {
                     if (!map.hasLayer(precipLayer) && !map.hasLayer(cloudLayer)) {
                         const legend = document.getElementById('radar-legend-logistics');
                         if (legend) legend.classList.add('hidden');
@@ -482,7 +480,7 @@
                         style: { color: '#0ea5e9', weight: 1.5, opacity: 0.8 },
                         interactive: false
                     });
-                    layerControl.addOverlay(hydroLayer, "💧 Red Hídrica");
+                    layerControl.addOverlay(hydroLayer, "Red Hídrica");
                 }).catch(e => console.warn("Error cargando red hídrica", e));
 
             renderMarkers(window.centros);
@@ -540,9 +538,9 @@
                     ${centro.contacto ? `<p class="text-xs text-gray-700 mb-1"><b>Cel:</b> ${centro.contacto}</p>` : ''}
                     ${centro.direccion ? `<p class="text-xs text-gray-700 mb-1"><b>Dir:</b> ${centro.direccion}</p>` : ''}
                         @if($isAdmin)
-                            <button onclick='editCentro(${JSON.stringify(centro).replace(/'/g, "&apos;")})' class="mt-2 w-full py-1 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold rounded border border-gray-300 transition-colors">✏️ Editar Centro</button>
+                            <button onclick='editCentro(${JSON.stringify(centro).replace(/'/g, "&apos;")})' class="mt-2 w-full py-1 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold rounded border border-gray-300 transition-colors">Editar Centro</button>
                         @endif
-                    <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}" target="_blank" rel="noopener noreferrer" class="mt-2 block w-full text-center py-2 bg-blue-600 hover:bg-blue-700 !text-white !no-underline text-xs font-bold rounded shadow-sm transition-all">📍 Ver ruta en Maps</a>
+                    <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}" target="_blank" rel="noopener noreferrer" class="mt-2 block w-full text-center py-2 bg-blue-700 hover:bg-blue-800 !text-white !no-underline text-xs font-bold rounded shadow-sm transition-all">Ver ruta en Maps</a>
                 </div>`;
 
                     const marker = L.marker([lat, lng], { icon: customIcon })
@@ -570,7 +568,7 @@
             function findNearestCenter() {
                 const loc = window.getUserLocation ? window.getUserLocation() : null;
                 if (!loc) {
-                    alert('Primero guarda tu ubicación haciendo clic en el botón 📍 del menú superior.');
+                    alert('Primero guarda tu ubicación haciendo clic en el botón del menú superior.');
                     return;
                 }
 

@@ -172,6 +172,7 @@ class ReportsIndex extends Component
             'reportesPendientes'     => $reportesPendientes,
             'reportesRechazados'     => $reportesRechazados,
             'inundacionesActivasParaVincular' => $inundacionesActivasParaVincular,
+            'ors_key' => config('services.openrouteservice.key'),
             'meta' => [
                 'current_page' => $activasPaginator->currentPage(),
                 'last_page'    => $activasPaginator->lastPage(),

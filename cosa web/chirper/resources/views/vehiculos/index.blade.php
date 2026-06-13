@@ -8,8 +8,9 @@
             <p class="mt-1 text-sm text-gray-600">Registra y administra las ambulancias y vehículos de rescate.</p>
         </div>
         <div>
-            <a href="{{ route('vehiculos.mapa', [], false) }}" class="inline-flex items-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500 transition-colors">
-                📍 Ver Mapa en Vivo
+            <a href="{{ route('vehiculos.mapa', [], false) }}" class="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition-colors">
+                <svg class="w-4 h-4 fill-current" viewBox="0 0 640 640"><path d="M541.9 139.5C546.4 127.7 543.6 114.3 534.7 105.4C525.8 96.5 512.4 93.6 500.6 98.2L84.6 258.2C71.9 263 63.7 275.2 64 288.7C64.3 302.2 73.1 314.1 85.9 318.3L262.7 377.2L321.6 554C325.9 566.8 337.7 575.6 351.2 575.9C364.7 576.2 376.9 568 381.8 555.4L541.8 139.4z"/></svg>
+                Ver Mapa en Vivo
             </a>
         </div>
     </div>

@@ -194,6 +194,29 @@
     </div>
 </div>
 
+<!-- Modal: Lista de Daños Materiales -->
+<div id="modal-lista-danos" class="hidden fixed inset-0 z-[2000] bg-black/60 backdrop-blur-sm flex items-center justify-center">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                <svg class="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                Daños Materiales Registrados
+            </h3>
+            <button type="button" onclick="closeDamagesListModal()" class="text-slate-400 hover:text-white transition-colors bg-slate-700 hover:bg-slate-600 p-1.5 rounded-lg"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+        </div>
+        <p id="lista-danos-subtitle" class="text-xs text-slate-400 mb-4">Mostrando daños de la Inundación N°--</p>
+        
+        <div class="flex-1 overflow-y-auto custom-scrollbar pr-2">
+            <div id="lista-danos-container" class="space-y-3">
+                <!-- JS renderiza los daños aquí -->
+            </div>
+        </div>
+        <div class="flex justify-end pt-4 border-t border-slate-700 mt-4">
+            <button type="button" onclick="closeDamagesListModal()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded text-sm font-medium transition-colors">Cerrar</button>
+        </div>
+    </div>
+</div>
+
 <!-- Modal: Fusión Manual -->
 <div id="modal-merge" class="hidden fixed inset-0 z-[2000] bg-black/60 backdrop-blur-sm flex items-center justify-center">
     <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-md shadow-2xl">
@@ -253,6 +276,8 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script src="{{ asset('js/smart-heatmap.js') }}"></script>
+
 
 <!-- Drawer (Flood Picker Dark Mode) -->
 <div id="fp-drawer-backdrop" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[2500] hidden transition-opacity duration-300 opacity-0" onclick="closeFloodDrawer()"></div>
@@ -426,7 +451,7 @@
             window.activeHeatLayer = null;
         }
 
-        const heatPoints = [];
+        let allActiveReports = [];
         
         allData.forEach(inun => {
             const inunDate = new Date(inun.created_at);
@@ -434,35 +459,8 @@
 
             // Filtrar los reportes activos para la fecha seleccionada
             const activeReports = inun.reportes.filter(rep => new Date(rep.created_at) <= maxDate);
-
-            // Agregar reportes al mapa de calor
-            activeReports.forEach(rep => {
-                let weight = 0.3; // baja
-                if (rep.intensidad === 'alta') weight = 1.0;
-                else if (rep.intensidad === 'media') weight = 0.6;
-                
-                heatPoints.push([parseFloat(rep.lat), parseFloat(rep.lng), weight]);
-            });
-
-            // --- LÓGICA DE PUENTES TÉRMICOS ---
-            if (activeReports.length > 1) {
-                for (let i = 0; i < activeReports.length; i++) {
-                    for (let j = i + 1; j < activeReports.length; j++) {
-                        let p1 = L.latLng(parseFloat(activeReports[i].lat), parseFloat(activeReports[i].lng));
-                        let p2 = L.latLng(parseFloat(activeReports[j].lat), parseFloat(activeReports[j].lng));
-                        let dist = p1.distanceTo(p2);
-                        
-                        if (dist > 10 && dist <= 250) {
-                            let steps = Math.floor(dist / 15);
-                            for (let k = 1; k < steps; k++) {
-                                let fraction = k / steps;
-                                let interLat = p1.lat + (p2.lat - p1.lat) * fraction;
-                                let interLng = p1.lng + (p2.lng - p1.lng) * fraction;
-                                heatPoints.push([interLat, interLng, 0.35]);
-                            }
-                        }
-                    }
-                }
+            if (activeReports.length > 0) {
+                allActiveReports.push(...activeReports);
             }
 
             const isSelected = selectedFloodId === inun.id;
@@ -559,18 +557,15 @@
         });
 
         // Crear la capa de calor (Heatmap)
-        if (heatPoints.length > 0) {
-            window.activeHeatLayer = L.heatLayer(heatPoints, {
-                radius: 75,       // Amplio para que se toquen
-                blur: 45,
-                minOpacity: 0.4,
-                maxZoom: 18,
-                gradient: {
-                    0.2: '#38bdf8', // baja
-                    0.5: '#2563eb', // media
-                    1.0: '#1e3a8a'  // alta
+        if (allActiveReports.length > 0) {
+            // Utilizamos el tamaño ampliado (radius: 75, blur: 45) que tenía el command center
+            window.activeHeatLayer = window.createSmartHeatmap(ccMap, allActiveReports, {
+                heatOptions: {
+                    radius: 75,
+                    blur: 45,
+                    minOpacity: 0.4
                 }
-            }).addTo(ccMap);
+            }).layer;
         }
     }
 
@@ -682,7 +677,7 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                         Ver Víctimas
                     </a>
-                    <button type="button" onclick="alert('Detalles de Daños Materiales. Redirigiendo...')" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] uppercase font-bold py-2 rounded transition-colors text-center border border-slate-600 flex flex-col items-center justify-center gap-1">
+                    <button type="button" onclick="showDamagesForFlood(${inun.id})" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] uppercase font-bold py-2 rounded transition-colors text-center border border-slate-600 flex flex-col items-center justify-center gap-1">
                         <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
                         Ver Daños
                     </button>
@@ -792,10 +787,8 @@
                         const m = L.map(mDiv, { zoomControl: false, attributionControl: false, scrollWheelZoom: true, dragging: true }).setView([parseFloat(f.centroide.lat), parseFloat(f.centroide.lng)], 13);
                         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(m);
                         
-                        let heatPts = [];
-                        f.reportes.forEach(r => heatPts.push([parseFloat(r.lat), parseFloat(r.lng), 1.0]));
-                        if (heatPts.length > 0) {
-                            L.heatLayer(heatPts, { radius: 25, blur: 15, minOpacity: 0.5, gradient: { 0.4: '#38bdf8', 1.0: '#1e3a8a' } }).addTo(m);
+                        if (f.reportes && f.reportes.length > 0) {
+                            window.createSmartHeatmap(m, f.reportes);
                         }
                         fpMiniMaps[f.id] = m;
                     }
@@ -821,10 +814,8 @@
             fpChipMapInstance = L.map(div, { zoomControl: false, attributionControl: false, scrollWheelZoom: false, dragging: false }).setView([parseFloat(inun.centroide.lat), parseFloat(inun.centroide.lng)], 13);
             L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(fpChipMapInstance);
             
-            let heatPts = [];
-            inun.reportes.forEach(r => heatPts.push([parseFloat(r.lat), parseFloat(r.lng), 1.0]));
-            if (heatPts.length > 0) {
-                L.heatLayer(heatPts, { radius: 25, blur: 15, minOpacity: 0.5, gradient: { 0.4: '#38bdf8', 1.0: '#1e3a8a' } }).addTo(fpChipMapInstance);
+            if (inun.reportes && inun.reportes.length > 0) {
+                window.createSmartHeatmap(fpChipMapInstance, inun.reportes);
             }
             updateMiniMapForSelected(inun);
         }, 300);
@@ -857,6 +848,44 @@
     function closeDamageModal() { document.getElementById('modal-dano').classList.add('hidden'); }
     function openMergeModal() { document.getElementById('modal-merge').classList.remove('hidden'); }
     function closeMergeModal() { document.getElementById('modal-merge').classList.add('hidden'); }
+
+    function showDamagesForFlood(id) {
+        const inun = allData.find(f => f.id === id);
+        if (!inun) return;
+        
+        document.getElementById('lista-danos-subtitle').innerText = `Mostrando daños de la Inundación N°${id}`;
+        const container = document.getElementById('lista-danos-container');
+        
+        if (!inun.danos_materiales || inun.danos_materiales.length === 0) {
+            container.innerHTML = '<p class="text-center text-sm text-slate-500 py-6">No hay daños materiales registrados para esta inundación.</p>';
+        } else {
+            container.innerHTML = inun.danos_materiales.map(dano => {
+                const dateStr = new Date(dano.created_at).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' });
+                return `
+                    <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-3 flex flex-col gap-2">
+                        <div class="flex justify-between items-start">
+                            <span class="text-sm font-bold text-white uppercase flex items-center gap-2">
+                                <div style="background-color:#f97316; width:10px; height:10px; border:1px solid white; transform: rotate(45deg);"></div>
+                                ${dano.tipo}
+                            </span>
+                            <span class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-600">${dateStr}</span>
+                        </div>
+                        <div class="flex gap-4 items-center">
+                            <span class="text-xs text-slate-400">Estado: <span class="font-bold text-slate-200 capitalize">${dano.estado}</span></span>
+                            <span class="text-xs text-slate-400">Coords: <span class="text-slate-300">${parseFloat(dano.lat).toFixed(4)}, ${parseFloat(dano.lng).toFixed(4)}</span></span>
+                        </div>
+                        ${dano.descripcion ? `<p class="text-xs text-slate-300 italic mt-1 bg-slate-800 p-2 rounded">"${dano.descripcion}"</p>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        document.getElementById('modal-lista-danos').classList.remove('hidden');
+    }
+
+    function closeDamagesListModal() {
+        document.getElementById('modal-lista-danos').classList.add('hidden');
+    }
 
     function submitDano(e) {
         e.preventDefault();

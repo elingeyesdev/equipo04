@@ -102,7 +102,7 @@
                     <div class="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                         <div>
                             <span class="text-xs font-semibold text-blue-500 block">ID</span>
-                            <span class="text-blue-900 font-bold">#{{ $inundacion->id }}</span>
+                            <span class="text-blue-900 font-bold">N°{{ $inundacion->id }}</span>
                         </div>
                         <div>
                             <span class="text-xs font-semibold text-blue-500 block">Estado</span>

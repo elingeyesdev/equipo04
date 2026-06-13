@@ -11,7 +11,7 @@
         </div>
         @if(isset($role) && $role === 'authority')
             <a href="{{ route('victimas.create', [], false) }}"
-               class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
+               class="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
                 </svg>
@@ -54,7 +54,7 @@
                 <div>
                     <label for="filtro-inundacion" class="block text-xs font-medium text-gray-600 mb-1">Inundación</label>
                     <select id="filtro-inundacion"
-                            class="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
                         <option value="">— Todas —</option>
                         @foreach($inundaciones as $inundacion)
                             @php
@@ -67,7 +67,7 @@
                             <option value="{{ $inundacion->id }}"
                                 data-municipio-id="{{ $inundacion->municipio_id }}"
                                 data-provincia-id="{{ $inundacion->municipio?->provincia_id }}">
-                                #{{ $inundacion->id }} · {{ $fecha }} · {{ $prov }} / {{ $muni }}
+                                N°{{ $inundacion->id }} · {{ $fecha }} · {{ $prov }} / {{ $muni }}
                             </option>
                         @endforeach
                     </select>
@@ -77,7 +77,7 @@
                 <div>
                     <label for="filtro-provincia" class="block text-xs font-medium text-gray-600 mb-1">Provincia</label>
                     <select id="filtro-provincia"
-                            class="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
                         <option value="">— Todas —</option>
                         @foreach($provincias as $prov)
                             <option value="{{ $prov->id }}">{{ $prov->nombre }}</option>
@@ -89,7 +89,7 @@
                 <div>
                     <label for="filtro-municipio" class="block text-xs font-medium text-gray-600 mb-1">Municipio</label>
                     <select id="filtro-municipio"
-                            class="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
                         <option value="">— Todos —</option>
                         @foreach($municipios as $muni)
                             <option value="{{ $muni->id }}" data-provincia-id="{{ $muni->provincia_id }}">
@@ -104,7 +104,7 @@
                     <label for="filtro-nombre" class="block text-xs font-medium text-gray-600 mb-1">Nombre de la víctima</label>
                     <input type="text" id="filtro-nombre"
                            placeholder="Buscar por nombre..."
-                           class="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                           class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
                 </div>
             </div>
         </div>
@@ -181,7 +181,7 @@
 
                             {{-- Inundación --}}
                             <td class="px-4 py-3 text-gray-600">
-                                #{{ $victima->inundacion_id }}
+                                N°{{ $victima->inundacion_id }}
                                 @if($victima->inundacion?->created_at)
                                     <span class="block text-xs text-gray-400">
                                         {{ \Carbon\Carbon::parse($victima->inundacion->created_at)->format('d/m/Y H:i') }}
@@ -197,14 +197,14 @@
 
                             {{-- Acciones --}}
                             <td class="px-4 py-3 text-right">
-                                <div class="flex items-center justify-end gap-1.5 flex-wrap">
+                                <div class="flex flex-wrap items-center justify-end gap-2">
                                     <a href="{{ route('victimas.show', ['id' => $victima->id], false) }}"
-                                       class="inline-flex items-center rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors">
+                                       class="inline-flex justify-center items-center w-24 rounded-md border border-gray-300 px-2 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors">
                                         Ver ficha
                                     </a>
                                     @if(isset($role) && $role === 'authority')
                                         <a href="{{ route('victimas.edit', ['id' => $victima->id], false) }}"
-                                           class="inline-flex items-center rounded-md border border-blue-300 px-2.5 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors">
+                                           class="inline-flex justify-center items-center w-24 rounded-md border border-blue-300 px-2 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors">
                                             Editar
                                         </a>
                                         <form method="POST"
@@ -213,7 +213,7 @@
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit"
-                                                    class="inline-flex items-center rounded-md border border-red-300 px-2.5 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors">
+                                                    class="inline-flex justify-center items-center w-24 rounded-md border border-red-300 px-2 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors">
                                                 Eliminar
                                             </button>
                                         </form>
@@ -363,6 +363,14 @@
         inputNombre.value   = '';
         filtrar();
     });
+
+    // ── Leer parámetros de la URL ──────────────────────────────────────────
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('inundacion_id')) {
+        selInundacion.value = urlParams.get('inundacion_id');
+        // Simular el change event para que se aplique y actualice provincias/municipios
+        selInundacion.dispatchEvent(new Event('change'));
+    }
 })();
 </script>
 @endsection

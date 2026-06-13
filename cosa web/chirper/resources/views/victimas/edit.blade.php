@@ -62,7 +62,7 @@
                     <input type="text" name="nombre_completo" id="nombre_completo"
                            value="{{ old('nombre_completo', $victima->nombre_completo) }}"
                            required maxlength="255"
-                           class="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:border-blue-500 focus:ring-blue-500 @error('nombre_completo') border-red-300 @enderror">
+                           class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 @error('nombre_completo') border-red-300 @enderror">
                     @error('nombre_completo')
                         <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                     @enderror
@@ -73,7 +73,7 @@
                     <input type="text" name="carnet" id="carnet"
                            value="{{ old('carnet', $victima->carnet) }}"
                            maxlength="20"
-                           class="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:border-blue-500 focus:ring-blue-500 @error('carnet') border-red-300 @enderror">
+                           class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 @error('carnet') border-red-300 @enderror">
                     @error('carnet')
                         <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                     @enderror
@@ -84,7 +84,7 @@
                     <input type="date" name="fecha_nacimiento" id="fecha_nacimiento"
                            value="{{ old('fecha_nacimiento', $victima->fecha_nacimiento?->format('Y-m-d')) }}"
                            max="{{ date('Y-m-d', strtotime('-1 day')) }}"
-                           class="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:border-blue-500 focus:ring-blue-500 @error('fecha_nacimiento') border-red-300 @enderror">
+                           class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 @error('fecha_nacimiento') border-red-300 @enderror">
                     @error('fecha_nacimiento')
                         <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                     @enderror
@@ -105,10 +105,10 @@
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         @php
                             $estadoConfig = [
-                                'perdido'    => ['icon' => '🔍', 'bg' => 'bg-yellow-50 border-yellow-300 text-yellow-800', 'checked' => 'ring-2 ring-yellow-400'],
-                                'encontrado' => ['icon' => '✅', 'bg' => 'bg-green-50 border-green-300 text-green-800', 'checked' => 'ring-2 ring-green-400'],
-                                'herido'     => ['icon' => '🩹', 'bg' => 'bg-orange-50 border-orange-300 text-orange-800', 'checked' => 'ring-2 ring-orange-400'],
-                                'fallecido'  => ['icon' => '✝️', 'bg' => 'bg-red-50 border-red-300 text-red-800', 'checked' => 'ring-2 ring-red-400'],
+                                'perdido'    => ['icon' => '<svg class="w-5 h-5 mb-1 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>', 'bg' => 'bg-yellow-50 border-yellow-300 text-yellow-800', 'checked' => 'ring-2 ring-yellow-400'],
+                                'encontrado' => ['icon' => '<svg class="w-4 h-4 mb-1 inline-block fill-current" viewBox="0 0 640 640"><path d="M530.8 134.1C545.1 144.5 548.3 164.5 537.9 178.8L281.9 530.8C276.4 538.4 267.9 543.1 258.5 543.9C249.1 544.7 240 541.2 233.4 534.6L105.4 406.6C92.9 394.1 92.9 373.8 105.4 361.3C117.9 348.8 138.2 348.8 150.7 361.3L252.2 462.8L486.2 141.1C496.6 126.8 516.6 123.6 530.9 134z"/></svg>', 'bg' => 'bg-green-50 border-green-300 text-green-800', 'checked' => 'ring-2 ring-green-400'],
+                                'herido'     => ['icon' => '<svg class="w-5 h-5 mb-1 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>', 'bg' => 'bg-orange-50 border-orange-300 text-orange-800', 'checked' => 'ring-2 ring-orange-400'],
+                                'fallecido'  => ['icon' => '<svg class="w-5 h-5 mb-1 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m-3-4h6"></path></svg>', 'bg' => 'bg-red-50 border-red-300 text-red-800', 'checked' => 'ring-2 ring-red-400'],
                             ];
                             $estadoActual = old('estado', $victima->estado);
                         @endphp
@@ -123,7 +123,7 @@
                                        value="{{ $val }}"
                                        class="sr-only"
                                        {{ $estadoActual === $val ? 'checked' : '' }}>
-                                <span class="text-2xl mb-1">{{ $cfg['icon'] ?? '' }}</span>
+                                <span class="text-2xl mb-1">{!! $cfg['icon'] ?? '' !!}</span>
                                 <span class="text-xs font-semibold">{{ $label }}</span>
                             </label>
                         @endforeach
@@ -137,7 +137,7 @@
                     <label for="descripcion" class="block text-sm font-medium text-gray-700 mb-1">Descripción adicional</label>
                     <textarea name="descripcion" id="descripcion" rows="4" maxlength="2000"
                               placeholder="Condición de la víctima, lugar donde fue encontrada..."
-                              class="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:border-blue-500 focus:ring-blue-500 @error('descripcion') border-red-300 @enderror">{{ old('descripcion', $victima->descripcion) }}</textarea>
+                              class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 @error('descripcion') border-red-300 @enderror">{{ old('descripcion', $victima->descripcion) }}</textarea>
                     @error('descripcion')
                         <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                     @enderror
@@ -199,7 +199,7 @@
                 Cancelar
             </a>
             <button type="submit"
-                    class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
+                    class="inline-flex items-center gap-2 rounded-md bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
                 </svg>
