@@ -23,11 +23,7 @@
                 :showSearch="true" />
         </div>
 
-        @if (session('status'))
-            <div class="mb-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700">
-                {{ session('status') }}
-            </div>
-        @endif
+
 
         @if ($error ?? null)
             <div class="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">
@@ -1109,7 +1105,7 @@
                         return response.json();
                     })
                     .then(data => {
-                        alert(data.message || "Guardado exitosamente.");
+                        Swal.fire('¡Listo!', data.message || "Guardado exitosamente.", 'success');
 
                         // --- Limpiar el formulario ---
                         document.getElementById('logistics_form').reset();
@@ -1164,7 +1160,7 @@
                             .finally(() => { submitBtn.disabled = false; });
                     })
                     .catch(error => {
-                        alert(error.message);
+                        Swal.fire('Error', error.message, 'error');
                         submitBtn.innerText = originalText;
                         submitBtn.disabled = false;
                     });
@@ -1174,31 +1170,48 @@
         // --- ELIMINAR AJAX ---
         function deleteCentroAjax(event, url) {
             event.preventDefault();
-            if (!confirm('¿Estás seguro de eliminar este centro? Esta acción es irreversible.')) return;
-
-            fetch(url, {
-                method: 'POST',
-                body: new URLSearchParams({
-                    '_token': '{{ csrf_token() }}',
-                    '_method': 'DELETE'
-                }),
-                headers: {
-                    'Accept': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
+            Swal.fire({
+                title: '¿Estás seguro?',
+                text: '¿Estás seguro de eliminar este centro? Esta acción es irreversible.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Sí, eliminar',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    fetch(url, {
+                        method: 'POST',
+                        body: new URLSearchParams({
+                            '_token': '{{ csrf_token() }}',
+                            '_method': 'DELETE'
+                        }),
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(async response => {
+                        if (!response.ok) {
+                            const data = await response.json();
+                            throw new Error(data.error || "Error al eliminar");
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        Swal.fire('Eliminado', data.message || "Eliminado correctamente", 'success');
+                        event.target.closest('tr').remove();
+                        const id = url.split('/').pop();
+                        if (window.centroMarkers[id]) {
+                            markersLayer.removeLayer(window.centroMarkers[id]);
+                            delete window.centroMarkers[id];
+                        }
+                        window.centros = window.centros.filter(c => c.id_centro != id);
+                    })
+                    .catch(error => Swal.fire('Error', error.message, 'error'));
                 }
-            })
-                .then(async response => {
-                    if (!response.ok) {
-                        const data = await response.json();
-                        throw new Error(data.error || "Error al eliminar");
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    alert(data.message || "Eliminado correctamente");
-                    event.target.closest('tr').remove();
-                })
-                .catch(error => alert(error.message));
+            });
         }
     </script>
     <!-- LEAFLET CDN -->

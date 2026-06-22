@@ -55,16 +55,9 @@
     <x-reports-map :reports="$inundacionesActivas" :pendingReports="$reportesPendientes ?? []" :showRouting="true" />
 
 
-            @if (session('error') || !empty($error))
+            @if (!empty($error))
                 <div class="mb-6 rounded border border-red-300 bg-red-100 p-4 text-sm flex items-center gap-3">
-                    <span class="text-red-800 font-medium">{{ session('error') ?? $error ?? '' }}</span>
-                </div>
-            @endif
-
-            @if (session('success'))
-                <div class="mb-6 rounded-2xl border border-teal-200/60 bg-teal-50/80 backdrop-blur-sm p-4 text-sm shadow-sm flex items-center gap-3">
-                    <span class="text-teal-500 text-xl"></span>
-                    <span class="text-teal-800 font-medium">{{ session('success') }}</span>
+                    <span class="text-red-800 font-medium">{{ $error }}</span>
                 </div>
             @endif
 
@@ -364,16 +357,9 @@
                                             </button>
                                             
                                             @if(count($rep->cercanas ?? []) > 0)
-                                                <div class="flex border border-blue-200 rounded-lg overflow-hidden shadow-sm h-[28px]">
-                                                    <select id="select-vincular-{{ $rep->id }}" class="text-[10px] border-0 py-0 pl-2 pr-6 bg-blue-50 text-blue-900 focus:ring-0 font-medium w-24">
-                                                        @foreach($rep->cercanas as $activa)
-                                                            <option value="{{ $activa->id }}">Inundación N°{{ $activa->id }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                    <button onclick="validarRapido({{ $rep->id }}, 'vincular', document.getElementById('select-vincular-{{ $rep->id }}').value)" class="bg-blue-600 hover:bg-blue-700 text-white px-2 py-0 text-[10px] font-bold transition-colors">
-                                                        Vincular
-                                                    </button>
-                                                </div>
+                                                <button data-report="{{ json_encode($rep) }}" onclick="openReviewDrawer(this)" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-xs rounded-lg font-bold shadow-sm transition-colors flex items-center gap-1">
+                                                    Vincular (Ver Mapa)
+                                                </button>
                                             @endif
                                             
                                             <button onclick="validarRapido({{ $rep->id }}, 'rechazar')" class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-3 py-1.5 text-xs rounded-lg font-bold shadow-sm transition-colors">
@@ -668,24 +654,35 @@ window.validateReport = function(id, action) {
                 body.inundacion_id = inundacion_id;
             }
 
-            if (!confirm('¿Estás seguro de ' + action + ' este reporte?')) return;
-
-            fetch('/api/reportes/' + id + '/validar', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'Authorization': 'Bearer {{ session('api_token') }}'
-                },
-                body: JSON.stringify(body)
-            })
-            .then(res => res.json())
-            .then(data => {
-                alert(data.message);
-                Livewire.dispatch('refreshReports');
-            })
-            .catch(() => {
-                alert('Ocurrió un error al procesar la solicitud.');
+            Swal.fire({
+                title: '¿Estás seguro?',
+                text: '¿Deseas ' + action + ' este reporte?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Sí, continuar',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    fetch('/api/reportes/' + id + '/validar', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'Authorization': 'Bearer {{ session("api_token") }}'
+                        },
+                        body: JSON.stringify(body)
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        Swal.fire('¡Listo!', data.message, 'success');
+                        Livewire.dispatch('refreshReports');
+                    })
+                    .catch(() => {
+                        Swal.fire('Error', 'Ocurrió un error al procesar la solicitud.', 'error');
+                    });
+                }
             });
         }
 
@@ -718,4 +715,286 @@ window.validateReport = function(id, action) {
             <img id="modalImage" src="" alt="Report Image" class="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl border border-white/20">
         </div>
     </div>
+    
+    {{-- Drawer de Revisión de Reporte --}}
+    <div id="review-drawer-backdrop" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[2500] hidden transition-opacity duration-300 opacity-0" onclick="closeReviewDrawer()"></div>
+    <div id="review-drawer" class="fixed inset-y-0 right-0 w-full max-w-xl bg-white shadow-[0_0_40px_rgba(0,0,0,0.5)] z-[2501] flex flex-col translate-x-full transition-transform duration-300 ease-in-out border-l border-gray-200">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white">
+            <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2" id="drawer-title">
+                Revisar Reporte
+            </h3>
+            <button type="button" onclick="closeReviewDrawer()" class="text-gray-400 hover:text-gray-600 transition-colors bg-gray-100 hover:bg-gray-200 p-2 rounded-lg">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto custom-scrollbar bg-white flex flex-col">
+            <!-- Mapa de revisión -->
+            <div class="w-full h-[350px] relative border-b border-gray-200 shrink-0">
+                <div id="review-map" class="w-full h-full z-0"></div>
+            </div>
+            
+            <div class="p-6">
+                <!-- Info del Reporte -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Información Reportada</span>
+                            <h4 class="font-bold text-slate-800" id="drawer-desc">Descripción del problema</h4>
+                            <p class="text-xs text-slate-500 mt-1" id="drawer-address">Dirección</p>
+                        </div>
+                        <span id="drawer-intensity" class="px-2 py-1 rounded text-[10px] font-bold uppercase">INTENSIDAD</span>
+                    </div>
+                    
+                    <div class="flex gap-4">
+                        <button id="btn-approve" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-2.5 rounded-lg text-xs font-bold shadow-sm transition-colors">
+                            Aprobar (Nueva Inundación)
+                        </button>
+                        <button id="btn-reject" class="flex-1 bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 py-2.5 rounded-lg text-xs font-bold shadow-sm transition-colors">
+                            Rechazar Reporte
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Inundaciones Cercanas Sugeridas -->
+                <div>
+                    <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Inundaciones Cercanas (Sugeridas para Vincular)</h4>
+                    <div id="drawer-cercanas-list" class="space-y-3">
+                        <!-- Cards dinámicas -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="p-4 bg-white border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+            <button id="btn-vincular" disabled class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white py-3 rounded-lg text-sm font-bold shadow transition-colors flex justify-center items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                Vincular a Inundación Seleccionada
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let reviewDrawerReportId = null;
+        let reviewMap = null;
+        let reviewSelectedFloodId = null;
+        let reviewPolygons = {}; 
+        
+        function openReviewDrawer(btnElement) {
+            const reportData = JSON.parse(btnElement.getAttribute('data-report'));
+            const id = reportData.id;
+            reviewDrawerReportId = id;
+            reviewSelectedFloodId = null;
+            
+            document.getElementById('drawer-title').innerText = 'Opciones de Vinculación - Reporte N°' + id;
+            document.getElementById('drawer-desc').innerText = reportData.description || 'Sin descripción detallada';
+            document.getElementById('drawer-address').innerText = reportData.address || 'Ubicación GPS generada';
+            
+            let intensityColor = 'bg-slate-100 text-slate-700';
+            if(reportData.intensidad_propuesta === 'alta') intensityColor = 'bg-rose-100 text-rose-700';
+            else if(reportData.intensidad_propuesta === 'media') intensityColor = 'bg-amber-100 text-amber-700';
+            else if(reportData.intensidad_propuesta === 'baja') intensityColor = 'bg-teal-100 text-teal-700';
+            
+            const intBadge = document.getElementById('drawer-intensity');
+            intBadge.className = `px-2 py-1 rounded text-[10px] font-bold uppercase ${intensityColor}`;
+            intBadge.innerText = reportData.intensidad_propuesta || 'N/A';
+            
+            document.getElementById('review-drawer-backdrop').classList.remove('hidden');
+            requestAnimationFrame(() => {
+                document.getElementById('review-drawer-backdrop').classList.remove('opacity-0');
+                document.getElementById('review-drawer').classList.remove('translate-x-full');
+                
+                setTimeout(() => {
+                    initReviewMap(reportData);
+                }, 350); // wait for animation
+            });
+            
+            const listContainer = document.getElementById('drawer-cercanas-list');
+            listContainer.innerHTML = '';
+            
+            if (reportData.cercanas && reportData.cercanas.length > 0) {
+                reportData.cercanas.forEach(flood => {
+                    const card = document.createElement('div');
+                    card.id = `flood-card-${flood.id}`;
+                    card.className = `p-3 rounded-xl border-2 border-slate-200 bg-white shadow-sm cursor-pointer hover:border-blue-300 transition-all flex justify-between items-center`;
+                    card.innerHTML = `
+                        <div>
+                            <span class="text-xs font-bold text-slate-800">Inundación N°${flood.id}</span>
+                            <p class="text-[10px] text-slate-500 mt-1">Intensidad ${flood.intensidad_calculada || flood.intensidad || 'N/A'}</p>
+                        </div>
+                    `;
+                    
+                    card.onclick = () => selectFloodToLink(flood.id);
+                    card.onmouseenter = () => highlightFloodPolygon(flood.id, true);
+                    card.onmouseleave = () => highlightFloodPolygon(flood.id, false);
+                    
+                    listContainer.appendChild(card);
+                });
+            } else {
+                listContainer.innerHTML = '<p class="text-xs text-slate-400 italic bg-slate-100 p-4 rounded-lg text-center">No se detectaron inundaciones activas cercanas (radio de 1km).</p>';
+            }
+            
+            document.getElementById('btn-approve').parentElement.style.display = 'none'; // Hide approve/reject in drawer, user just wants to link here
+            
+            document.getElementById('btn-vincular').onclick = () => { 
+                if(reviewSelectedFloodId) {
+                    closeReviewDrawer(); 
+                    validarRapido(id, 'vincular', reviewSelectedFloodId);
+                }
+            };
+            
+            updateVincularButton();
+        }
+        
+        function closeReviewDrawer() {
+            document.getElementById('review-drawer-backdrop').classList.add('opacity-0');
+            document.getElementById('review-drawer').classList.add('translate-x-full');
+            setTimeout(() => document.getElementById('review-drawer-backdrop').classList.add('hidden'), 300);
+        }
+        
+        function initReviewMap(report) {
+            if (!reviewMap) {
+                reviewMap = L.map('review-map', { zoomControl: false }).setView([-17.7833, -63.1821], 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap'
+                }).addTo(reviewMap);
+                L.control.zoom({ position: 'topright' }).addTo(reviewMap);
+            } else {
+                reviewMap.eachLayer((layer) => {
+                    if (!layer._url) reviewMap.removeLayer(layer);
+                });
+                reviewPolygons = {};
+            }
+            const latRep = parseFloat(report.lat_reporte);
+            const lngRep = parseFloat(report.long_reporte);
+            const latUser = parseFloat(report.lat_gps);
+            const lngUser = parseFloat(report.long_gps);
+            
+            const bounds = L.latLngBounds();
+            let addedUser = false;
+            let addedEvent = false;
+            
+            if (!isNaN(latUser) && !isNaN(lngUser)) {
+                const userIcon = L.divIcon({
+                    className: 'custom-leaflet-user',
+                    html: `<div style="background-color:#3b82f6;width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 0 5px rgba(0,0,0,0.4);"></div>`,
+                    iconSize: [12, 12], iconAnchor: [6, 6]
+                });
+                L.marker([latUser, lngUser], { icon: userIcon }).bindTooltip("Ubicación del Reportero (GPS)").addTo(reviewMap);
+                bounds.extend([latUser, lngUser]);
+                addedUser = true;
+            }
+            
+            if (!isNaN(latRep) && !isNaN(lngRep)) {
+                const eventIcon = L.divIcon({
+                    className: 'custom-leaflet-event',
+                    html: `<div style="background-color:#f43f5e;width:16px;height:16px;border-radius:50%;border:2px solid white;box-shadow:0 0 10px rgba(0,0,0,0.5);animation:pulse 2s infinite;"></div>`,
+                    iconSize: [16, 16], iconAnchor: [8, 8]
+                });
+                L.marker([latRep, lngRep], { icon: eventIcon }).bindTooltip("Punto de Evento Reportado", {permanent: true, direction: "top", className: "text-xs font-bold"}).addTo(reviewMap);
+                bounds.extend([latRep, lngRep]);
+                addedEvent = true;
+            }
+            
+            if (addedUser && addedEvent && (latUser !== latRep || lngUser !== lngRep)) {
+                L.polyline([[latUser, lngUser], [latRep, lngRep]], {
+                    color: '#94a3b8', weight: 2, dashArray: '4, 4'
+                }).addTo(reviewMap);
+                
+                const dist = reviewMap.distance([latUser, lngUser], [latRep, lngRep]);
+                L.marker([(latUser+latRep)/2, (lngUser+lngRep)/2], {
+                    icon: L.divIcon({
+                        className: 'dist-label',
+                        html: `<div style="background:rgba(255,255,255,0.9);color:#64748b;font-size:9px;font-weight:bold;padding:1px 4px;border-radius:4px;border:1px solid #cbd5e1;box-shadow:0 1px 2px rgba(0,0,0,0.1);">${Math.round(dist)}m</div>`,
+                        iconSize: [40, 16], iconAnchor: [20, 8]
+                    })
+                }).addTo(reviewMap);
+            }
+            
+            if (report.cercanas && report.cercanas.length > 0) {
+                report.cercanas.forEach(flood => {
+                    const latC = parseFloat(flood.latitud);
+                    const lngC = parseFloat(flood.longitud);
+                    
+                    if (flood.polygon_coords && flood.polygon_coords.length >= 3) {
+                        const polygon = L.polygon(flood.polygon_coords, {
+                            color: '#cbd5e1', fillColor: '#94a3b8', fillOpacity: 0.2, weight: 2, dashArray: '5,5'
+                        }).addTo(reviewMap);
+                        
+                        polygon.on('click', () => selectFloodToLink(flood.id));
+                        polygon.bindTooltip(`Inundación N°${flood.id}`, { className: 'text-xs font-bold' });
+                        
+                        reviewPolygons[flood.id] = polygon;
+                        bounds.extend(polygon.getBounds());
+                    } else if (!isNaN(latC) && !isNaN(lngC)) {
+                        const circle = L.circle([latC, lngC], {
+                            radius: 150, color: '#cbd5e1', fillColor: '#94a3b8', fillOpacity: 0.2, weight: 2, dashArray: '5,5'
+                        }).addTo(reviewMap);
+                        
+                        circle.on('click', () => selectFloodToLink(flood.id));
+                        circle.bindTooltip(`Inundación N°${flood.id}`, { className: 'text-xs font-bold' });
+                        
+                        reviewPolygons[flood.id] = circle;
+                        bounds.extend(circle.getBounds());
+                    }
+                });
+            }
+            
+            if (bounds.isValid()) {
+                // Initial fit before invalidateSize (can help center roughly)
+                reviewMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+            }
+            
+            setTimeout(() => {
+                reviewMap.invalidateSize();
+                if (bounds.isValid()) {
+                    reviewMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+                }
+            }, 100);
+        }
+        
+        function highlightFloodPolygon(floodId, isHover) {
+            if(floodId === reviewSelectedFloodId) return;
+            const poly = reviewPolygons[floodId];
+            if(poly) {
+                if(isHover) {
+                    poly.setStyle({ color: '#60a5fa', fillColor: '#93c5fd', fillOpacity: 0.4, weight: 2 });
+                } else {
+                    poly.setStyle({ color: '#cbd5e1', fillColor: '#94a3b8', fillOpacity: 0.2, weight: 2 });
+                }
+            }
+        }
+        
+        function selectFloodToLink(floodId) {
+            Object.keys(reviewPolygons).forEach(id => {
+                reviewPolygons[id].setStyle({ color: '#cbd5e1', fillColor: '#94a3b8', fillOpacity: 0.2, weight: 2 });
+                const card = document.getElementById(`flood-card-${id}`);
+                if(card) {
+                    card.classList.remove('border-blue-500', 'bg-blue-50');
+                    card.classList.add('border-slate-200', 'bg-white');
+                }
+            });
+            
+            reviewSelectedFloodId = floodId;
+            if(reviewPolygons[floodId]) {
+                reviewPolygons[floodId].setStyle({ color: '#2563eb', fillColor: '#3b82f6', fillOpacity: 0.5, weight: 3 });
+            }
+            const selectedCard = document.getElementById(`flood-card-${floodId}`);
+            if(selectedCard) {
+                selectedCard.classList.remove('border-slate-200', 'bg-white');
+                selectedCard.classList.add('border-blue-500', 'bg-blue-50');
+            }
+            
+            updateVincularButton();
+        }
+        
+        function updateVincularButton() {
+            const btn = document.getElementById('btn-vincular');
+            if (reviewSelectedFloodId) {
+                btn.disabled = false;
+            } else {
+                btn.disabled = true;
+            }
+        }
+    </script>
 </div>

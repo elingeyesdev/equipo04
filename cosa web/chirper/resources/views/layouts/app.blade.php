@@ -21,6 +21,7 @@
 
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
         @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -199,11 +200,7 @@
 
         <!-- PAGE CONTENT -->
         <main class="mx-auto w-full max-w-7xl px-4 py-8 flex-1">
-        @if (session('status'))
-            <div class="mb-4 rounded-md border border-gray-200 bg-gray-50 p-3 text-sm">
-                {{ session('status') }}
-            </div>
-        @endif
+
 
         @if ($errors->any())
             <div class="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm">
@@ -288,6 +285,39 @@
     </script>
 
     @include('chat.widget')
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const Toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+            didOpen: (toast) => {
+                toast.addEventListener('mouseenter', Swal.stopTimer)
+                toast.addEventListener('mouseleave', Swal.resumeTimer)
+            }
+        });
+
+        @if(session('success'))
+            Toast.fire({
+                icon: 'success',
+                title: {!! json_encode(session('success')) !!}
+            });
+        @elseif(session('error'))
+            Toast.fire({
+                icon: 'error',
+                title: {!! json_encode(session('error')) !!}
+            });
+        @elseif(session('status'))
+            Toast.fire({
+                icon: 'info',
+                title: {!! json_encode(session('status')) !!}
+            });
+        @endif
+    });
+    </script>
 </body>
 
 <script>
@@ -332,7 +362,7 @@
 
     btn.addEventListener('click', function () {
         if (!navigator.geolocation) {
-            alert('Tu navegador no soporta geolocalización.');
+            Swal.fire('Error', 'Tu navegador no soporta geolocalización.', 'error');
             return;
         }
         btn.disabled = true;
@@ -346,7 +376,7 @@
                 updateBtnState();
             },
             function (err) {
-                alert('No se pudo obtener la ubicación: ' + err.message);
+                Swal.fire('Error', 'No se pudo obtener la ubicación: ' + err.message, 'error');
                 btn.disabled = false;
                 updateBtnState();
             },
@@ -354,6 +384,61 @@
         );
     });
 })();
+</script>
+
+<script>
+// Función global para reemplazar onsubmit="return confirm('...')"
+function confirmForm(event, message) {
+    event.preventDefault();
+    const form = event.target;
+    Swal.fire({
+        title: '¿Estás seguro?',
+        text: message || 'Esta acción no se puede deshacer.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Sí, continuar',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            form.submit();
+        }
+    });
+}
+
+// Interceptar wire:confirm de Livewire 3
+document.addEventListener('livewire:initialized', () => {
+    if (window.Livewire) {
+        Livewire.directive('confirm', ({ el, directive, component, cleanup }) => {
+            let content = directive.expression;
+            let onClick = e => {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                Swal.fire({
+                    title: '¿Confirmación requerida?',
+                    text: content,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#d33',
+                    confirmButtonText: 'Sí, continuar',
+                    cancelButtonText: 'Cancelar'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        el.removeAttribute('wire:confirm');
+                        el.click();
+                        setTimeout(() => el.setAttribute('wire:confirm', content), 500);
+                    }
+                });
+            };
+            el.addEventListener('click', onClick, { capture: true });
+            cleanup(() => {
+                el.removeEventListener('click', onClick);
+            });
+        });
+    }
+});
 </script>
 
 </html>

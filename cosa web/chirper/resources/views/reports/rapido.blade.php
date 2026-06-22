@@ -44,9 +44,7 @@
             </button>
         </form>
         
-        <div id="successMessage" class="mt-4 p-4 bg-green-100 text-green-800 rounded-md hidden">
-            Reporte enviado o actualizado correctamente. Gracias por tu colaboración.
-        </div>
+
     </div>
 </div>
 
@@ -235,16 +233,29 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
             
             if (response.ok) {
-                document.getElementById('successMessage').classList.remove('hidden');
-                setTimeout(() => {
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Reporte Enviado!',
+                    text: 'Reporte enviado o actualizado correctamente. Gracias por tu colaboración.',
+                    timer: 2000,
+                    showConfirmButton: false
+                }).then(() => {
                     window.location.href = '/login';
-                }, 2000);
+                });
             } else {
-                alert('Error: ' + (result.message || 'Error desconocido'));
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: result.message || 'Error desconocido'
+                });
                 btn.disabled = false;
             }
         } catch (err) {
-            alert('Error de conexión');
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Error de conexión'
+            });
             btn.disabled = false;
         }
         btn.textContent = 'Enviar Reporte';

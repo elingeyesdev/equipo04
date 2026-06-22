@@ -905,11 +905,11 @@
             body: JSON.stringify(payload)
         }).then(res => res.json()).then(data => {
             if(data.dano) {
-                alert('Daño registrado');
+                Swal.fire('¡Registrado!', 'Daño registrado correctamente.', 'success');
                 closeDamageModal();
                 fetchData(); // Reload data
             } else {
-                alert('Error al registrar daño');
+                Swal.fire('Error', 'Error al registrar daño', 'error');
             }
         });
     }
@@ -928,12 +928,12 @@
             body: JSON.stringify(payload)
         }).then(res => res.json()).then(data => {
             if(data.message) {
-                alert(data.message);
+                Swal.fire('¡Fusión Exitosa!', data.message, 'success');
                 closeMergeModal();
                 fetchData(); // Reload data
                 fetchMergeRecommendations(); // Reload alerts
             } else {
-                alert('Error al fusionar: ' + (data.error || 'Desconocido'));
+                Swal.fire('Error', 'Error al fusionar: ' + (data.error || 'Desconocido'), 'error');
             }
         });
     }
