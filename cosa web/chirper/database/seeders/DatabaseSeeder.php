@@ -3,7 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\CentroAsistencia;
-use App\Models\Donacion;
+
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -152,40 +152,10 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // --- Donaciones Seeders ---
-        $centro1 = CentroAsistencia::where('nombre', 'Centro de Acopio Cristo Redentor')->first()->id_centro;
-        $centro2 = CentroAsistencia::where('nombre', 'Centro Municipal Parque Urbano')->first()->id_centro;
-
-        Donacion::query()->firstOrCreate(
-            ['items_description' => '50 litros de agua embotellada, 20 latas de atún'],
-            [
-                'centro_id' => $centro1,
-                'donor_carnet' => '10000001',
-                'is_anonymous' => false,
-                'status' => 'recibido',
-            ]
-        );
-
-        Donacion::query()->firstOrCreate(
-            ['items_description' => 'Ropa variada para adultos y niños (4 bolsas grandes)'],
-            [
-                'centro_id' => $centro2,
-                'donor_carnet' => '10000001',
-                'is_anonymous' => true,
-                'status' => 'en_uso',
-                'usage_details' => 'Se clasificó y entregó a 3 familias desplazadas del barrio central.',
-            ]
-        );
-
-        Donacion::query()->firstOrCreate(
-            ['items_description' => '15 colchonetas y 30 frazadas térmicas'],
-            [
-                'centro_id' => $centro1,
-                'donor_carnet' => '10000002',
-                'is_anonymous' => false,
-                'status' => 'entregado',
-                'usage_details' => 'Entregado íntegramente al refugio temporal de la avenida principal.',
-            ]
-        );
+        $this->call([
+            FloodsSeeder::class,
+            VictimsSeeder::class,
+            InventorySeeder::class,
+        ]);
     }
 }
