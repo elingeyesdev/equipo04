@@ -509,7 +509,7 @@
                                         @foreach($repsVinc as $rv)
                                             <div class="bg-white rounded-lg p-2.5 text-xs border border-slate-100 shadow-sm flex justify-between items-center">
                                                 <div>
-                                                    <span class="font-bold text-slate-700">Reporte</span>
+                                                    <span class="font-bold text-slate-700">N°{{ $rv['id'] }}</span>
                                                     <span class="ml-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase {{ $rv['intensidad_propuesta'] === 'alta' ? 'bg-rose-50 text-rose-700' : ($rv['intensidad_propuesta'] === 'media' ? 'bg-amber-50 text-amber-700' : 'bg-teal-50 text-teal-700') }}">{{ $rv['intensidad_propuesta'] }}</span>
                                                 </div>
                                                 <span class="text-slate-400 font-medium">{{ $rv['peso'] }}pts</span>

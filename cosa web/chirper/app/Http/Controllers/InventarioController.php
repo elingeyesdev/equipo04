@@ -24,7 +24,9 @@ class InventarioController extends Controller
             ->latest()
             ->get();
 
-        return view('inventario.show', compact('centro', 'inventario'));
+        $inundaciones = \App\Models\Inundacion::activas()->get();
+
+        return view('inventario.show', compact('centro', 'inventario', 'inundaciones'));
     }
 
     public function store(Request $request, CentroAsistencia $centro)
@@ -91,13 +93,18 @@ class InventarioController extends Controller
         $validated = $request->validate([
             'items' => 'required|array|min:1',
             'items.*' => 'exists:inventario,id',
-            'status' => 'required|in:recibido_centro,almacenado,retirado,en_transito,entregado',
+            'status' => 'required|in:recibido_centro,almacenado,retirado,en_transito,entregado,desechado',
             'usage_details' => 'nullable|string',
             'photo' => 'nullable|image|max:5120',
+            'inundacion_id' => 'nullable|exists:inundaciones,id',
         ]);
 
         if ($validated['status'] === 'entregado' && !$request->hasFile('photo')) {
             return redirect()->back()->withErrors(['photo' => 'La foto es obligatoria al entregar.']);
+        }
+
+        if ($validated['status'] === 'desechado' && empty($validated['usage_details'])) {
+            return redirect()->back()->withErrors(['usage_details' => 'Debes justificar por qué se está desechando (Observación requerida).']);
         }
 
         $photoPath = null;
@@ -108,21 +115,69 @@ class InventarioController extends Controller
         $apiUser = session('api_user', []);
         $authorityCarnet = $apiUser['carnet'] ?? null;
 
-        DB::transaction(function () use ($validated, $photoPath, $authorityCarnet) {
+        $flujo = [
+            'recibido_centro' => 1,
+            'almacenado' => 2,
+            'retirado' => 3,
+            'en_transito' => 4,
+            'entregado' => 5,
+        ];
+
+        DB::transaction(function () use ($validated, $photoPath, $authorityCarnet, $flujo) {
             $items = Inventario::whereIn('id', $validated['items'])->get();
+
+            // Verificamos que todos tengan el mismo status inicial
+            $statusInicial = $items->first()->status;
+            foreach ($items as $item) {
+                if ($item->status !== $statusInicial) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['items' => 'No puedes seleccionar ítems con diferentes estados para una actualización masiva.']);
+                }
+                if ($item->status === 'desechado') {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['items' => 'Los ítems desechados no pueden cambiar de estado.']);
+                }
+            }
+
+            $nuevoStatus = $validated['status'];
+
+            // Lógica para 'desechado'
+            if ($nuevoStatus === 'desechado') {
+                $permitidos = ['comida', 'bebida', 'medicamentos'];
+                foreach ($items as $item) {
+                    if (!in_array($item->categoria, $permitidos)) {
+                        throw \Illuminate\Validation\ValidationException::withMessages(['status' => 'Solo se pueden desechar donaciones de comida, bebida o medicamentos.']);
+                    }
+                }
+            } else {
+                // Validación estricta del flujo normal
+                if (!isset($flujo[$statusInicial]) || !isset($flujo[$nuevoStatus])) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['status' => 'Estado inválido.']);
+                }
+                $pasoActual = $flujo[$statusInicial];
+                $pasoSiguiente = $flujo[$nuevoStatus];
+
+                if ($pasoSiguiente !== $pasoActual + 1) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['status' => 'El estado seleccionado no corresponde al siguiente paso lógico del ciclo de vida.']);
+                }
+            }
 
             foreach ($items as $inventario) {
                 $oldStatus = $inventario->status;
 
-                $inventario->update([
-                    'status' => $validated['status'],
+                $dataToUpdate = [
+                    'status' => $nuevoStatus,
                     'usage_details' => $validated['usage_details'] ?? $inventario->usage_details,
-                ]);
+                ];
+
+                if (!empty($validated['inundacion_id'])) {
+                    $dataToUpdate['inundacion_id'] = $validated['inundacion_id'];
+                }
+
+                $inventario->update($dataToUpdate);
 
                 TrazabilidadInventario::create([
                     'inventario_id' => $inventario->id,
                     'estado_anterior' => $oldStatus,
-                    'estado_nuevo' => $validated['status'],
+                    'estado_nuevo' => $nuevoStatus,
                     'observacion' => $validated['usage_details'] ?? 'Actualización masiva de estado.',
                     'fecha_actualizacion' => now(),
                     'registrado_por' => $authorityCarnet,

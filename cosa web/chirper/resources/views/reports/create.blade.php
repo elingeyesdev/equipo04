@@ -334,10 +334,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
             
             if (response.ok) {
+                let etaMsg = '';
+                if (result.eta) {
+                    etaMsg = `<br><span class="font-bold text-sm">Tiempo estimado de ayuda: ~${result.eta.eta_minutes} min (desde ${result.eta.name}, a ${result.eta.distance_km}km).</span>`;
+                }
+                document.getElementById('successMessage').innerHTML = 'Reporte creado exitosamente.' + etaMsg;
                 document.getElementById('successMessage').classList.remove('hidden');
                 setTimeout(() => {
                     window.location.href = '/reports';
-                }, 2000);
+                }, 3500);
             } else {
                 document.getElementById('errorMessage').textContent = 'Error: ' + (result.message || 'Error desconocido');
                 document.getElementById('errorMessage').classList.remove('hidden');

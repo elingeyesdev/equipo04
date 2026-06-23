@@ -107,7 +107,40 @@
     @endif
 
     <!-- Lista de Inventario -->
-    <div x-data="{ showBulk: false }" class="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
+    <div x-data="{ 
+        showBulk: false,
+        itemsData: {
+            @foreach($inventario as $item)
+            {{ $item->id }}: { status: '{{ $item->status }}', categoria: '{{ $item->categoria }}' },
+            @endforeach
+        },
+        selectedItemIds: [],
+        newStatus: '',
+        
+        get selectedStatus() {
+            if (this.selectedItemIds.length === 0) return null;
+            return this.itemsData[this.selectedItemIds[0]].status;
+        },
+        
+        get canDiscard() {
+            if (this.selectedItemIds.length === 0) return false;
+            const allowed = ['comida', 'bebida', 'medicamentos'];
+            for(let id of this.selectedItemIds) {
+                if (!allowed.includes(this.itemsData[id].categoria)) return false;
+            }
+            return true;
+        },
+
+        get isTargetRetirado() {
+            return this.newStatus === 'retirado';
+        },
+
+        isDisabled(itemId) {
+            if (this.itemsData[itemId].status === 'desechado' || this.itemsData[itemId].status === 'entregado') return true;
+            if (this.selectedItemIds.length === 0) return false;
+            return this.itemsData[itemId].status !== this.selectedStatus;
+        }
+    }" class="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
         <div class="px-4 py-5 sm:px-6 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
             <h3 class="text-lg leading-6 font-medium text-gray-900">Ítems en Inventario</h3>
             
@@ -125,12 +158,12 @@
 
         <ul class="divide-y divide-gray-200">
             @forelse($inventario as $item)
-            <li class="p-6 hover:bg-gray-50 transition-colors">
+            <li class="p-6 hover:bg-gray-50 transition-colors" :class="{'opacity-50': isDisabled({{ $item->id }})}">
                 <div class="flex items-start">
                     
                     @if($apiRole === 'authority')
                     <div x-show="showBulk" class="mr-4 mt-1" style="display: none;">
-                        <input type="checkbox" name="items[]" value="{{ $item->id }}" class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded">
+                        <input type="checkbox" name="items[]" value="{{ $item->id }}" x-model="selectedItemIds" :disabled="isDisabled({{ $item->id }})" class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded disabled:bg-gray-200 disabled:cursor-not-allowed">
                     </div>
                     @endif
 
@@ -189,30 +222,60 @@
 
         @if($apiRole === 'authority')
             <!-- Controles de Bulk Update -->
-            <div x-show="showBulk" class="bg-gray-100 p-4 border-t border-gray-200" style="display: none;">
-                <h4 class="text-sm font-medium text-gray-900 mb-3">Actualizar ítems seleccionados</h4>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+            <div x-show="showBulk && selectedItemIds.length > 0" class="bg-gray-100 p-4 border-t border-gray-200" style="display: none;" x-transition>
+                <h4 class="text-sm font-medium text-gray-900 mb-3">Actualizar <span x-text="selectedItemIds.length"></span> ítem(s) seleccionado(s)</h4>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
                     <div>
                         <label class="block text-xs font-medium text-gray-700">Nuevo Estado</label>
-                        <select name="status" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
-                            <option value="recibido_centro">Recibido en Centro</option>
-                            <option value="almacenado">Guardado en Almacén</option>
-                            <option value="retirado">Retiro de Almacén</option>
-                            <option value="en_transito">En Tránsito (Vehículo)</option>
-                            <option value="entregado">Entregado al Beneficiario</option>
+                        <select name="status" x-model="newStatus" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" required>
+                            <option value="" disabled selected>Seleccionar...</option>
+                            <template x-if="selectedStatus === 'recibido_centro'">
+                                <option value="almacenado">Guardado en Almacén</option>
+                            </template>
+                            <template x-if="selectedStatus === 'almacenado'">
+                                <option value="retirado">Retiro de Almacén</option>
+                            </template>
+                            <template x-if="selectedStatus === 'retirado'">
+                                <option value="en_transito">En Tránsito (Vehículo)</option>
+                            </template>
+                            <template x-if="selectedStatus === 'en_transito'">
+                                <option value="entregado">Entregado al Beneficiario</option>
+                            </template>
+                            <template x-if="(selectedStatus === 'recibido_centro' || selectedStatus === 'almacenado') && canDiscard">
+                                <option value="desechado">Desechar (Mal estado)</option>
+                            </template>
                         </select>
                     </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-700">Observación / Destino</label>
-                        <input type="text" name="usage_details" placeholder="Ej: Entregado a la comunidad..." class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
+
+                    <div x-show="isTargetRetirado" style="display: none;">
+                        <label class="block text-xs font-medium text-gray-700">Vincular a Inundación (Opcional)</label>
+                        <select name="inundacion_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
+                            <option value="">-- Ninguna --</option>
+                            @foreach($inundaciones as $inundacion)
+                                <option value="{{ $inundacion->id }}">Inundación #{{ $inundacion->id }} - {{ $inundacion->address ?? 'Sin dirección' }}</option>
+                            @endforeach
+                        </select>
                     </div>
+
+                    <div :class="{'sm:col-span-1': isTargetRetirado, 'sm:col-span-2': !isTargetRetirado}">
+                        <label class="block text-xs font-medium text-gray-700">
+                            Observación / Destino <span x-show="newStatus === 'desechado'" class="text-red-500 font-bold">*</span>
+                        </label>
+                        <input type="text" name="usage_details" :required="newStatus === 'desechado'" placeholder="Ej: Entregado a la comunidad..." class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
+                    </div>
+
                     <div>
-                        <label class="block text-xs font-medium text-gray-700">Foto (Requerida para "Entregado")</label>
-                        <input type="file" name="photo" accept="image/*" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100">
+                        <label class="block text-xs font-medium text-gray-700">Foto <span x-show="newStatus === 'entregado'" class="text-red-500 font-bold">*</span></label>
+                        <input type="file" name="photo" accept="image/*" :required="newStatus === 'entregado'" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100">
                     </div>
                 </div>
+
                 <div class="mt-4 flex justify-end">
-                    <button type="submit" class="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-md hover:bg-primary-700">Confirmar Movimiento</button>
+                    <button type="submit" class="px-4 py-2 text-white text-sm font-medium rounded-md transition-colors" :class="newStatus === 'desechado' ? 'bg-red-600 hover:bg-red-700' : 'bg-primary-600 hover:bg-primary-700'" :disabled="!newStatus">
+                        <span x-show="newStatus !== 'desechado'">Confirmar Movimiento</span>
+                        <span x-show="newStatus === 'desechado'" style="display: none;">Desechar Donaciones</span>
+                    </button>
                 </div>
             </div>
         </form>
