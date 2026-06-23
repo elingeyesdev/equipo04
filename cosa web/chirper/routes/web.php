@@ -10,6 +10,8 @@ use App\Http\Controllers\InventarioController;
 use App\Http\Middleware\ApiAuthenticate;
 use App\Http\Middleware\EnsureApiAuthority;
 use App\Http\Middleware\RedirectIfApiAuthenticated;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SugerenciaController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -40,6 +42,13 @@ Route::get('/weather/tiles/{layer}/{z}/{x}/{y}', [\App\Http\Controllers\WeatherC
 // Usado por el Job CalcularPoligonoInundacion y opcionalmente por el frontend
 Route::get('/api/elevation', [\App\Http\Controllers\ElevationController::class, 'getElevation'])->name('elevation.get');
 
+// ── Rutas Públicas de Información y Sugerencias ───────────────────────
+Route::view('/faq', 'faq.index')->name('faq.index');
+Route::view('/contacto', 'contact.index')->name('contact.index');
+Route::get('/sugerencias', [SugerenciaController::class, 'index'])->name('sugerencias.index');
+Route::post('/sugerencias', [SugerenciaController::class, 'store'])->name('sugerencias.store');
+Route::post('/sugerencias/{sugerencia}/like', [SugerenciaController::class, 'incrementLike'])->name('sugerencias.like');
+
 Route::middleware(ApiAuthenticate::class)->group(function () {
     Route::get('/reports', \App\Livewire\ReportsIndex::class)->name('reports.index');
     Route::get('/reports/create', [ReportController::class, 'create'])->name('reports.create');
@@ -53,6 +62,10 @@ Route::middleware(ApiAuthenticate::class)->group(function () {
 
         Route::get('/reports/notifications/latest', [ReportController::class, 'latestForNotifications'])->name('reports.notifications.latest');
     });
+
+    // ── Perfil de Usuario ────────────────────────────────────────────────
+    Route::get('/perfil', [ProfileController::class, 'show'])->name('profile.show');
+    Route::put('/perfil', [ProfileController::class, 'update'])->name('profile.update');
 
     // ── Logística (Centros de Asistencia) ────────────────────────────────
     Route::get('/logistica', [LogisticsController::class, 'index'])->name('logistica.index');

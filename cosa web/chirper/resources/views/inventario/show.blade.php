@@ -10,6 +10,10 @@
         <a href="{{ route('inventario.index') }}" class="mt-4 sm:mt-0 text-sm font-medium text-primary-600 hover:text-primary-500">&larr; Volver a Centros</a>
     </div>
 
+    @php($apiUser = (array) session('api_user', []))
+    @php($apiRole = (string) ($apiUser['role'] ?? ''))
+
+    @if($apiRole === 'autoridad')
     <!-- Formulario Agregar Item -->
     <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-8">
         <h2 class="text-lg font-medium text-gray-900 mb-4">Registrar Nuevo Ítem</h2>
@@ -46,6 +50,7 @@
             </div>
         </form>
     </div>
+    @endif
 
     <!-- Lista de Inventario -->
     <div class="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
@@ -83,6 +88,7 @@
                         </span>
                     </div>
 
+                    @if($apiRole === 'autoridad')
                     <form action="{{ route('inventario.updateStatus', $item->id) }}" method="POST" class="flex flex-col sm:flex-row gap-3">
                         @csrf
                         @method('PATCH')
@@ -94,6 +100,7 @@
                         <input type="text" name="usage_details" placeholder="Observación o destino..." value="{{ $item->usage_details }}" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
                         <button type="submit" class="px-3 py-2 bg-gray-900 text-white text-sm font-medium rounded-md hover:bg-gray-800 whitespace-nowrap">Actualizar</button>
                     </form>
+                    @endif
                 </div>
 
                 <!-- Historial de Trazabilidad -->

@@ -128,9 +128,9 @@
                             </div>
                         </div>
 
-                        <!-- User Menu -->
-                        <div class="relative group hidden sm:block ml-2">
-                            <div class="flex items-center gap-2 cursor-pointer p-1 pr-3 rounded-full bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-colors">
+                        <!-- User Profile Link -->
+                        <div class="hidden sm:block ml-2">
+                            <a href="{{ route('profile.show') }}" class="flex items-center gap-2 p-1 pr-3 rounded-full bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-colors">
                                 <div class="w-8 h-8 rounded-full bg-primary-800 text-white flex items-center justify-center font-bold text-xs shadow-sm">
                                     {{ strtoupper(substr($apiUser['name'] ?? 'U', 0, 1)) }}
                                 </div>
@@ -138,7 +138,7 @@
                                     <span class="font-bold text-gray-800 leading-none text-xs">{{ (string) ($apiUser['name'] ?? '') }}</span>
                                     <span class="text-primary-600 text-[10px] font-medium uppercase mt-0.5">{{ $apiRole }}</span>
                                 </div>
-                            </div>
+                            </a>
                         </div>
 
                         <!-- Logout Form -->
@@ -189,9 +189,23 @@
     </main>
 
     <!-- FOOTER INSTITUCIONAL -->
-    <footer class="bg-white border-t border-gray-200 mt-auto py-6 text-center text-sm text-gray-500">
-        <p>&copy; {{ date('Y') }} Gobierno Autónomo Departamental de Santa Cruz. Todos los derechos reservados.</p>
-        <p class="text-xs mt-1">Sistema Integrado de Gestión y Transparencia de Desastres</p>
+    <footer class="bg-white border-t border-gray-200 mt-auto py-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row justify-between items-center md:items-start gap-6">
+                <!-- Información Principal -->
+                <div class="text-center md:text-left">
+                    <p class="text-sm text-gray-500 font-medium">&copy; {{ date('Y') }} Gobierno Autónomo Departamental de Santa Cruz. Todos los derechos reservados.</p>
+                    <p class="text-xs mt-1 text-gray-400">Sistema Integrado de Gestión y Transparencia de Desastres</p>
+                </div>
+                
+                <!-- Enlaces Rápidos -->
+                <nav class="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm">
+                    <a href="{{ route('sugerencias.index') }}" class="text-gray-500 hover:text-primary-700 transition-colors font-medium">Foro de Sugerencias</a>
+                    <a href="{{ route('faq.index') }}" class="text-gray-500 hover:text-primary-700 transition-colors font-medium">Preguntas Frecuentes (FAQ)</a>
+                    <a href="{{ route('contact.index') }}" class="text-gray-500 hover:text-primary-700 transition-colors font-medium">Contáctanos</a>
+                </nav>
+            </div>
+        </div>
     </footer>
 
     <!-- Global Image Modal -->
