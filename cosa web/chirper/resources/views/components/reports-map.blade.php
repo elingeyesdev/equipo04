@@ -393,7 +393,8 @@ function initMap() {
                         lng: lng,
                         lat_reporte: lat,
                         long_reporte: lng,
-                        polygon_coords: report.polygon_coords,
+                        polygon_coords: report.polygon_es_fallback ? null : report.polygon_coords,
+                        polygon_es_fallback: !!report.polygon_es_fallback,
                         intensidad_propuesta: intensidad,
                         updated_at: report.updated_at,
                     });

@@ -43,6 +43,7 @@ class InundacionResource extends JsonResource
                 'datos_clima_json'     => $rep->datos_clima_json,
                 'estado_validacion'    => $rep->estado_validacion,
                 'polygon_coords'       => $rep->polygon_coords,
+                'polygon_es_fallback'  => (bool) $rep->polygon_es_fallback,
                 'updated_at'           => $rep->updated_at,
                 'created_at'           => $rep->created_at,
                 'created_at_human'     => Carbon::parse($rep->created_at)->diffForHumans(),
@@ -94,6 +95,7 @@ class InundacionResource extends JsonResource
             'polygon_coords'            => $this->polygon_coords,
             'polygon_calculado_at'      => $this->polygon_calculado_at?->toISOString(),
             'polygon_editado_autoridad' => (bool) $this->polygon_editado_autoridad,
+            'polygon_es_fallback'       => (bool) $this->polygon_es_fallback,
 
             // ── Detalle de reportes para el panel lateral del mapa ───────
             'reportes_activos' => $reportesActivosTTL,

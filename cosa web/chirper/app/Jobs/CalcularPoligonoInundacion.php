@@ -6,6 +6,7 @@ namespace App\Jobs;
 
 use App\Models\Inundacion;
 use App\Models\Reporte;
+use App\Services\PoligonoTopografiaCacheService;
 use App\Services\TopografiaInundacionService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -16,9 +17,7 @@ use Illuminate\Support\Facades\Log;
  *
  * Calcula el polígono de área de inundación mediante region growing
  * sobre una grilla de elevación (Open Topo Data / SRTM 30 m).
- *
- * Puede operar sobre un reporte individual (polygon_coords en reportes)
- * o sobre una inundación creada manualmente por autoridad.
+ * Persiste polygon_coords, GeoJSON y caché para consumo del mapa.
  */
 final class CalcularPoligonoInundacion implements ShouldQueue
 {
@@ -33,19 +32,23 @@ final class CalcularPoligonoInundacion implements ShouldQueue
         private readonly string $entityType = 'reporte',
     ) {}
 
-    public function handle(TopografiaInundacionService $topografia): void
-    {
+    public function handle(
+        TopografiaInundacionService $topografia,
+        PoligonoTopografiaCacheService $cacheService,
+    ): void {
         if ($this->entityType === 'inundacion') {
-            $this->calcularParaInundacion($topografia);
+            $this->calcularParaInundacion($topografia, $cacheService);
 
             return;
         }
 
-        $this->calcularParaReporte($topografia);
+        $this->calcularParaReporte($topografia, $cacheService);
     }
 
-    private function calcularParaReporte(TopografiaInundacionService $topografia): void
-    {
+    private function calcularParaReporte(
+        TopografiaInundacionService $topografia,
+        PoligonoTopografiaCacheService $cacheService,
+    ): void {
         $reporte = Reporte::find($this->entityId);
 
         if ($reporte === null) {
@@ -71,15 +74,29 @@ final class CalcularPoligonoInundacion implements ShouldQueue
 
         Log::info("CalcularPoligonoInundacion: Region growing para Reporte #{$this->entityId} ({$intensidad}).");
 
-        $polygon = $topografia->calcularPoligono($lat, $lng, $intensidad);
+        $resultado = $topografia->calcularResultado($lat, $lng, $intensidad);
+        $geoJson = $cacheService->construirGeoJson(
+            $resultado['polygon_coords'],
+            $lat,
+            $lng,
+            $intensidad,
+            $resultado['es_fallback'],
+        );
 
-        $reporte->update(['polygon_coords' => $polygon]);
+        $cacheService->persistirReporte(
+            $reporte,
+            $resultado['polygon_coords'],
+            $geoJson,
+            $resultado['es_fallback'],
+        );
 
-        Log::info("CalcularPoligonoInundacion: Topografía guardada para Reporte #{$this->entityId}.");
+        Log::info("CalcularPoligonoInundacion: Topografía guardada para Reporte #{$this->entityId} ({$resultado['fuente']}).");
     }
 
-    private function calcularParaInundacion(TopografiaInundacionService $topografia): void
-    {
+    private function calcularParaInundacion(
+        TopografiaInundacionService $topografia,
+        PoligonoTopografiaCacheService $cacheService,
+    ): void {
         $inundacion = Inundacion::find($this->entityId);
 
         if ($inundacion === null) {
@@ -103,13 +120,22 @@ final class CalcularPoligonoInundacion implements ShouldQueue
 
         Log::info("CalcularPoligonoInundacion: Region growing para Inundación #{$this->entityId}.");
 
-        $polygon = $topografia->calcularPoligono($lat, $lng, 'media');
+        $resultado = $topografia->calcularResultado($lat, $lng, 'media');
+        $geoJson = $cacheService->construirGeoJson(
+            $resultado['polygon_coords'],
+            $lat,
+            $lng,
+            'media',
+            $resultado['es_fallback'],
+        );
 
-        $inundacion->update([
-            'polygon_coords' => $polygon,
-            'polygon_calculado_at' => now(),
-        ]);
+        $cacheService->persistirInundacion(
+            $inundacion,
+            $resultado['polygon_coords'],
+            $geoJson,
+            $resultado['es_fallback'],
+        );
 
-        Log::info("CalcularPoligonoInundacion: Topografía guardada para Inundación #{$this->entityId}.");
+        Log::info("CalcularPoligonoInundacion: Topografía guardada para Inundación #{$this->entityId} ({$resultado['fuente']}).");
     }
 }

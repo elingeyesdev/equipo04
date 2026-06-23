@@ -42,16 +42,20 @@ class Inundacion extends Model
         'estado',
         'municipio_id',
         'polygon_coords',
+        'polygon_geojson',
         'polygon_calculado_at',
         'polygon_editado_autoridad',
+        'polygon_es_fallback',
     ];
 
     protected $casts = [
         'latitud'                    => 'decimal:7',
         'longitud'                   => 'decimal:7',
         'polygon_coords'             => 'array',
+        'polygon_geojson'            => 'array',
         'polygon_calculado_at'       => 'datetime',
         'polygon_editado_autoridad'  => 'boolean',
+        'polygon_es_fallback'        => 'boolean',
     ];
 
     // ─────────────────────────────────────────────────────────────────────

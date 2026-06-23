@@ -38,6 +38,9 @@ class Reporte extends Model
         'estado_validacion',
         'datos_clima_json',
         'polygon_coords',
+        'polygon_geojson',
+        'polygon_calculado_at',
+        'polygon_es_fallback',
     ];
 
     protected $casts = [
@@ -48,6 +51,9 @@ class Reporte extends Model
         'peso'             => 'integer',
         'datos_clima_json' => 'array',
         'polygon_coords'   => 'array',
+        'polygon_geojson'  => 'array',
+        'polygon_calculado_at' => 'datetime',
+        'polygon_es_fallback'  => 'boolean',
     ];
 
     public function inundacion(): BelongsTo

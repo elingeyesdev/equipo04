@@ -22,13 +22,15 @@ window.createSmartHeatmap = function (map, reports, options = {}) {
     const parsedReports = reports.map(function (r) {
         const lat = parseFloat(r.lat || r.lat_reporte || r.latitud);
         const lng = parseFloat(r.lng || r.long_reporte || r.longitud);
-        const polygon = normalizePolygon(r.polygon_coords);
+        const esFallback = r.polygon_es_fallback === true || r.polygon_es_fallback === 1;
+        const polygon = esFallback ? null : normalizePolygon(r.polygon_coords);
 
         return {
             lat: lat,
             lng: lng,
             intensity: r.intensidad || r.intensidad_propuesta || r.intensidad_calculada || 'baja',
             polygon: polygon,
+            esFallback: esFallback,
             updatedAt: r.updated_at || r.updatedAt || r.created_at || null,
         };
     }).filter(function (r) {

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Http\Controllers\ElevationController;
+use App\Contracts\ElevationProvider;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -34,7 +34,7 @@ final class TopografiaInundacionService
     private const ELEVATION_BATCH_DELAY_MS = 1100;
 
     public function __construct(
-        private readonly ElevationController $elevationService,
+        private readonly ElevationProvider $elevationService,
     ) {}
 
     /**
@@ -42,33 +42,66 @@ final class TopografiaInundacionService
      */
     public function calcularPoligono(float $lat, float $lng, string $intensidad = 'media'): array
     {
+        return $this->calcularResultado($lat, $lng, $intensidad)['polygon_coords'];
+    }
+
+    /**
+     * @return array{
+     *   polygon_coords: array<int, array{0: float, 1: float}>,
+     *   es_fallback: bool,
+     *   fuente: 'topographic'|'geometric_fallback'
+     * }
+     */
+    public function calcularResultado(float $lat, float $lng, string $intensidad = 'media'): array
+    {
         $maxRadius = self::MAX_RADIUS_M[$intensidad] ?? self::MAX_RADIUS_M['media'];
+        $fallbackRadius = $maxRadius * 0.35;
 
         if ($lat === 0.0 && $lng === 0.0) {
-            return $this->buildCircularFallback($lat, $lng, $maxRadius * 0.35);
+            return $this->resultadoFallback($lat, $lng, $fallbackRadius);
         }
 
         $grid = $this->buildElevationGrid($lat, $lng, $maxRadius);
 
         if ($grid === null) {
-            Log::warning('TopografiaInundacionService: sin datos de elevación, usando fallback circular.');
+            Log::warning('TopografiaInundacionService: sin datos de elevación, usando fallback geométrico.');
 
-            return $this->buildCircularFallback($lat, $lng, $maxRadius * 0.35);
+            return $this->resultadoFallback($lat, $lng, $fallbackRadius);
         }
 
         $flooded = $this->regionGrow($grid, $lat, $lng, $maxRadius);
 
         if (count($flooded) < 1) {
-            return $this->buildCircularFallback($lat, $lng, $maxRadius * 0.35);
+            return $this->resultadoFallback($lat, $lng, $fallbackRadius);
         }
 
         $polygon = $this->floodedCellsToPolygon($flooded, $grid);
 
         if (count($polygon) < 3) {
-            return $this->buildCircularFallback($lat, $lng, $maxRadius * 0.35);
+            return $this->resultadoFallback($lat, $lng, $fallbackRadius);
         }
 
-        return $polygon;
+        return [
+            'polygon_coords' => $polygon,
+            'es_fallback' => false,
+            'fuente' => 'topographic',
+        ];
+    }
+
+    /**
+     * @return array{
+     *   polygon_coords: array<int, array{0: float, 1: float}>,
+     *   es_fallback: bool,
+     *   fuente: 'geometric_fallback'
+     * }
+     */
+    private function resultadoFallback(float $lat, float $lng, float $radiusMeters): array
+    {
+        return [
+            'polygon_coords' => $this->buildCircularFallback($lat, $lng, $radiusMeters),
+            'es_fallback' => true,
+            'fuente' => 'geometric_fallback',
+        ];
     }
 
     /**

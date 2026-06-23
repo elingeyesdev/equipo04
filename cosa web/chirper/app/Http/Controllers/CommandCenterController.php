@@ -52,6 +52,7 @@ class CommandCenterController extends Controller
                     'lng' => $inundacion->longitud,
                 ],
                 'polygon_coords' => $inundacion->polygon_coords, // Puede ser null
+                'polygon_es_fallback' => (bool) $inundacion->polygon_es_fallback,
                 'created_at' => $inundacion->created_at,
                 'updated_at' => $inundacion->updated_at,
                 'intensidad_calculada' => $inundacion->intensidadCalculada(),
@@ -65,6 +66,7 @@ class CommandCenterController extends Controller
                         'intensidad' => $r->intensidad_propuesta,
                         'intensidad_propuesta' => $r->intensidad_propuesta,
                         'polygon_coords' => $r->polygon_coords,
+                        'polygon_es_fallback' => (bool) $r->polygon_es_fallback,
                         'updated_at' => $r->updated_at,
                         'created_at' => $r->created_at,
                     ];
