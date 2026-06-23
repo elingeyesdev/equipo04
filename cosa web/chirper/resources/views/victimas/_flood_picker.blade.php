@@ -212,6 +212,29 @@
         return '<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-red-100 text-red-600">Falsa</span>';
     }
 
+    function buildHeatData(flood, lat, lng) {
+        const hasAuthorityPolygon = flood
+            && flood.polygon_coords
+            && Array.isArray(flood.polygon_coords)
+            && flood.polygon_coords.length >= 3;
+
+        if (hasAuthorityPolygon) {
+            return [{
+                lat: lat,
+                lng: lng,
+                polygon_coords: flood.polygon_coords,
+                intensidad_propuesta: flood.intensidad_calculada || 'media',
+                updated_at: flood.updated_at,
+            }];
+        }
+
+        if (flood && flood.reportes && flood.reportes.length > 0) {
+            return flood.reportes;
+        }
+
+        return [{ lat: lat, lng: lng, intensidad_propuesta: 'media' }];
+    }
+
     function renderCard(f, isSelected) {
         const sel = isSelected ? 'border-blue-500 bg-blue-50' : 'border-transparent hover:bg-gray-50';
         return `
@@ -311,12 +334,12 @@
                 }).setView([lat, lng], 13);
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 20 }).addTo(m);
                 const flood = FLOODS.find(f => f.id === id);
-                let heatData = (flood && flood.reportes && flood.reportes.length > 0) 
-                    ? flood.reportes 
-                    : [{ lat: lat, lng: lng, intensidad: 'media' }];
+                const heatData = buildHeatData(flood, lat, lng);
                 
                 window.createSmartHeatmap(m, heatData, {
-                    heatOptions: { radius: 25, blur: 15 } // Ajustado para minimapa
+                    heatOptions: { radius: 25, blur: 15 },
+                    mode: 'auto',
+                    ttlHours: 3,
                 });
                 
                 miniMaps[id] = m;
@@ -381,12 +404,12 @@
             }).setView([lat, lng], 13);
             L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 20 }).addTo(chipLeafletMap);
             
-            let heatData = (flood && flood.reportes && flood.reportes.length > 0) 
-                ? flood.reportes 
-                : [{ lat: lat, lng: lng, intensidad: 'media' }];
+            const heatData = buildHeatData(flood, lat, lng);
             
             window.createSmartHeatmap(chipLeafletMap, heatData, {
-                heatOptions: { radius: 25, blur: 15 }
+                heatOptions: { radius: 25, blur: 15 },
+                mode: 'auto',
+                ttlHours: 3,
             });
         }, 100);
 
@@ -451,12 +474,12 @@
                 }).setView([flood.latitud, flood.longitud], 13);
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 20 }).addTo(chipLeafletMap);
                 
-                let heatData = (flood && flood.reportes && flood.reportes.length > 0) 
-                    ? flood.reportes 
-                    : [{ lat: flood.latitud, lng: flood.longitud, intensidad: 'media' }];
+                const heatData = buildHeatData(flood, flood.latitud, flood.longitud);
                 
                 window.createSmartHeatmap(chipLeafletMap, heatData, {
-                    heatOptions: { radius: 25, blur: 15 }
+                    heatOptions: { radius: 25, blur: 15 },
+                    mode: 'auto',
+                    ttlHours: 3,
                 });
             }, 300);
         }

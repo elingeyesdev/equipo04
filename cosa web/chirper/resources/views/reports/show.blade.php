@@ -114,10 +114,28 @@
                             subdomains: 'abcd', maxZoom: 20 
                         }).addTo(miniMap);
                         
-                        const heatData = @json($inundacion->reportes->count() > 0 ? $inundacion->reportes : [['lat' => $inundacion->latitud, 'lng' => $inundacion->longitud, 'intensidad' => 'media']]);
+                        const heatData = @json(
+                            $inundacion->reportes->map(fn ($r) => [
+                                'lat' => $r->lat_reporte,
+                                'lng' => $r->long_reporte,
+                                'lat_reporte' => $r->lat_reporte,
+                                'long_reporte' => $r->long_reporte,
+                                'intensidad_propuesta' => $r->intensidad_propuesta,
+                                'polygon_coords' => $r->polygon_coords,
+                                'updated_at' => $r->updated_at,
+                            ])->values()->all() ?: [[
+                                'lat' => $inundacion->latitud,
+                                'lng' => $inundacion->longitud,
+                                'intensidad_propuesta' => 'media',
+                                'polygon_coords' => $inundacion->polygon_coords,
+                                'updated_at' => $inundacion->updated_at,
+                            ]]
+                        );
                         
                         window.createSmartHeatmap(miniMap, heatData, {
-                            heatOptions: { radius: 25, blur: 15 }
+                            heatOptions: { radius: 25, blur: 15 },
+                            mode: 'auto',
+                            ttlHours: 3,
                         });
                         
                         // Icono simple para el centroide

@@ -197,6 +197,7 @@ class ReportsIndex extends Component
             'foto_path'            => $r->foto_path,
             'estado_validacion'    => $r->estado_validacion,
             'polygon_coords'       => $r->polygon_coords,
+            'updated_at'           => $r->updated_at,
             'created_at'           => $r->created_at,
             'created_at_human'     => $r->created_at?->diffForHumans(),
         ])->toArray();
@@ -218,6 +219,7 @@ class ReportsIndex extends Component
             'foto_path'            => $r->foto_path,
             'estado_validacion'    => $r->estado_validacion,
             'polygon_coords'       => $r->polygon_coords,
+            'updated_at'           => $r->updated_at,
             'created_at'           => $r->created_at,
             'created_at_human'     => $r->created_at?->diffForHumans(),
             'caducado_hace'        => ($r->updated_at ?? $r->created_at)?->diffForHumans(),
@@ -260,6 +262,7 @@ class ReportsIndex extends Component
             'foto_path'            => $r->foto_path,
             'estado_validacion'    => $r->estado_validacion,
             'polygon_coords'       => $r->polygon_coords,
+            'updated_at'           => $r->updated_at,
             'created_at'           => $r->created_at,
             'created_at_human'     => $r->created_at?->diffForHumans(),
         ])->toArray();

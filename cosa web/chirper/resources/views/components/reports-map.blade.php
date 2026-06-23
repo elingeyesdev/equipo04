@@ -305,6 +305,7 @@ function initMap() {
         }
 
         let allActiveReports = [];
+        let heatSources = [];
 
         reportsData.forEach(report => {
             const lat = parseFloat(report.latitud);
@@ -381,6 +382,24 @@ function initMap() {
             const activeReps = report.reportes_activos || report.reportes || [];
             if (activeReps && Array.isArray(activeReps)) {
                 allActiveReports.push(...activeReps);
+
+                const hasAuthorityPolygon = report.polygon_coords
+                    && Array.isArray(report.polygon_coords)
+                    && report.polygon_coords.length >= 3;
+
+                if (hasAuthorityPolygon) {
+                    heatSources.push({
+                        lat: lat,
+                        lng: lng,
+                        lat_reporte: lat,
+                        long_reporte: lng,
+                        polygon_coords: report.polygon_coords,
+                        intensidad_propuesta: intensidad,
+                        updated_at: report.updated_at,
+                    });
+                } else {
+                    heatSources.push(...activeReps);
+                }
                 
                 activeReps.forEach(rep => {
                     const repLat = parseFloat(rep.lat_reporte || rep.latitud);
@@ -427,10 +446,12 @@ function initMap() {
             }
         });
 
-        if (allActiveReports.length > 0) {
+        if (heatSources.length > 0) {
             if (window.createSmartHeatmap) {
-                window.smartHeatmapInstance = window.createSmartHeatmap(map, allActiveReports, {
-                    targetLayer: polygonLayer
+                window.smartHeatmapInstance = window.createSmartHeatmap(map, heatSources, {
+                    targetLayer: polygonLayer,
+                    mode: 'auto',
+                    ttlHours: 3,
                 });
             }
         }

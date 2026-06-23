@@ -452,6 +452,7 @@
         }
 
         let allActiveReports = [];
+        let heatSources = [];
         
         allData.forEach(inun => {
             const inunDate = new Date(inun.created_at);
@@ -461,6 +462,22 @@
             const activeReports = inun.reportes.filter(rep => new Date(rep.created_at) <= maxDate);
             if (activeReports.length > 0) {
                 allActiveReports.push(...activeReports);
+
+                const hasAuthorityPolygon = inun.polygon_coords
+                    && Array.isArray(inun.polygon_coords)
+                    && inun.polygon_coords.length >= 3;
+
+                if (hasAuthorityPolygon) {
+                    heatSources.push({
+                        lat: parseFloat(inun.centroide.lat),
+                        lng: parseFloat(inun.centroide.lng),
+                        polygon_coords: inun.polygon_coords,
+                        intensidad_propuesta: inun.intensidad_calculada,
+                        updated_at: inun.updated_at,
+                    });
+                } else {
+                    heatSources.push(...activeReports);
+                }
             }
 
             const isSelected = selectedFloodId === inun.id;
@@ -557,9 +574,10 @@
         });
 
         // Crear la capa de calor (Heatmap)
-        if (allActiveReports.length > 0) {
-            // Utilizamos el tamaño ampliado (radius: 75, blur: 45) que tenía el command center
-            window.activeHeatLayer = window.createSmartHeatmap(ccMap, allActiveReports, {
+        if (heatSources.length > 0) {
+            window.activeHeatLayer = window.createSmartHeatmap(ccMap, heatSources, {
+                mode: 'auto',
+                ttlHours: 3,
                 heatOptions: {
                     radius: 75,
                     blur: 45,

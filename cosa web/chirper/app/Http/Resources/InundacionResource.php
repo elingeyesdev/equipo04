@@ -42,6 +42,8 @@ class InundacionResource extends JsonResource
                 'foto_path'            => $rep->foto_path,
                 'datos_clima_json'     => $rep->datos_clima_json,
                 'estado_validacion'    => $rep->estado_validacion,
+                'polygon_coords'       => $rep->polygon_coords,
+                'updated_at'           => $rep->updated_at,
                 'created_at'           => $rep->created_at,
                 'created_at_human'     => Carbon::parse($rep->created_at)->diffForHumans(),
             ])

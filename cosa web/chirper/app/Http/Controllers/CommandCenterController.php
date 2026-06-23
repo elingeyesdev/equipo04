@@ -53,14 +53,20 @@ class CommandCenterController extends Controller
                 ],
                 'polygon_coords' => $inundacion->polygon_coords, // Puede ser null
                 'created_at' => $inundacion->created_at,
+                'updated_at' => $inundacion->updated_at,
                 'intensidad_calculada' => $inundacion->intensidadCalculada(),
                 'reportes' => $inundacion->reportes->map(function ($r) {
                     return [
                         'id' => $r->id,
                         'lat' => $r->lat_reporte,
                         'lng' => $r->long_reporte,
+                        'lat_reporte' => $r->lat_reporte,
+                        'long_reporte' => $r->long_reporte,
                         'intensidad' => $r->intensidad_propuesta,
-                        'created_at' => $r->created_at
+                        'intensidad_propuesta' => $r->intensidad_propuesta,
+                        'polygon_coords' => $r->polygon_coords,
+                        'updated_at' => $r->updated_at,
+                        'created_at' => $r->created_at,
                     ];
                 }),
                 'victimas' => $inundacion->victimas->map(function ($v) {
