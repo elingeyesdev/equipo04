@@ -100,6 +100,9 @@
                     <a href="{{ route('logistica.index', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('logistica.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Logística</a>
                     <a href="{{ route('inventario.index', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('inventario.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Inventario</a>
                     <a href="{{ route('victimas.index', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('victimas.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Víctimas</a>
+                    @if ($apiRole === 'authority')
+                        <a href="{{ route('authorities.create', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('authorities.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Promover Autoridad</a>
+                    @endif
                 </nav>
                 @endif
             </div>
@@ -162,6 +165,9 @@
         <a href="{{ route('logistica.index', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('logistica.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Logística</a>
         <a href="{{ route('inventario.index', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('inventario.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Inventario</a>
         <a href="{{ route('victimas.index', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('victimas.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Víctimas</a>
+        @if ($apiRole === 'authority')
+            <a href="{{ route('authorities.create', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('authorities.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Promover Autoridad</a>
+        @endif
     </nav>
     @endif
 

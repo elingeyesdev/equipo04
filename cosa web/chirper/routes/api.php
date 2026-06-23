@@ -13,6 +13,10 @@ Route::prefix('auth')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('me', [AuthController::class, 'me']);
         Route::post('logout', [AuthController::class, 'logout']);
+
+        // Autoridades: Búsqueda y Promoción
+        Route::get('citizens/search', [\App\Http\Controllers\Api\AuthorityController::class, 'searchCitizens']);
+        Route::post('authorities/promote', [\App\Http\Controllers\Api\AuthorityController::class, 'promote']);
     });
 });
 

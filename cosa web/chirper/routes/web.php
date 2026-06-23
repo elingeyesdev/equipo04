@@ -110,6 +110,11 @@ Route::middleware(ApiAuthenticate::class)->group(function () {
         Route::post('/command-center/merge', [\App\Http\Controllers\CommandCenterController::class, 'mergeInundaciones'])->name('command-center.merge');
         Route::get('/command-center/merge-recommendations', [\App\Http\Controllers\CommandCenterController::class, 'getMergeRecommendations'])->name('command-center.merge.recommendations');
 
+        // ── Gestión de Autoridades ────────────────────────────────────────────
+        Route::get('/authorities/create', [\App\Http\Controllers\AuthorityController::class, 'create'])->name('authorities.create');
+        Route::get('/authorities/search', [\App\Http\Controllers\AuthorityController::class, 'search'])->name('authorities.search');
+        Route::post('/authorities', [\App\Http\Controllers\AuthorityController::class, 'store'])->name('authorities.store');
+
         // ── Chat entre autoridades ────────────────────────────────────────────
         Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
         Route::get('/chat/authorities', [ChatController::class, 'authorities'])->name('chat.authorities');
