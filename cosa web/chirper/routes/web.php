@@ -82,6 +82,7 @@ Route::middleware(ApiAuthenticate::class)->group(function () {
 
     // ── Módulo de Inventario ──────────────────────────────────────────────
     Route::get('/inventario', [InventarioController::class, 'index'])->name('inventario.index');
+    Route::get('/inventario/item/{inventario}', [InventarioController::class, 'showItem'])->name('inventario.item.show');
     Route::get('/inventario/{centro}', [InventarioController::class, 'show'])->name('inventario.show');
     // ── Centro de Comando (Timeline y Análisis) ───────────────────────────
     Route::get('/command-center', [\App\Http\Controllers\CommandCenterController::class, 'index'])->name('command-center.index');
@@ -117,7 +118,7 @@ Route::middleware(ApiAuthenticate::class)->group(function () {
 
         // ── Inventario (escritura) ────────────────────────────────────────────
         Route::post('/inventario/{centro}', [InventarioController::class, 'store'])->name('inventario.store');
-        Route::patch('/inventario/item/{inventario}', [InventarioController::class, 'updateStatus'])->name('inventario.updateStatus');
+        Route::post('/inventario/{centro}/bulk-update', [InventarioController::class, 'bulkUpdateStatus'])->name('inventario.bulkUpdateStatus');
     });
 });
 

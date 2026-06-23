@@ -71,7 +71,7 @@
 <body class="min-h-screen bg-gray-50 text-gray-900 antialiased flex flex-col font-sans">
     
     <!-- GOBIERNO TOP BAR (Branding institucional) -->
-    <div class="bg-primary-900 text-white w-full py-2 px-4 shadow-md z-[100] relative">
+    <div class="bg-primary-900 text-white w-full py-2 px-4 shadow-md z-[10000] relative">
         <div class="max-w-7xl mx-auto flex justify-between items-center text-xs sm:text-sm font-medium tracking-wide">
             <div class="flex items-center gap-3">
                 <!-- Escudo/Logo Placeholder -->
@@ -85,7 +85,7 @@
     </div>
 
     <!-- MAIN NAVIGATION BAR -->
-    <header class="bg-white border-b border-gray-200 sticky top-0 z-[90] shadow-sm w-full">
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-[9999] shadow-sm w-full">
         <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
             
             <div class="flex items-center gap-6">

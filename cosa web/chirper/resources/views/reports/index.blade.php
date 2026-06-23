@@ -75,7 +75,7 @@
                         <table class="w-full text-sm glass-table rounded-xl overflow-hidden">
                             <thead class="text-slate-600">
                                 <tr>
-                                    <th class="text-left font-semibold px-4 py-3 rounded-tl-xl">ID</th>
+                                    <th class="text-left font-semibold px-4 py-3 rounded-tl-xl">Fecha</th>
                                     <th class="text-left font-semibold px-4 py-3">Estado</th>
                                     <th class="text-left font-semibold px-4 py-3">Intensidad</th>
                                     <th class="text-left font-semibold px-4 py-3 rounded-tr-xl">Actualización</th>
@@ -84,7 +84,7 @@
                             <tbody class="divide-y divide-slate-200/50">
                                 @forelse(($misReportes ?? []) as $rep)
                                     <tr class="transition-colors duration-200">
-                                        <td class="px-4 py-3 font-semibold text-slate-700">N°{{ $rep->id }}</td>
+                                        <td class="px-4 py-3 font-semibold text-slate-700">{{ optional($rep->created_at)->format('d/m/Y') }}</td>
                                         <td class="px-4 py-3">
                                             @php($estadoVal = (string) $rep->estado_validacion)
                                             <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold shadow-sm
@@ -131,7 +131,7 @@
                             <div class="p-5 flex flex-wrap items-center justify-between gap-4 cursor-pointer hover:bg-white/30 transition-colors" onclick="toggleDetails({{ $id }})">
                                 <div class="flex items-center gap-4">
                                     <div class="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 text-slate-700 font-bold text-lg shadow-sm">
-                                        N°{{ $id }}
+                                        Alerta
                                     </div>
                                     <div>
                                         <div class="flex items-center gap-2 mb-1">
@@ -162,7 +162,7 @@
                                     <div class="flex items-center gap-3">
                                         @if(isset($role) && $role === 'authority' && $estado === 'activa')
                                             <form method="POST" action="{{ route('reports.desactivar', ['id' => $id], false) }}"
-                                                  onsubmit="return confirm('¿Desactivar la inundación N°{{ $id }}? Pasará a estado Terminada.')" onclick="event.stopPropagation()">
+                                                  onsubmit="return confirm('¿Desactivar la inundación? Pasará a estado Terminada.')" onclick="event.stopPropagation()">
                                                 @csrf
                                                 <button type="submit" class="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 transition-colors shadow-sm" title="Finalizar Inundación">
                                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>
@@ -190,7 +190,7 @@
                                                     <div class="bg-white/70 border border-white rounded-xl p-3 shadow-sm flex items-start justify-between group hover:border-indigo-200 transition-colors">
                                                         <div>
                                                             <div class="flex items-center gap-2 mb-1">
-                                                                <span class="font-bold text-slate-700 text-sm">N°{{ $rep['id'] }}</span>
+                                                                <span class="font-bold text-slate-700 text-sm">Reporte</span>
                                                                 <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase
                                                                     {{ $rep['intensidad_propuesta'] === 'alta' ? 'bg-rose-100 text-rose-700' : ($rep['intensidad_propuesta'] === 'media' ? 'bg-amber-100 text-amber-700' : 'bg-teal-100 text-teal-700') }}">
                                                                     {{ $rep['intensidad_propuesta'] }}
@@ -227,7 +227,7 @@
                                                     <div class="bg-white/40 border border-slate-200/50 rounded-xl p-3 shadow-sm flex items-start justify-between group hover:border-slate-300 transition-colors">
                                                         <div>
                                                             <div class="flex items-center gap-2 mb-1">
-                                                                <span class="font-bold text-slate-500 text-sm">N°{{ $rep['id'] }}</span>
+                                                                <span class="font-bold text-slate-500 text-sm">Reporte</span>
                                                                 <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase
                                                                     {{ $rep['intensidad_propuesta'] === 'alta' ? 'bg-rose-50 text-rose-500' : ($rep['intensidad_propuesta'] === 'media' ? 'bg-amber-50 text-amber-500' : 'bg-teal-50 text-teal-500') }}">
                                                                     {{ $rep['intensidad_propuesta'] }}
@@ -330,7 +330,7 @@
                                 <div class="p-5 flex flex-col flex-grow">
                                     <div class="flex justify-between items-start mb-3">
                                         <div>
-                                            <h3 class="font-bold text-slate-800 text-lg">Reporte Rápido N°{{ $rep->id }}</h3>
+                                            <h3 class="font-bold text-slate-800 text-lg">Reporte Ciudadano</h3>
                                             <p class="text-xs font-semibold text-slate-400 mt-0.5">{{ $rep->created_at->format('d M, Y H:i') }}</p>
                                         </div>
                                         <div class="flex flex-col items-end">
@@ -366,7 +366,7 @@
                                             <div class="flex border border-blue-200 rounded-xl overflow-hidden w-full shadow-sm mt-2">
                                                 <select id="select-vincular-{{ $rep->id }}" class="text-xs border-0 py-2.5 pl-3 pr-8 bg-blue-50 text-blue-900 focus:ring-0 flex-grow font-medium truncate">
                                                     @foreach($rep->cercanas as $activa)
-                                                        <option value="{{ $activa->id }}">A Inundación N°{{ $activa->id }}</option>
+                                                        <option value="{{ $activa->id }}">A Inundación Activa ({{ $activa->municipio?->nombre ?? 'GPS' }})</option>
                                                     @endforeach
                                                 </select>
                                                 <button onclick="validarRapido({{ $rep->id }}, 'vincular', document.getElementById('select-vincular-{{ $rep->id }}').value)" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 text-xs font-bold transition-colors whitespace-nowrap">
@@ -416,7 +416,7 @@
                             </div>
                             
                             <div class="flex-grow grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-slate-600">
-                                <div><span class="block text-[10px] font-bold text-slate-400 uppercase">ID</span><span class="font-semibold text-slate-800">N°{{ $rep->id }}</span></div>
+                                <div></div>
                                 <div><span class="block text-[10px] font-bold text-slate-400 uppercase">Intensidad</span>
                                     <span class="inline-block mt-0.5 px-2 py-0.5 bg-rose-100 text-rose-700 font-bold text-[10px] rounded uppercase">{{ $rep->intensidad_propuesta }}</span>
                                 </div>
@@ -441,7 +441,7 @@
                                                 <option value="">Ninguna</option>
                                                 @foreach(($inundacionesActivasParaVincular ?? []) as $inundacionActiva)
                                                     <option value="{{ $inundacionActiva->id }}" {{ (int) ($rep->inundacion_id ?? 0) === (int) $inundacionActiva->id ? 'selected' : '' }}>
-                                                        Inundación N°{{ $inundacionActiva->id }}
+                                                        Evento Activo ({{ $inundacionActiva->municipio?->nombre ?? 'GPS' }})
                                                     </option>
                                                 @endforeach
                                             </select>
@@ -481,7 +481,7 @@
                         <div class="bg-white/40 rounded-xl m-2 overflow-hidden hover:bg-white/60 transition-colors">
                             <div class="flex items-center justify-between p-4 cursor-pointer" onclick="toggleDetails('term-{{ $tid }}')">
                                 <div class="flex items-center gap-4">
-                                    <div class="w-10 h-10 rounded-lg bg-slate-200 flex items-center justify-center font-bold text-slate-600">N°{{ $tid }}</div>
+                                    <div class="w-10 h-10 rounded-lg bg-slate-200 flex items-center justify-center font-bold text-slate-600">Ev.</div>
                                     <div>
                                         <div class="flex gap-2">
                                             @if($totalQ > 0)
@@ -509,7 +509,7 @@
                                         @foreach($repsVinc as $rv)
                                             <div class="bg-white rounded-lg p-2.5 text-xs border border-slate-100 shadow-sm flex justify-between items-center">
                                                 <div>
-                                                    <span class="font-bold text-slate-700">N°{{ $rv['id'] }}</span>
+                                                    <span class="font-bold text-slate-700">Reporte</span>
                                                     <span class="ml-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase {{ $rv['intensidad_propuesta'] === 'alta' ? 'bg-rose-50 text-rose-700' : ($rv['intensidad_propuesta'] === 'media' ? 'bg-amber-50 text-amber-700' : 'bg-teal-50 text-teal-700') }}">{{ $rv['intensidad_propuesta'] }}</span>
                                                 </div>
                                                 <span class="text-slate-400 font-medium">{{ $rv['peso'] }}pts</span>

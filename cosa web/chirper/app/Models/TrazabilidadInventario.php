@@ -10,6 +10,7 @@ class TrazabilidadInventario extends Model
     use HasFactory;
 
     protected $table = 'trazabilidad_inventario';
+    protected $primaryKey = 'trazabilidadid';
     public $timestamps = false; // We use fecha_actualizacion instead of created_at/updated_at
 
     protected $fillable = [
@@ -18,11 +19,18 @@ class TrazabilidadInventario extends Model
         'estado_nuevo',
         'ubicacion_actual',
         'observacion',
-        'fecha_actualizacion'
+        'fecha_actualizacion',
+        'registrado_por',
+        'photo_path'
     ];
 
     public function inventario()
     {
         return $this->belongsTo(Inventario::class, 'inventario_id');
+    }
+
+    public function registrador()
+    {
+        return $this->belongsTo(User::class, 'registrado_por', 'carnet');
     }
 }

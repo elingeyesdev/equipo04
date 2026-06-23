@@ -21,7 +21,10 @@ class Inventario extends Model
         'usage_details',
         'inundacion_id',
         'victima_id',
-        'photo_path'
+        'photo_path',
+        'registrado_por',
+        'cantidad',
+        'unidad_medida'
     ];
 
     public function centro()
@@ -37,5 +40,10 @@ class Inventario extends Model
     public function trazabilidad()
     {
         return $this->hasMany(TrazabilidadInventario::class, 'inventario_id');
+    }
+
+    public function registrador()
+    {
+        return $this->belongsTo(User::class, 'registrado_por', 'carnet');
     }
 }
