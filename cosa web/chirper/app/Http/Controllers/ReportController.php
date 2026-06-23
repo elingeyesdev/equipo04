@@ -8,6 +8,7 @@ use App\Models\CentroAsistencia;
 use App\Models\Inundacion;
 use App\Models\Reporte;
 use App\Services\FloodApiClient;
+use App\Services\ReporteValidacionService;
 use App\Services\FloodApiExceptions\ApiRequestException;
 use App\Services\FloodApiExceptions\ApiUnauthorizedException;
 use App\Services\FloodApiExceptions\ApiValidationException;
@@ -135,6 +136,7 @@ final class ReportController
             'long_reporte'         => $r->long_reporte,
             'foto_path'            => $r->foto_path,
             'estado_validacion'    => $r->estado_validacion,
+            'polygon_coords'       => $r->polygon_coords,
             'created_at'           => $r->created_at,
             'created_at_human'     => $r->created_at?->diffForHumans(),
         ])->toArray();
@@ -156,27 +158,30 @@ final class ReportController
             'long_reporte'         => $r->long_reporte,
             'foto_path'            => $r->foto_path,
             'estado_validacion'    => $r->estado_validacion,
+            'polygon_coords'       => $r->polygon_coords,
             'created_at'           => $r->created_at,
             'created_at_human'     => $r->created_at?->diffForHumans(),
             'caducado_hace'        => ($r->updated_at ?? $r->created_at)?->diffForHumans(),
         ])->toArray();
 
         return [
-            'id'                   => $i->id,
-            'latitud'              => $i->latitud,
-            'longitud'             => $i->longitud,
-            'estado'               => $i->estado,
-            'created_at'           => $i->created_at,
-            'updated_at'           => $i->updated_at,
-            'address'              => $i->reportes->first()?->address,
-            'description'          => $i->reportes->first()?->description,
+            'id'                        => $i->id,
+            'latitud'                   => $i->latitud,
+            'longitud'                  => $i->longitud,
+            'estado'                    => $i->estado,
+            'created_at'                => $i->created_at,
+            'updated_at'                => $i->updated_at,
+            'address'                   => $i->reportes->first()?->address,
+            'description'               => $i->reportes->first()?->description,
+            'polygon_coords'            => $i->polygon_coords,
+            'polygon_editado_autoridad' => $i->polygon_editado_autoridad,
             // Quórum dinámico — solo reportes últimas 3h, excluyendo rechazados
-            'quorum_total'         => $i->quorumTotal(),
-            'intensidad_calculada' => $i->intensidadCalculada(),
-            'esta_confirmada'      => $i->estaConfirmada(),
-            'desglose_puntos'      => $i->desgloseReportes($i->reportesActivosTTL),
-            'reportes_activos'     => $reportesActivos,
-            'reportes_inactivos'   => $reportesInactivos,
+            'quorum_total'              => $i->quorumTotal(),
+            'intensidad_calculada'      => $i->intensidadCalculada(),
+            'esta_confirmada'           => $i->estaConfirmada(),
+            'desglose_puntos'           => $i->desgloseReportes($i->reportesActivosTTL),
+            'reportes_activos'          => $reportesActivos,
+            'reportes_inactivos'        => $reportesInactivos,
         ];
     }
 
@@ -200,6 +205,7 @@ final class ReportController
             'long_reporte'         => $r->long_reporte,
             'foto_path'            => $r->foto_path,
             'estado_validacion'    => $r->estado_validacion,
+            'polygon_coords'       => $r->polygon_coords,
             'created_at'           => $r->created_at,
             'created_at_human'     => $r->created_at?->diffForHumans(),
         ])->toArray();
@@ -397,19 +403,17 @@ final class ReportController
 
         $reporte = Reporte::findOrFail((int) $id);
         $nuevoEstado = (string) $data['estado_validacion'];
-        $reporte->update([
-            'estado_validacion' => $nuevoEstado,
-            // Si se acepta, queda vinculado; en otro estado, se limpia vínculo.
-            'inundacion_id' => $nuevoEstado === Reporte::VALIDACION_ACEPTADO
-                ? (int) $data['inundacion_id']
-                : null,
-        ]);
+        $validacion = app(ReporteValidacionService::class);
 
         if ($nuevoEstado === Reporte::VALIDACION_ACEPTADO && !empty($data['inundacion_id'])) {
-            $inundacion = Inundacion::find((int) $data['inundacion_id']);
-            if ($inundacion) {
-                $inundacion->recalcularCentroide();
-            }
+            $validacion->aceptarYVincular($reporte, (int) $data['inundacion_id']);
+        } elseif ($nuevoEstado === Reporte::VALIDACION_RECHAZADO) {
+            $validacion->rechazar($reporte);
+        } else {
+            $reporte->update([
+                'estado_validacion' => $nuevoEstado,
+                'inundacion_id'     => null,
+            ]);
         }
 
         return redirect()->route('reports.index')

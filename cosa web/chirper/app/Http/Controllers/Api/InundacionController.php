@@ -73,7 +73,7 @@ class InundacionController extends Controller
         // registramos un `Reporte` vinculado para que aparezca en "Mis reportes"
         // y quede trazable en el historial.
         if ($user->isCitizen()) {
-            \App\Models\Reporte::create([
+            $reporte = \App\Models\Reporte::create([
                 'user_uuid' => null,
                 'citizen_carnet' => $user->carnet,
                 'inundacion_id' => $inundacion->id,
@@ -87,11 +87,11 @@ class InundacionController extends Controller
                 'description' => $data['description'] ?? null,
                 'estado_validacion' => \App\Models\Reporte::VALIDACION_ACEPTADO,
             ]);
-        }
 
-        // Disparar Job en background para calcular el polígono de inundación
-        // basado en datos topográficos de Open Topo Data.
-        CalcularPoligonoInundacion::dispatch($inundacion->id);
+            CalcularPoligonoInundacion::dispatch($reporte->id);
+        } else {
+            CalcularPoligonoInundacion::dispatch($inundacion->id, 'inundacion');
+        }
 
         return response()->json([
             'data' => new InundacionResource($inundacion),

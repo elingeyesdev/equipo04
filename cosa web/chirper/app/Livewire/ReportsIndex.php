@@ -8,6 +8,7 @@ use Livewire\Attributes\On;
 use App\Models\Inundacion;
 use App\Models\Reporte;
 use App\Services\FloodApiClient;
+use App\Services\ReporteValidacionService;
 use Illuminate\Support\Facades\Session;
 
 class ReportsIndex extends Component
@@ -82,18 +83,17 @@ class ReportsIndex extends Component
         }
 
         $reporte = Reporte::findOrFail($id);
-        $reporte->update([
-            'estado_validacion' => $estadoValidacion,
-            'inundacion_id' => $estadoValidacion === Reporte::VALIDACION_ACEPTADO
-                ? (int) $inundacionId
-                : null,
-        ]);
+        $validacion = app(ReporteValidacionService::class);
 
         if ($estadoValidacion === Reporte::VALIDACION_ACEPTADO && !empty($inundacionId)) {
-            $inundacion = Inundacion::find((int) $inundacionId);
-            if ($inundacion) {
-                $inundacion->recalcularCentroide();
-            }
+            $validacion->aceptarYVincular($reporte, (int) $inundacionId);
+        } elseif ($estadoValidacion === Reporte::VALIDACION_RECHAZADO) {
+            $validacion->rechazar($reporte);
+        } else {
+            $reporte->update([
+                'estado_validacion' => $estadoValidacion,
+                'inundacion_id'     => null,
+            ]);
         }
 
         session()->flash('success', "Estado de validación del reporte #{$reporte->id} actualizado a \"{$estadoValidacion}\".");
@@ -196,6 +196,7 @@ class ReportsIndex extends Component
             'long_reporte'         => $r->long_reporte,
             'foto_path'            => $r->foto_path,
             'estado_validacion'    => $r->estado_validacion,
+            'polygon_coords'       => $r->polygon_coords,
             'created_at'           => $r->created_at,
             'created_at_human'     => $r->created_at?->diffForHumans(),
         ])->toArray();
@@ -216,26 +217,29 @@ class ReportsIndex extends Component
             'long_reporte'         => $r->long_reporte,
             'foto_path'            => $r->foto_path,
             'estado_validacion'    => $r->estado_validacion,
+            'polygon_coords'       => $r->polygon_coords,
             'created_at'           => $r->created_at,
             'created_at_human'     => $r->created_at?->diffForHumans(),
             'caducado_hace'        => ($r->updated_at ?? $r->created_at)?->diffForHumans(),
         ])->toArray();
 
         return [
-            'id'                   => $i->id,
-            'latitud'              => $i->latitud,
-            'longitud'             => $i->longitud,
-            'estado'               => $i->estado,
-            'created_at'           => $i->created_at,
-            'updated_at'           => $i->updated_at,
-            'address'              => $i->reportes->first()?->address,
-            'description'          => $i->reportes->first()?->description,
-            'quorum_total'         => $i->quorumTotal(),
-            'intensidad_calculada' => $i->intensidadCalculada(),
-            'esta_confirmada'      => $i->estaConfirmada(),
-            'desglose_puntos'      => $i->desgloseReportes($i->reportesActivosTTL),
-            'reportes_activos'     => $reportesActivos,
-            'reportes_inactivos'   => $reportesInactivos,
+            'id'                        => $i->id,
+            'latitud'                   => $i->latitud,
+            'longitud'                  => $i->longitud,
+            'estado'                    => $i->estado,
+            'created_at'                => $i->created_at,
+            'updated_at'                => $i->updated_at,
+            'address'                   => $i->reportes->first()?->address,
+            'description'               => $i->reportes->first()?->description,
+            'polygon_coords'            => $i->polygon_coords,
+            'polygon_editado_autoridad' => $i->polygon_editado_autoridad,
+            'quorum_total'              => $i->quorumTotal(),
+            'intensidad_calculada'      => $i->intensidadCalculada(),
+            'esta_confirmada'           => $i->estaConfirmada(),
+            'desglose_puntos'           => $i->desgloseReportes($i->reportesActivosTTL),
+            'reportes_activos'          => $reportesActivos,
+            'reportes_inactivos'        => $reportesInactivos,
         ];
     }
 
@@ -255,6 +259,7 @@ class ReportsIndex extends Component
             'long_reporte'         => $r->long_reporte,
             'foto_path'            => $r->foto_path,
             'estado_validacion'    => $r->estado_validacion,
+            'polygon_coords'       => $r->polygon_coords,
             'created_at'           => $r->created_at,
             'created_at_human'     => $r->created_at?->diffForHumans(),
         ])->toArray();
