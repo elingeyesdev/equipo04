@@ -32,7 +32,8 @@ final class AuthorityController
         try {
             $citizens = $this->api->searchCitizens($token, $query);
             return response()->json($citizens);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Error searching citizens: ' . $e->getMessage());
             return response()->json([], 500);
         }
     }

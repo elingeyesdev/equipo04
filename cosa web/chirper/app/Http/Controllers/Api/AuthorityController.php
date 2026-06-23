@@ -17,12 +17,14 @@ class AuthorityController extends Controller
         }
 
         $query = $request->input('q', '');
+        
+        \Illuminate\Support\Facades\Log::info("Search request received for: " . $query);
 
         $citizens = User::where('role', User::ROLE_CITIZEN)
             ->when($query !== '', function ($q) use ($query) {
                 $q->where(function ($sub) use ($query) {
-                    $sub->where('name', 'like', "%{$query}%")
-                        ->orWhere('carnet', 'like', "%{$query}%");
+                    $sub->where('name', 'ilike', "%{$query}%")
+                        ->orWhere('carnet', 'ilike', "%{$query}%");
                 });
             })
             ->limit(10)
