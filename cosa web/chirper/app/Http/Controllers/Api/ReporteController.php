@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\CalcularPoligonoInundacion;
 use App\Models\Reporte;
 use App\Models\Inundacion;
+use App\Services\ReporteValidacionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -148,36 +148,20 @@ class ReporteController extends Controller
             'inundacion_id'=> 'required_if:action,vincular|exists:inundaciones,id',
         ]);
 
+        $validacion = app(ReporteValidacionService::class);
+
         if ($data['action'] === 'rechazar') {
-            $reporte->update(['estado_validacion' => Reporte::VALIDACION_RECHAZADO]);
+            $validacion->rechazar($reporte);
+
             return response()->json(['message' => 'Reporte rechazado']);
         }
 
         if ($data['action'] === 'crear') {
-            // Crear nueva inundación con estado 'activa'.
-            // La intensidad y el quórum se calcularán dinámicamente
-            // a partir de este reporte (y los que se añadan después).
-            $inundacion = Inundacion::create([
-                'latitud'      => $reporte->lat_reporte,
-                'longitud'     => $reporte->long_reporte,
-                'estado'       => Inundacion::ESTADO_ACTIVA,
-                'validador_id' => $request->user()->carnet,
-            ]);
+            $inundacion = $validacion->crearInundacionDesdeReporte(
+                $reporte,
+                (string) $request->user()->carnet
+            );
 
-            // Resolver y persistir el municipio usando point-in-polygon
-            // sobre las coordenadas del primer reporte (= centroide inicial).
-            $inundacion->resolverMunicipio();
-
-            $reporte->update([
-                'estado_validacion' => Reporte::VALIDACION_ACEPTADO,
-                'inundacion_id'     => $inundacion->id,
-            ]);
-
-            // Disparar Job en background para calcular el polígono de topografía
-            // específico de este nuevo reporte. (dispatchSync para asegurar que corra sin worker local)
-            CalcularPoligonoInundacion::dispatchSync($reporte->id);
-
-            // Eager-load reportes para devolver quórum actualizado
             $inundacion->load('reportesActivosTTL');
 
             return response()->json([
@@ -187,21 +171,11 @@ class ReporteController extends Controller
         }
 
         if ($data['action'] === 'vincular') {
-            $inundacion = Inundacion::findOrFail($data['inundacion_id']);
+            $inundacion = $validacion->aceptarYVincular(
+                $reporte,
+                (int) $data['inundacion_id']
+            );
 
-            $reporte->update([
-                'estado_validacion' => Reporte::VALIDACION_ACEPTADO,
-                'inundacion_id'     => $inundacion->id,
-            ]);
-
-            // Recalcular centro geográfico promediado
-            $inundacion->recalcularCentroide();
-
-            // Disparar Job para calcular el polígono topográfico
-            // exclusivo de este reporte recién vinculado.
-            CalcularPoligonoInundacion::dispatchSync($reporte->id);
-
-            // Eager-load para cómputo dinámico del quórum
             $inundacion->load('reportesActivosTTL');
 
             return response()->json([

@@ -50,6 +50,8 @@ Route::post('/sugerencias', [SugerenciaController::class, 'store'])->name('suger
 Route::post('/sugerencias/{sugerencia}/like', [SugerenciaController::class, 'incrementLike'])->name('sugerencias.like');
 
 Route::middleware(ApiAuthenticate::class)->group(function () {
+    Route::get('/api/topografia/reportes/{id}', [\App\Http\Controllers\TopografiaController::class, 'showReporte'])->name('topografia.reporte');
+    Route::get('/api/topografia/inundaciones/{id}', [\App\Http\Controllers\TopografiaController::class, 'showInundacion'])->name('topografia.inundacion');
     Route::get('/reports', \App\Livewire\ReportsIndex::class)->name('reports.index');
     Route::get('/reports/create', [ReportController::class, 'create'])->name('reports.create');
     Route::post('/reports', [ReportController::class, 'store'])->name('reports.store');

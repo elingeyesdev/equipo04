@@ -276,7 +276,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-<script src="{{ asset('js/smart-heatmap.js') }}"></script>
+<script src="{{ asset('js/smart-heatmap.js') }}?v=20260623f"></script>
 
 
 <!-- Drawer (Flood Picker Dark Mode) -->
@@ -452,6 +452,7 @@
         }
 
         let allActiveReports = [];
+        let heatSources = [];
         
         allData.forEach(inun => {
             const inunDate = new Date(inun.created_at);
@@ -461,6 +462,36 @@
             const activeReports = inun.reportes.filter(rep => new Date(rep.created_at) <= maxDate);
             if (activeReports.length > 0) {
                 allActiveReports.push(...activeReports);
+
+                const hasAuthorityPolygon = window.normalizePolygonRings
+                    ? window.normalizePolygonRings(inun.polygon_coords).length > 0
+                    : (inun.polygon_coords
+                        && Array.isArray(inun.polygon_coords)
+                        && inun.polygon_coords.length >= 3);
+
+                const inunTier = inun.intensidad_calculada || 'baja';
+
+                if (hasAuthorityPolygon) {
+                    heatSources.push({
+                        lat: parseFloat(inun.centroide.lat),
+                        lng: parseFloat(inun.centroide.lng),
+                        polygon_coords: inun.polygon_coords,
+                        intensidad_propuesta: inun.intensidad_calculada,
+                        tier: inunTier,
+                        updated_at: inun.updated_at,
+                        epicenters: activeReports.map(function (rep) {
+                            return {
+                                lat: parseFloat(rep.lat || rep.lat_reporte),
+                                lng: parseFloat(rep.lng || rep.long_reporte),
+                                updated_at: rep.updated_at,
+                            };
+                        }),
+                    });
+                } else {
+                    activeReports.forEach(function (rep) {
+                        heatSources.push(Object.assign({}, rep, { tier: inunTier }));
+                    });
+                }
             }
 
             const isSelected = selectedFloodId === inun.id;
@@ -557,9 +588,10 @@
         });
 
         // Crear la capa de calor (Heatmap)
-        if (allActiveReports.length > 0) {
-            // Utilizamos el tamaño ampliado (radius: 75, blur: 45) que tenía el command center
-            window.activeHeatLayer = window.createSmartHeatmap(ccMap, allActiveReports, {
+        if (heatSources.length > 0) {
+            window.activeHeatLayer = window.createSmartHeatmap(ccMap, heatSources, {
+                mode: 'auto',
+                ttlHours: 3,
                 heatOptions: {
                     radius: 75,
                     blur: 45,

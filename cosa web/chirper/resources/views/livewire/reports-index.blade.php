@@ -1,4 +1,14 @@
 <div>
+    @php
+        /**
+         * @var \Illuminate\Support\Collection<int, \App\Models\Reporte>|array<int, \App\Models\Reporte> $misReportes
+         * @var \Illuminate\Support\Collection<int, \App\Models\Reporte>|array<int, \App\Models\Reporte> $reportesPendientes
+         * @var \Illuminate\Support\Collection<int, \App\Models\Reporte>|array<int, \App\Models\Reporte> $reportesRechazados
+         * @var iterable<int, array<string, mixed>> $inundacionesActivas
+         * @var iterable<int, array<string, mixed>> $inundacionesTerminadas
+         * @var \Illuminate\Support\Collection<int, \App\Models\Inundacion> $inundacionesActivasParaVincular
+         */
+    @endphp
     <!-- Leaflet CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -40,10 +50,25 @@
                     <h1 class="text-3xl font-bold tracking-tight text-blue-800">Registro de Inundaciones</h1>
                     <p class="mt-2 text-sm font-medium text-slate-600">Centro de Monitoreo y Validación de Eventos Hidrológicos.</p>
                 </div>
-                <a href="{{ route('reports.create', [], false) }}" class="group relative inline-flex items-center gap-2 rounded bg-blue-700 px-6 py-2.5 text-white font-semibold shadow-md hover:bg-blue-800 transition-colors">
-                    <svg class="w-5 h-5 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                    <span class="relative z-10">Nuevo Reporte</span>
-                </a>
+                <div class="flex flex-wrap items-center gap-2">
+                    <a href="{{ route('command-center.index', [], false) }}" class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition-colors">
+                        <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                        Análisis de Impacto
+                    </a>
+                    <a href="{{ route('vehiculos.mapa', [], false) }}" class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition-colors">
+                        <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                        Vehículos
+                    </a>
+                    @if ($role === 'authority')
+                        <a href="{{ route('vehiculos.index', [], false) }}" class="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-800 shadow-sm hover:bg-emerald-100 transition-colors">
+                            Gestionar Flota
+                        </a>
+                    @endif
+                    <a href="{{ route('reports.create', [], false) }}" class="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-6 py-2.5 text-white font-semibold shadow-md hover:bg-blue-800 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                        Nuevo Reporte
+                    </a>
+                </div>
             </div>
 
     <!-- Map Filters -->
@@ -88,13 +113,13 @@
                             </thead>
                             <tbody class="divide-y divide-slate-200/50">
                                 @forelse(($misReportes ?? []) as $rep)
+                                    @php /** @var \App\Models\Reporte $rep */ @endphp
                                     <tr class="transition-colors duration-200">
                                         <td class="px-4 py-3 font-semibold text-slate-700">N°{{ $rep->id }}</td>
                                         <td class="px-4 py-3">
-                                            @php($estadoVal = (string) $rep->estado_validacion)
                                             <span class="inline-flex items-center rounded px-2.5 py-1 text-xs font-bold
-                                                {{ $estadoVal === 'pendiente' ? 'bg-yellow-100 text-yellow-800' : ($estadoVal === 'aceptado' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800') }}">
-                                                {{ ucfirst($estadoVal) }}
+                                                {{ (string) $rep->estado_validacion === 'pendiente' ? 'bg-yellow-100 text-yellow-800' : ((string) $rep->estado_validacion === 'aceptado' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800') }}">
+                                                {{ ucfirst((string) $rep->estado_validacion) }}
                                             </span>
                                         </td>
                                         <td class="px-4 py-3 font-medium text-slate-600">{{ ucfirst((string) $rep->intensidad_propuesta) }}</td>
@@ -135,11 +160,13 @@
                         </thead>
                         <tbody class="divide-y divide-slate-200/50">
                             @forelse ($inundacionesActivas as $inundacion)
-                                @php($id = data_get($inundacion, 'id'))
-                                @php($estado = data_get($inundacion, 'estado', ''))
-                                @php($int = data_get($inundacion, 'intensidad_calculada', null))
-                                @php($quorum = data_get($inundacion, 'quorum_total', 0))
-                                @php($confirmada = data_get($inundacion, 'esta_confirmada', false))
+                                @php
+                                    $id = data_get($inundacion, 'id');
+                                    $estado = data_get($inundacion, 'estado', '');
+                                    $int = data_get($inundacion, 'intensidad_calculada', null);
+                                    $quorum = data_get($inundacion, 'quorum_total', 0);
+                                    $confirmada = data_get($inundacion, 'esta_confirmada', false);
+                                @endphp
                                 
                                 <tr class="transition-colors duration-200 cursor-pointer hover:bg-white/30" onclick="toggleDetails({{ $id }})">
                                     <td class="px-4 py-3 font-semibold text-slate-700">N°{{ $id }}</td>
@@ -186,7 +213,9 @@
                                                     <h4 class="font-bold text-sm text-indigo-900 uppercase tracking-wide mb-3 flex items-center gap-2">
                                                         <svg class="w-4 h-4 fill-current inline-block mr-1" viewBox="0 0 640 640"><path d="M541.9 139.5C546.4 127.7 543.6 114.3 534.7 105.4C525.8 96.5 512.4 93.6 500.6 98.2L84.6 258.2C71.9 263 63.7 275.2 64 288.7C64.3 302.2 73.1 314.1 85.9 318.3L262.7 377.2L321.6 554C325.9 566.8 337.7 575.6 351.2 575.9C364.7 576.2 376.9 568 381.8 555.4L541.8 139.4z"/></svg> Reportes Vinculados (Últimas 3h)
                                                     </h4>
-                                                    @php($reportesActivos = data_get($inundacion, 'reportes_activos', []))
+                                                    @php
+                                                        $reportesActivos = data_get($inundacion, 'reportes_activos', []);
+                                                    @endphp
                                                     @if(count($reportesActivos) > 0)
                                                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                             @foreach($reportesActivos as $rep)
@@ -217,7 +246,9 @@
                                                             <p class="text-sm text-slate-500 font-medium">No hay reportes activos en las últimas 3h.</p>
                                                         </div>
                                                     @endif
-                                                    @php($reportesInactivos = data_get($inundacion, 'reportes_inactivos', []))
+                                                    @php
+                                                        $reportesInactivos = data_get($inundacion, 'reportes_inactivos', []);
+                                                    @endphp
                                                     @if(count($reportesInactivos) > 0)
                                                         <h4 class="font-bold text-sm text-slate-500 uppercase tracking-wide mt-6 mb-3 flex items-center gap-2 border-t border-slate-200/60 pt-4">
                                                             <svg class="w-4 h-4 fill-current inline-block mr-1" viewBox="0 0 640 640"><path d="M128 96C128 78.3 142.3 64 160 64L480 64C497.7 64 512 78.3 512 96C512 113.7 497.7 128 480 128L480 139C480 181.4 463.1 222.1 433.1 252.1L365.2 320L433.1 387.9C463.1 417.9 480 458.6 480 501L480 512C497.7 512 512 526.3 512 544C512 561.7 497.7 576 480 576L160 576C142.3 576 128 561.7 128 544C128 526.3 142.3 512 160 512L160 501C160 458.6 176.9 417.9 206.9 387.9L274.8 320L206.9 252.1C176.9 222.1 160 181.4 160 139L160 128C142.3 128 128 113.7 128 96zM224 128L224 139C224 164.5 234.1 188.9 252.1 206.9L320 274.8L387.9 206.9C405.9 188.9 416 164.5 416 139L416 128L224 128zM224 512L416 512L416 501C416 475.5 405.9 451.1 387.9 433.1L320 365.2L252.1 433.1C234.1 451.1 224 475.5 224 501L224 512z"/></svg> Reportes Inactivos (TTL Caducado)
@@ -251,7 +282,9 @@
                                                 <div class="w-full md:w-64 flex flex-col gap-4">
                                                     <div class="bg-white/60 border border-white rounded-2xl p-4 shadow-sm">
                                                         <h4 class="font-bold text-[11px] text-slate-400 uppercase tracking-widest mb-3">Distribución de Quórum</h4>
-                                                        @php($desglose = data_get($inundacion, 'desglose_puntos', ['alta'=>0,'media'=>0,'baja'=>0]))
+                                                        @php
+                                                            $desglose = data_get($inundacion, 'desglose_puntos', ['alta' => 0, 'media' => 0, 'baja' => 0]);
+                                                        @endphp
                                                         <div class="space-y-2">
                                                             <div class="flex justify-between items-center text-sm">
                                                                 <span class="text-rose-600 font-bold">Alta</span>
@@ -286,8 +319,10 @@
                 </div>
             </div>
 
-            @php($currentPage = (int) ($meta['current_page'] ?? 1))
-            @php($lastPage = (int) ($meta['last_page'] ?? 1))
+            @php
+                $currentPage = (int) ($meta['current_page'] ?? 1);
+                $lastPage = (int) ($meta['last_page'] ?? 1);
+            @endphp
 
             @if ($lastPage > 1)
                 <div class="mt-6 mb-12 flex items-center justify-between">
@@ -330,6 +365,7 @@
                         </thead>
                         <tbody class="divide-y divide-slate-200/50">
                             @forelse ($reportesPendientes ?? [] as $rep)
+                                @php /** @var \App\Models\Reporte $rep */ @endphp
                                 <tr class="transition-colors duration-200 hover:bg-white/30">
                                     <td class="px-4 py-3">
                                         @if(!empty($rep->foto_path))
@@ -406,6 +442,7 @@
                 </div>
                 <div class="divide-y divide-gray-200/50">
                     @forelse ($reportesRechazados ?? [] as $rep)
+                        @php /** @var \App\Models\Reporte $rep */ @endphp
                         <div class="p-5 flex flex-col md:flex-row gap-5 hover:bg-white/30 transition-colors">
                             <div class="w-full md:w-32 flex-shrink-0 flex items-center justify-center bg-white/50 border border-white/60 rounded-2xl overflow-hidden h-32 shadow-sm">
                                 @if($rep->foto_path)
@@ -442,6 +479,7 @@
                                             <select wire:model="inundacionVincularIds.{{ $rep->id }}" class="text-xs font-medium border-0 rounded-xl bg-white shadow-sm focus:ring-2 focus:ring-indigo-500">
                                                 <option value="">Ninguna</option>
                                                 @foreach(($inundacionesActivasParaVincular ?? []) as $inundacionActiva)
+                                                    @php /** @var \App\Models\Inundacion $inundacionActiva */ @endphp
                                                     <option value="{{ $inundacionActiva->id }}">
                                                         Inundación N°{{ $inundacionActiva->id }}
                                                     </option>
@@ -487,10 +525,14 @@
                         </thead>
                         <tbody class="divide-y divide-slate-200/50">
                             @forelse ($inundacionesTerminadas as $term)
-                                @php($tid = data_get($term, 'id'))
-                                @php($desglose = data_get($term, 'desglose_historico', ['alta'=>0,'media'=>0,'baja'=>0]))
-                                @php($totalQ = data_get($term, 'quorum_historico', 0))
-                                @php($intGanadora = $desglose['alta'] >= $desglose['media'] && $desglose['alta'] >= $desglose['baja'] ? 'alta' : ($desglose['media'] >= $desglose['baja'] ? 'media' : 'baja'))
+                                @php
+                                    $tid = data_get($term, 'id');
+                                    $desglose = data_get($term, 'desglose_historico', ['alta' => 0, 'media' => 0, 'baja' => 0]);
+                                    $totalQ = data_get($term, 'quorum_historico', 0);
+                                    $intGanadora = $desglose['alta'] >= $desglose['media'] && $desglose['alta'] >= $desglose['baja']
+                                        ? 'alta'
+                                        : ($desglose['media'] >= $desglose['baja'] ? 'media' : 'baja');
+                                @endphp
                                 
                                 <tr class="transition-colors duration-200 cursor-pointer hover:bg-white/30" onclick="toggleDetails('term-{{ $tid }}')">
                                     <td class="px-4 py-3 font-semibold text-slate-700">N°{{ $tid }}</td>
@@ -518,7 +560,9 @@
                                 </tr>
                                 <tr id="details-term-{{ $tid }}" class="hidden bg-slate-50/50 border-t border-white/50">
                                     <td colspan="5" class="p-4">
-                                        @php($repsVinc = data_get($term, 'reportes_vinculados', []))
+                                        @php
+                                            $repsVinc = data_get($term, 'reportes_vinculados', []);
+                                        @endphp
                                         @if(count($repsVinc) > 0)
                                             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
                                                 @foreach($repsVinc as $rv)
@@ -556,7 +600,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <!-- LEAFLET HEATMAP PLUGIN -->
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-<script src="{{ asset('js/smart-heatmap.js') }}"></script>
+<script src="{{ asset('js/smart-heatmap.js') }}?v=20260623b"></script>
 
 <!-- RUTAS SEGURAS -->
 <script>

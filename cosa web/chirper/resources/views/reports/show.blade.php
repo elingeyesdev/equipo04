@@ -94,7 +94,7 @@
                 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
                 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
                 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-                <script src="{{ asset('js/smart-heatmap.js') }}"></script>
+                <script src="{{ asset('js/smart-heatmap.js') }}?v=20260623f"></script>
                 
                 <script>
                     document.addEventListener('DOMContentLoaded', function() {
@@ -114,10 +114,60 @@
                             subdomains: 'abcd', maxZoom: 20 
                         }).addTo(miniMap);
                         
-                        const heatData = @json($inundacion->reportes->count() > 0 ? $inundacion->reportes : [['lat' => $inundacion->latitud, 'lng' => $inundacion->longitud, 'intensidad' => 'media']]);
+                        @php
+                            $reportesParaHeat = $inundacion->reportes->map(fn ($r) => [
+                                'lat' => $r->lat_reporte,
+                                'lng' => $r->long_reporte,
+                                'lat_reporte' => $r->lat_reporte,
+                                'long_reporte' => $r->long_reporte,
+                                'intensidad_propuesta' => $r->intensidad_propuesta,
+                                'intensity' => $r->intensidad_propuesta,
+                                'updated_at' => $r->updated_at,
+                            ])->values()->all();
+
+                            $tienePoligonoUnificado = \App\Support\PolygonCoordsHelper::tieneGeometriaValida(
+                                (array) ($inundacion->polygon_coords ?? [])
+                            );
+
+                            $intensidadInundacion = $inundacion->intensidadCalculada() ?? 'media';
+
+                            $heatData = $tienePoligonoUnificado
+                                ? [[
+                                    'lat' => $inundacion->latitud,
+                                    'lng' => $inundacion->longitud,
+                                    'polygon_coords' => $inundacion->polygon_coords,
+                                    'polygon_es_fallback' => (bool) $inundacion->polygon_es_fallback,
+                                    'intensidad_propuesta' => $intensidadInundacion,
+                                    'tier' => $intensidadInundacion,
+                                    'updated_at' => $inundacion->updated_at,
+                                    'epicenters' => $reportesParaHeat,
+                                ]]
+                                : ($inundacion->reportes->map(fn ($r) => [
+                                    'lat' => $r->lat_reporte,
+                                    'lng' => $r->long_reporte,
+                                    'lat_reporte' => $r->lat_reporte,
+                                    'long_reporte' => $r->long_reporte,
+                                    'intensidad_propuesta' => $r->intensidad_propuesta,
+                                    'tier' => $intensidadInundacion,
+                                    'polygon_coords' => $r->polygon_coords,
+                                    'polygon_es_fallback' => (bool) $r->polygon_es_fallback,
+                                    'updated_at' => $r->updated_at,
+                                ])->values()->all() ?: [[
+                                    'lat' => $inundacion->latitud,
+                                    'lng' => $inundacion->longitud,
+                                    'intensidad_propuesta' => 'media',
+                                    'tier' => $intensidadInundacion,
+                                    'polygon_coords' => $inundacion->polygon_coords,
+                                    'updated_at' => $inundacion->updated_at,
+                                ]]);
+                        @endphp
+
+                        const heatData = @json($heatData);
                         
                         window.createSmartHeatmap(miniMap, heatData, {
-                            heatOptions: { radius: 25, blur: 15 }
+                            heatOptions: { radius: 25, blur: 15 },
+                            mode: 'auto',
+                            ttlHours: 3,
                         });
                         
                         // Icono simple para el centroide

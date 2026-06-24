@@ -42,16 +42,20 @@ class Inundacion extends Model
         'estado',
         'municipio_id',
         'polygon_coords',
+        'polygon_geojson',
         'polygon_calculado_at',
         'polygon_editado_autoridad',
+        'polygon_es_fallback',
     ];
 
     protected $casts = [
         'latitud'                    => 'decimal:7',
         'longitud'                   => 'decimal:7',
         'polygon_coords'             => 'array',
+        'polygon_geojson'            => 'array',
         'polygon_calculado_at'       => 'datetime',
         'polygon_editado_autoridad'  => 'boolean',
+        'polygon_es_fallback'        => 'boolean',
     ];
 
     // ─────────────────────────────────────────────────────────────────────
@@ -209,9 +213,10 @@ class Inundacion extends Model
         }
 
         if ($sumaPesos > 0) {
-            $this->latitud  = $sumaLat / $sumaPesos;
-            $this->longitud = $sumaLng / $sumaPesos;
-            $this->save();
+            $this->update([
+                'latitud'  => (string) round($sumaLat / $sumaPesos, 7),
+                'longitud' => (string) round($sumaLng / $sumaPesos, 7),
+            ]);
 
             // Resolver municipio automáticamente después de actualizar el centroide
             $this->resolverMunicipio();

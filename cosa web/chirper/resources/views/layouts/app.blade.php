@@ -97,6 +97,8 @@
                 @if (session()->has('api_token'))
                 <nav class="hidden md:flex items-center gap-1 text-sm font-medium">
                     <a href="{{ route('reports.index', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('reports.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Reportes</a>
+                    <a href="{{ route('command-center.index', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('command-center.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Análisis de Impacto</a>
+                    <a href="{{ route('vehiculos.mapa', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('vehiculos.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Vehículos</a>
                     <a href="{{ route('logistica.index', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('logistica.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Logística</a>
                     <a href="{{ route('inventario.index', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('inventario.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Inventario</a>
                     <a href="{{ route('victimas.index', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('victimas.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Víctimas</a>
@@ -162,6 +164,8 @@
     @if (session()->has('api_token'))
     <nav class="md:hidden bg-white border-b border-gray-200 overflow-x-auto no-scrollbar flex items-center px-4 py-2 gap-2 shadow-inner">
         <a href="{{ route('reports.index', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('reports.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Reportes</a>
+        <a href="{{ route('command-center.index', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('command-center.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Análisis</a>
+        <a href="{{ route('vehiculos.mapa', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('vehiculos.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Vehículos</a>
         <a href="{{ route('logistica.index', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('logistica.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Logística</a>
         <a href="{{ route('inventario.index', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('inventario.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Inventario</a>
         <a href="{{ route('victimas.index', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('victimas.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Víctimas</a>
