@@ -23,7 +23,7 @@ class DatabaseSeeder extends Seeder
 
         User::query()->updateOrCreate(['carnet' => '10000001'], [
             'carnet' => '10000001',
-            'name' => 'Test User',
+            'name' => 'Juan Pérez',
             'phone' => '70000001',
             'address' => 'Zona Centro',
             'email' => 'test@example.com',
@@ -35,7 +35,7 @@ class DatabaseSeeder extends Seeder
         // Autoridades extra para probar chat 1-a-1
         User::query()->updateOrCreate(['carnet' => '10000002'], [
             'carnet' => '10000002',
-            'name' => 'Jefe Emergencias',
+            'name' => 'Carlos Gutiérrez',
             'phone' => '70000002',
             'address' => 'Central de Emergencias',
             'email' => 'emergencias@autoridad.gob',
@@ -46,7 +46,7 @@ class DatabaseSeeder extends Seeder
 
         User::query()->updateOrCreate(['carnet' => '10000003'], [
             'carnet' => '10000003',
-            'name' => 'Coord. Logística',
+            'name' => 'María López',
             'phone' => '70000003',
             'address' => 'Depósito Municipal',
             'email' => 'logistica@autoridad.gob',
@@ -57,7 +57,7 @@ class DatabaseSeeder extends Seeder
 
         User::query()->updateOrCreate(['carnet' => '10000004'], [
             'carnet' => '10000004',
-            'name' => 'Resp. Comunicaciones',
+            'name' => 'Ana Suárez',
             'phone' => '70000004',
             'address' => 'Torre de Comunicaciones',
             'email' => 'comunicaciones@autoridad.gob',
@@ -68,7 +68,7 @@ class DatabaseSeeder extends Seeder
 
         User::query()->updateOrCreate(['carnet' => '10000005'], [
             'carnet' => '10000005',
-            'name' => 'Dir. Coordinación',
+            'name' => 'Fernando Vargas',
             'phone' => '70000005',
             'address' => 'Sala de Situación',
             'email' => 'coordinacion@autoridad.gob',
@@ -79,7 +79,7 @@ class DatabaseSeeder extends Seeder
 
         User::query()->updateOrCreate(['carnet' => '20000001'], [
             'carnet' => '20000001',
-            'name' => 'Autoridad Norte',
+            'name' => 'Luisa Mamani',
             'phone' => '71111111',
             'address' => 'Distrito Norte',
             'email' => 'autoridad.norte@example.com',
@@ -90,7 +90,7 @@ class DatabaseSeeder extends Seeder
 
         User::query()->updateOrCreate(['carnet' => '20000002'], [
             'carnet' => '20000002',
-            'name' => 'Autoridad Sur',
+            'name' => 'Diego Flores',
             'phone' => '72222222',
             'address' => 'Distrito Sur',
             'email' => 'autoridad.sur@example.com',
@@ -101,7 +101,7 @@ class DatabaseSeeder extends Seeder
 
         User::query()->updateOrCreate(['carnet' => '20000003'], [
             'carnet' => '20000003',
-            'name' => 'Autoridad Centro',
+            'name' => 'Andrea Castro',
             'phone' => '73333333',
             'address' => 'Distrito Centro',
             'email' => 'autoridad.centro@example.com',

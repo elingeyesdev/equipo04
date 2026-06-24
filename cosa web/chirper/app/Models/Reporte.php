@@ -89,4 +89,52 @@ class Reporte extends Model
     {
         return $fotoPath !== null ? self::PESO_CON_FOTO : self::PESO_SIN_FOTO;
     }
+
+    /**
+     * Calcula el ETA estimado de ayuda logística para este reporte.
+     */
+    public function getEtaAttribute(): ?array
+    {
+        $lat = (float) $this->lat_reporte;
+        $lng = (float) $this->long_reporte;
+        if (!$lat || !$lng) return null;
+
+        $centros = \App\Models\CentroAsistencia::all();
+
+        if ($centros->isEmpty()) {
+            return null;
+        }
+
+        $minDistanceKm = null;
+        $closest = null;
+
+        foreach ($centros as $centro) {
+            $cLat = (float) $centro->latitud;
+            $cLng = (float) $centro->longitud;
+            if (!$cLat || !$cLng) continue;
+
+            $dLat = deg2rad($cLat - $lat);
+            $dLng = deg2rad($cLng - $lng);
+            $a = sin($dLat / 2) ** 2 + cos(deg2rad($lat)) * cos(deg2rad($cLat)) * sin($dLng / 2) ** 2;
+            $dist = 6371 * 2 * atan2(sqrt($a), sqrt(1 - $a));
+
+            if ($minDistanceKm === null || $dist < $minDistanceKm) {
+                $minDistanceKm = $dist;
+                $closest = $centro;
+            }
+        }
+
+        if (!$closest || $minDistanceKm === null) {
+            return null;
+        }
+
+        $speedKmH  = 35.0;
+        $etaMinutes = (int) max(3, ceil(($minDistanceKm / $speedKmH) * 60));
+
+        return [
+            'name'         => (string) ($closest->nombre ?? 'Centro de asistencia'),
+            'distance_km'  => round($minDistanceKm, 2),
+            'eta_minutes'  => $etaMinutes,
+        ];
+    }
 }

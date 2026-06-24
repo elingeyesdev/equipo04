@@ -137,7 +137,10 @@ class InundacionController extends Controller
             $report->load('reportes');
             foreach ($report->reportes as $rep) {
                 if ($rep->citizen_carnet) {
-                    $this->refreshCitizenBanStatus((string) $rep->citizen_carnet);
+                    $citizen = User::find($rep->citizen_carnet);
+                    if ($citizen) {
+                        $citizen->refreshBanStatus();
+                    }
                 }
             }
         }
@@ -149,27 +152,5 @@ class InundacionController extends Controller
         ]);
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // Helpers privados
-    // ─────────────────────────────────────────────────────────────────────
 
-    /**
-     * Recalcula el estado de baneo de un ciudadano en base a cuántas de
-     * sus inundaciones fueron marcadas como 'falsa'.
-     */
-    private function refreshCitizenBanStatus(string $citizenCarnet): void
-    {
-        $falseReportsCount = \App\Models\Reporte::query()
-            ->where('citizen_carnet', $citizenCarnet)
-            ->whereHas('inundacion', function ($q) {
-                $q->where('estado', Inundacion::ESTADO_FALSA);
-            })
-            ->count();
-
-        User::query()
-            ->where('carnet', $citizenCarnet)
-            ->update([
-                'is_banned' => $falseReportsCount >= 2,
-            ]);
-    }
 }

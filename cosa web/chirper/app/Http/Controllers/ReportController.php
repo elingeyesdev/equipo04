@@ -285,7 +285,7 @@ final class ReportController
 
     public function show(Request $request, int|string $id): View|RedirectResponse
     {
-        $inundacion = Inundacion::with(['reportes', 'victimas'])->findOrFail($id);
+        $inundacion = Inundacion::with(['reportes', 'victimas', 'inventarios'])->findOrFail($id);
 
         $reportArray = [
             'latitude' => $inundacion->latitud,
@@ -530,6 +530,26 @@ final class ReportController
                     'created_at' => optional($changedAt)?->toIso8601String(),
                     'link'       => route('reports.index', [], false),
                 ];
+            }
+        }
+
+        // Agregar notificaciones de Trazabilidad de Inventario
+        $inventarios = \App\Models\Inventario::with('trazabilidad')
+            ->where('donor_carnet', $carnet)
+            ->where('status', '!=', 'recibido_centro')
+            ->get();
+
+        foreach ($inventarios as $inv) {
+            $lastTrace = $inv->trazabilidad->last();
+            if ($lastTrace) {
+               $items[] = [
+                   'id' => 'citizen-inv-' . $lastTrace->trazabilidadid,
+                   'cursor' => (int) \Carbon\Carbon::parse($lastTrace->fecha_actualizacion)->timestamp,
+                   'title' => 'Actualización de Donación',
+                   'message' => 'Tu donación de ' . ucfirst($inv->categoria) . ' (' . $inv->descripcion . ') ha cambiado a estado: ' . strtoupper(str_replace('_', ' ', $lastTrace->estado_nuevo)),
+                   'created_at' => \Carbon\Carbon::parse($lastTrace->fecha_actualizacion)->toIso8601String(),
+                   'link' => route('profile.show', [], false)
+               ];
             }
         }
 

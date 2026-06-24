@@ -1,99 +1,3 @@
-@extends('layouts.app')
-
-@section('content')
-<div class="mx-auto max-w-2xl py-8 px-4 sm:px-6 lg:px-8">
-    <div class="bg-white shadow rounded-lg p-6">
-        <h1 class="text-2xl font-bold text-gray-900 mb-6">Crear Reporte Detallado</h1>
-
-        <form id="detailedReportForm" class="space-y-6" enctype="multipart/form-data">
-            @csrf
-
-            <!-- Ubicación GPS y Mapa -->
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Tu Ubicación (GPS)</label>
-                <div class="mt-1 flex items-center justify-between">
-                    <span id="gpsStatus" class="text-sm text-yellow-600">Obteniendo ubicación...</span>
-                    <button type="button" id="btnGetLocation" class="text-sm text-blue-600 hover:text-blue-800">Actualizar GPS</button>
-                </div>
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Ubicación del Reporte (Máx. 500m del GPS)</label>
-            <div id="map" class="h-64 bg-gray-100 rounded-lg border border-gray-300 relative z-0"></div>
-                <p id="distanceWarning" class="mt-2 text-sm text-red-600 hidden">El marcador está demasiado lejos de tu ubicación real (máximo 500m).</p>
-            </div>
-
-            <!-- Selección de Región/Provincia/Municipio -->
-            <div class="bg-white p-4 rounded-md border border-gray-200 shadow-sm hidden">
-                <p class="text-sm font-medium text-gray-700 mb-3">Región y Municipio (Autocompletado por GPS)</p>
-                <x-location-filter idPrefix="form" :requireFields="false" />
-            </div>
-
-            <!-- Address -->
-            <div>
-                <label for="address" class="block text-sm font-medium text-gray-700">Dirección (opcional)</label>
-                <input id="address" name="address" type="text" class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-lg py-3 px-4">
-            </div>
-
-            <!-- Intensidad -->
-            <div>
-                <label for="intensidad" class="block text-sm font-medium text-gray-700">Intensidad Propuesta</label>
-                <select id="intensidad" name="intensidad_propuesta" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-lg py-3 px-4">
-                    <option value="baja" selected>Baja</option>
-                    <option value="media">Media</option>
-                    <option value="alta">Alta</option>
-                </select>
-            </div>
-
-            <!-- Description -->
-            <div>
-                <label for="description" class="block text-sm font-medium text-gray-700">Descripción (obligatorio)</label>
-                <textarea id="description" name="description" rows="4" required class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"></textarea>
-            </div>
-
-            <!-- Foto -->
-            <div>
-                <label for="foto" class="block text-sm font-medium text-gray-700">Foto de Evidencia (opcional)</label>
-                <input id="foto" name="foto" type="file" accept="image/*" class="mt-1 block w-full text-sm text-gray-500
-                file:mr-4 file:py-2 file:px-4
-                file:rounded-md file:border-0
-                file:text-sm file:font-semibold
-                file:bg-blue-50 file:text-blue-700
-                hover:file:bg-blue-100">
-
-                <!-- Vista previa de imagen -->
-                <div id="foto-preview-wrapper" class="hidden mt-3">
-                    <div class="flex items-center justify-between mb-1">
-                        <p class="text-xs text-gray-500">Vista previa <span class="text-blue-500">(clic para ampliar)</span>:</p>
-                        <button type="button" id="btn-remove-foto"
-                            class="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 transition-colors font-medium">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                            Quitar imagen
-                        </button>
-                    </div>
-                    <img id="foto-preview-img"
-                        src="" alt="Vista previa"
-                        class="clickable-image max-h-40 rounded-lg border border-gray-200 shadow-sm cursor-zoom-in object-cover transition-transform hover:scale-105">
-                </div>
-            </div>
-
-            <button type="submit" id="btnSubmit" disabled class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none disabled:opacity-50">
-                Enviar Reporte
-            </button>
-        </form>
-
-        <div id="successMessage" class="mt-4 p-4 bg-green-100 text-green-800 rounded-md hidden">
-            Reporte creado exitosamente.
-        </div>
-        <div id="errorMessage" class="mt-4 p-4 bg-red-100 text-red-800 rounded-md hidden"></div>
-    </div>
-</div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
-
-<script>
 document.addEventListener('DOMContentLoaded', function() {
     let map, marker, circle;
     let gpsLat, gpsLng;
@@ -334,15 +238,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
             
             if (response.ok) {
-                let etaMsg = '';
-                if (result.eta) {
-                    etaMsg = `<br><span class="font-bold text-sm">Tiempo estimado de ayuda: ~${result.eta.eta_minutes} min (desde ${result.eta.name}, a ${result.eta.distance_km}km).</span>`;
-                }
-                document.getElementById('successMessage').innerHTML = 'Reporte creado exitosamente.' + etaMsg;
                 document.getElementById('successMessage').classList.remove('hidden');
                 setTimeout(() => {
                     window.location.href = '/reports';
-                }, 3500);
+                }, 2000);
             } else {
                 document.getElementById('errorMessage').textContent = 'Error: ' + (result.message || 'Error desconocido');
                 document.getElementById('errorMessage').classList.remove('hidden');
@@ -356,5 +255,3 @@ document.addEventListener('DOMContentLoaded', function() {
         btn.textContent = 'Enviar Reporte';
     });
 });
-</script>
-@endsection

@@ -111,6 +111,7 @@ class ReporteController extends Controller
         return response()->json([
             'message' => 'Reporte creado exitosamente',
             'reporte' => $reporte,
+            'eta'     => $reporte->eta,
         ], 201);
     }
 

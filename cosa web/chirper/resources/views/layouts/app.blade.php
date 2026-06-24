@@ -71,7 +71,7 @@
 <body class="min-h-screen bg-gray-50 text-gray-900 antialiased flex flex-col font-sans">
     
     <!-- GOBIERNO TOP BAR (Branding institucional) -->
-    <div class="bg-primary-900 text-white w-full py-2 px-4 shadow-md z-[100] relative">
+    <div class="bg-primary-900 text-white w-full py-2 px-4 shadow-md z-[10000] relative">
         <div class="max-w-7xl mx-auto flex justify-between items-center text-xs sm:text-sm font-medium tracking-wide">
             <div class="flex items-center gap-3">
                 <!-- Escudo/Logo Placeholder -->
@@ -85,7 +85,7 @@
     </div>
 
     <!-- MAIN NAVIGATION BAR -->
-    <header class="bg-white border-b border-gray-200 sticky top-0 z-[90] shadow-sm w-full">
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-[9999] shadow-sm w-full">
         <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
             
             <div class="flex items-center gap-6">
@@ -102,6 +102,9 @@
                     <a href="{{ route('logistica.index', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('logistica.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Logística</a>
                     <a href="{{ route('inventario.index', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('inventario.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Inventario</a>
                     <a href="{{ route('victimas.index', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('victimas.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Víctimas</a>
+                    @if ($apiRole === 'authority')
+                        <a href="{{ route('authorities.create', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('authorities.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Promover Autoridad</a>
+                    @endif
                 </nav>
                 @endif
             </div>
@@ -130,9 +133,9 @@
                             </div>
                         </div>
 
-                        <!-- User Menu -->
-                        <div class="relative group hidden sm:block ml-2">
-                            <div class="flex items-center gap-2 cursor-pointer p-1 pr-3 rounded-full bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-colors">
+                        <!-- User Profile Link -->
+                        <div class="hidden sm:block ml-2">
+                            <a href="{{ route('profile.show') }}" class="flex items-center gap-2 p-1 pr-3 rounded-full bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-colors">
                                 <div class="w-8 h-8 rounded-full bg-primary-800 text-white flex items-center justify-center font-bold text-xs shadow-sm">
                                     {{ strtoupper(substr($apiUser['name'] ?? 'U', 0, 1)) }}
                                 </div>
@@ -140,7 +143,7 @@
                                     <span class="font-bold text-gray-800 leading-none text-xs">{{ (string) ($apiUser['name'] ?? '') }}</span>
                                     <span class="text-primary-600 text-[10px] font-medium uppercase mt-0.5">{{ $apiRole }}</span>
                                 </div>
-                            </div>
+                            </a>
                         </div>
 
                         <!-- Logout Form -->
@@ -166,6 +169,9 @@
         <a href="{{ route('logistica.index', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('logistica.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Logística</a>
         <a href="{{ route('inventario.index', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('inventario.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Inventario</a>
         <a href="{{ route('victimas.index', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('victimas.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Víctimas</a>
+        @if ($apiRole === 'authority')
+            <a href="{{ route('authorities.create', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('authorities.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Promover Autoridad</a>
+        @endif
     </nav>
     @endif
 
@@ -193,9 +199,23 @@
     </main>
 
     <!-- FOOTER INSTITUCIONAL -->
-    <footer class="bg-white border-t border-gray-200 mt-auto py-6 text-center text-sm text-gray-500">
-        <p>&copy; {{ date('Y') }} Gobierno Autónomo Departamental de Santa Cruz. Todos los derechos reservados.</p>
-        <p class="text-xs mt-1">Sistema Integrado de Gestión y Transparencia de Desastres</p>
+    <footer class="bg-white border-t border-gray-200 mt-auto py-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row justify-between items-center md:items-start gap-6">
+                <!-- Información Principal -->
+                <div class="text-center md:text-left">
+                    <p class="text-sm text-gray-500 font-medium">&copy; {{ date('Y') }} Gobierno Autónomo Departamental de Santa Cruz. Todos los derechos reservados.</p>
+                    <p class="text-xs mt-1 text-gray-400">Sistema Integrado de Gestión y Transparencia de Desastres</p>
+                </div>
+                
+                <!-- Enlaces Rápidos -->
+                <nav class="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm">
+                    <a href="{{ route('sugerencias.index') }}" class="text-gray-500 hover:text-primary-700 transition-colors font-medium">Foro de Sugerencias</a>
+                    <a href="{{ route('faq.index') }}" class="text-gray-500 hover:text-primary-700 transition-colors font-medium">Preguntas Frecuentes (FAQ)</a>
+                    <a href="{{ route('contact.index') }}" class="text-gray-500 hover:text-primary-700 transition-colors font-medium">Contáctanos</a>
+                </nav>
+            </div>
+        </div>
     </footer>
 
     <!-- Global Image Modal -->

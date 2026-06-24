@@ -20,6 +20,10 @@ Route::prefix('auth')->group(function () {
 Route::post('reportes', [ReporteController::class, 'store']);
 
 Route::middleware('auth:sanctum')->group(function () {
+    // Autoridades: Búsqueda y Promoción
+    Route::get('citizens/search', [\App\Http\Controllers\Api\AuthorityController::class, 'searchCitizens']);
+    Route::post('authorities/promote', [\App\Http\Controllers\Api\AuthorityController::class, 'promote']);
+
     Route::get('reports', [InundacionController::class, 'index']);
     Route::post('reports', [InundacionController::class, 'store']);
     Route::get('reports/{report}', [InundacionController::class, 'show']);

@@ -86,6 +86,14 @@ class Inundacion extends Model
     }
 
     /**
+     * Inventario / donaciones registradas en esta inundación.
+     */
+    public function inventarios(): HasMany
+    {
+        return $this->hasMany(Inventario::class, 'inundacion_id');
+    }
+
+    /**
      * Daños materiales registrados en esta inundación.
      */
     public function danosMateriales(): HasMany

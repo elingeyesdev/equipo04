@@ -188,6 +188,27 @@ final class FloodApiClient
     }
 
     /**
+     * @return array<int,array{carnet:string,name:string}>
+     */
+    public function searchCitizens(string $token, string $query): array
+    {
+        $response = $this->request('GET', '/citizens/search', ['q' => $query], $token);
+
+        $this->throwIfError($response);
+
+        $json = $response['json'];
+
+        return (array) Arr::get($json, 'data', []);
+    }
+
+    public function promoteAuthority(string $token, string $carnet): void
+    {
+        $response = $this->request('POST', '/authorities/promote', ['carnet' => $carnet], $token);
+
+        $this->throwIfError($response);
+    }
+
+    /**
      * @return array{data:array<int,mixed>,meta:array<string,mixed>,links:array<string,mixed>}
      */
     public function listReports(string $token, int $page = 1, ?string $provincia = null, ?string $municipio = null): array
