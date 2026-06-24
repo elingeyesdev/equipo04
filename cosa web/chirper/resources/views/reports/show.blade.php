@@ -47,7 +47,9 @@
                 </div>
                 <div class="glass-panel rounded-2xl p-5">
                     <div class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Intensidad</div>
-                    @php($int = $inundacion->intensidadCalculada() ?? 'N/A')
+                    @php
+                        $int = $inundacion->intensidadCalculada() ?? 'N/A';
+                    @endphp
                     <div class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider shadow-sm
                         {{ $int === 'alta' ? 'bg-rose-500 text-white' : ($int === 'media' ? 'bg-amber-400 text-amber-900' : ($int === 'baja' ? 'bg-teal-400 text-teal-900' : 'bg-gray-100 text-gray-600')) }}">
                         {{ $int }}
