@@ -44,4 +44,8 @@ return [
         'key' => env('OPEN_ROUTE_SERVICE_KEY'),
     ],
 
+    'opentopography' => [
+        'key' => env('OPENTOPOGRAPHY_API_KEY'),
+    ],
+
 ];

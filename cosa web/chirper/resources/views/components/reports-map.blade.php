@@ -10,7 +10,8 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-<script src="{{ asset('js/smart-heatmap.js') }}"></script>
+<script src="{{ asset('js/smart-heatmap.js') }}?v=20260623g"></script>
+<script src="{{ asset('js/flood-outline.js') }}?v=20260623g"></script>
 
 <style>
 /* ── Animación de pulso para zonas de alta intensidad ────────────────── */
@@ -22,6 +23,45 @@
 .flood-polygon-alta path {
     animation: flood-pulse 2.5s ease-in-out infinite;
 }
+.flood-polygon-alta.flood-selected-outline path {
+    animation: flood-pulse 2.5s ease-in-out infinite;
+}
+.flood-selected-outline path {
+    stroke-width: 3.5px !important;
+    filter: drop-shadow(0 0 6px rgba(37, 99, 235, 0.55));
+}
+.flood-marker-selected > div {
+    box-shadow: 0 0 0 4px rgba(255,255,255,0.95), 0 0 14px rgba(37,99,235,0.75) !important;
+    transform: scale(1.15);
+}
+.flood-report-selected > div {
+    width: 14px !important;
+    height: 14px !important;
+    box-shadow: 0 0 0 3px #fff, 0 0 10px rgba(37,99,235,0.8) !important;
+}
+
+/* Tooltip de intensidad sobre el centroide */
+.heat-tier-tooltip {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+}
+.heat-tier-tooltip::before { display: none; }
+.heat-tier-tip {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.02em;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    white-space: nowrap;
+}
+.heat-tier-tip.heat-tier-alta  { background: #1e3a8a; }
+.heat-tier-tip.heat-tier-media { background: #0ea5e9; }
+.heat-tier-tip.heat-tier-baja  { background: #38bdf8; color: #0c4a6e; }
 
 /* Leyenda flotante del mapa */
 .map-legend-float {
@@ -122,6 +162,29 @@
         </div>
     </div>
     
+    <!-- LEYENDA DE INTENSIDAD DEL MAPA DE CALOR -->
+    <div id="heat-intensity-legend" class="hidden absolute top-4 right-4 bg-white/95 backdrop-blur p-3.5 rounded-xl shadow-xl border border-gray-100 z-[1000] pointer-events-none transition-all duration-300">
+        <h4 class="text-[11px] font-bold text-gray-800 mb-2.5 uppercase tracking-wider flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a6 6 0 016 6c0 4-6 10-6 10S4 12 4 8a6 6 0 016-6z"/></svg>
+            <span>Intensidad de Inundación</span>
+        </h4>
+        <div class="space-y-1.5">
+            <div class="flex items-center gap-2.5" data-heat-tier="alta">
+                <span class="w-5 h-5 rounded-md shadow-inner border border-black/10" style="background:#1e3a8a"></span>
+                <span class="text-xs text-gray-700 font-semibold">Alta</span>
+            </div>
+            <div class="flex items-center gap-2.5" data-heat-tier="media">
+                <span class="w-5 h-5 rounded-md shadow-inner border border-black/10" style="background:#0ea5e9"></span>
+                <span class="text-xs text-gray-700 font-semibold">Media</span>
+            </div>
+            <div class="flex items-center gap-2.5" data-heat-tier="baja">
+                <span class="w-5 h-5 rounded-md shadow-inner border border-black/10" style="background:#7dd3fc"></span>
+                <span class="text-xs text-gray-700 font-semibold">Baja</span>
+            </div>
+        </div>
+        <p class="text-[10px] text-gray-400 mt-2.5 italic max-w-[170px] leading-tight">El color refleja la intensidad calculada por peso de los reportes.</p>
+    </div>
+
     @if($showRouting)
         <!-- Panel de Rutas Seguras -->
         <x-routing-panel />
@@ -180,12 +243,16 @@ function initMap() {
     const layerControl = L.control.layers(baseMaps, overlayMaps, { collapsed: true }).addTo(map);
 
     // ── 3a. Capas de Reportes ─────────────────────────────────────────────
-    const markersLayer           = L.layerGroup().addTo(map); // Centroides principales de inundación
-    const polygonLayer           = L.layerGroup().addTo(map); // Polígonos topográficos (activo por defecto)
-    const individualReportsLayer = L.layerGroup().addTo(map); // Reportes atómicos (activo por defecto)
+    const markersLayer           = L.layerGroup().addTo(map);
+    const polygonLayer           = L.layerGroup().addTo(map);
+    const selectionBorderLayer   = L.layerGroup().addTo(map);
+    const individualReportsLayer = L.layerGroup().addTo(map);
+
+    window.selectedInundacionId = null;
 
     layerControl.addOverlay(markersLayer,           "Centros de Inundación (Centroides)");
-    layerControl.addOverlay(polygonLayer,           "Mapa de Calor Inteligente (Topográfico)");
+    layerControl.addOverlay(polygonLayer,           "Zona de Inundación (Mapa de Calor)");
+    layerControl.addOverlay(selectionBorderLayer,   "Contorno de Inundación Seleccionada");
     layerControl.addOverlay(individualReportsLayer, "Reportes Ciudadanos (Detalle)");
 
     // ── 3b. ESRI Shaded Relief — relieve topográfico superpuesto ─────────
@@ -295,16 +362,126 @@ function initMap() {
         return INTENSITY_PALETTE[intensidad] || INTENSITY_PALETTE['null'];
     }
 
+    function getInundacionOutlineRings(inundacion) {
+        if (window.computeInundacionSelectionOutline) {
+            const unified = window.computeInundacionSelectionOutline(inundacion);
+            if (unified && unified.length >= 3) {
+                return [unified];
+            }
+        }
+
+        const activeReps = inundacion.reportes_activos || inundacion.reportes || [];
+        const rings = [];
+
+        activeReps.forEach(function (rep) {
+            if (rep.polygon_es_fallback || !rep.polygon_coords) return;
+            if (!window.normalizePolygonRings) return;
+            window.normalizePolygonRings(rep.polygon_coords).forEach(function (ring) {
+                rings.push(ring);
+            });
+        });
+
+        return rings;
+    }
+
+    function buildCentroidIcon(palette, selected) {
+        const cls = selected ? 'custom-leaflet-marker flood-marker-selected' : 'custom-leaflet-marker';
+        const border = selected ? '4px solid #fbbf24' : '3px solid white';
+        return L.divIcon({
+            className: cls,
+            html: `<div style="background-color:${palette.marker};width:20px;height:20px;border-radius:50%;border:${border};box-shadow:0 0 10px rgba(0,0,0,0.3);transition:transform 0.2s;"></div>`,
+            iconSize: [20, 20],
+            iconAnchor: [10, 10],
+        });
+    }
+
+    function buildReportIcon(selected) {
+        const cls = selected ? 'individual-report-dot flood-report-selected' : 'individual-report-dot';
+        const size = selected ? 14 : 10;
+        return L.divIcon({
+            className: cls,
+            html: `<div style="background-color:#60a5fa;width:${size}px;height:${size}px;border-radius:50%;border:1.5px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);transition:all 0.2s;"></div>`,
+            iconSize: [size, size],
+            iconAnchor: [size / 2, size / 2],
+        });
+    }
+
+    function updateSelectionMarkerStyles() {
+        markersLayer.eachLayer(function (marker) {
+            if (!marker._inundacionMeta) return;
+            const selected = marker._inundacionMeta.id === window.selectedInundacionId;
+            marker.setIcon(buildCentroidIcon(marker._inundacionMeta.palette, selected));
+        });
+
+        individualReportsLayer.eachLayer(function (marker) {
+            if (!marker._inundacionId) return;
+            const selected = marker._inundacionId === window.selectedInundacionId;
+            marker.setIcon(buildReportIcon(selected));
+        });
+    }
+
+    function clearInundacionSelection() {
+        window.selectedInundacionId = null;
+        selectionBorderLayer.clearLayers();
+        updateSelectionMarkerStyles();
+    }
+
+    function selectInundacion(inundacion, options) {
+        options = options || { fly: true };
+        const lat = parseFloat(inundacion.latitud);
+        const lng = parseFloat(inundacion.longitud);
+        const intensidad = inundacion.intensidad_calculada || inundacion.intensidad || 'baja';
+        const palette = getPalette(intensidad);
+
+        window.selectedInundacionId = inundacion.id;
+        selectionBorderLayer.clearLayers();
+
+        const rings = getInundacionOutlineRings(inundacion);
+        const outlineLayers = [];
+
+        rings.forEach(function (ring) {
+            const poly = L.polygon(ring, {
+                color: palette.stroke,
+                weight: 3,
+                opacity: 0.95,
+                fillColor: palette.fill,
+                fillOpacity: 0.08,
+                smoothFactor: 2.5,
+                interactive: false,
+                className: intensidad === 'alta'
+                    ? 'flood-polygon-alta flood-selected-outline'
+                    : 'flood-selected-outline',
+            });
+            poly.addTo(selectionBorderLayer);
+            outlineLayers.push(poly);
+        });
+
+        updateSelectionMarkerStyles();
+
+        if (options.fly) {
+            if (outlineLayers.length > 0) {
+                const group = L.featureGroup(outlineLayers);
+                map.fitBounds(group.getBounds().pad(0.12), { maxZoom: 16, animate: true, duration: 0.8 });
+            } else if (!isNaN(lat) && !isNaN(lng)) {
+                map.flyTo([lat, lng], 15, { animate: true, duration: 0.8 });
+            }
+        }
+    }
+
+    map.on('click', function () {
+        clearInundacionSelection();
+    });
+
     function renderReports(reportsData) {
         markersLayer.clearLayers();
         polygonLayer.clearLayers();
+        selectionBorderLayer.clearLayers();
         individualReportsLayer.clearLayers();
 
         if (window.smartHeatmapInstance) {
             window.smartHeatmapInstance.remove();
         }
 
-        let allActiveReports = [];
         let heatSources = [];
 
         reportsData.forEach(report => {
@@ -334,8 +511,8 @@ function initMap() {
             }
 
             const polygonNote = report.polygon_coords
-                ? `<p class="text-[10px] text-blue-600 mt-1">Polígono expansivo recalculado (${numReports} reportes asociados)</p>`
-                : '<p class="text-[10px] text-gray-500 mt-1">Calculando zona de impacto topográfica…</p>';
+                ? `<p class="text-[10px] text-blue-600 mt-1">Zona de impacto en mapa de calor (${numReports} reportes)</p>`
+                : '<p class="text-[10px] text-gray-500 mt-1">Calculando zona de impacto…</p>';
 
             const popupContent = `
                 <div class="max-w-[240px] font-sans">
@@ -350,78 +527,93 @@ function initMap() {
                     <a href="/reports/${report.id}" class="block mt-2 text-center text-xs text-blue-600 hover:underline font-medium">Ver detalles de Inundación →</a>
                 </div>`;
 
-            const customIcon = L.divIcon({
-                className: 'custom-leaflet-marker',
-                html: `<div style="background-color:${palette.marker};width:20px;height:20px;border-radius:50%;border:3px solid white;box-shadow:0 0 10px rgba(0,0,0,0.3);animation:pulse 2s infinite;"></div>`,
-                iconSize: [20, 20], iconAnchor: [10, 10]
-            });
+            const customIcon = buildCentroidIcon(palette, window.selectedInundacionId === report.id);
 
             const marker = L.marker([lat, lng], { icon: customIcon })
-                .bindPopup(popupContent, { minWidth: 220 })
-                .on('click', () => map.flyTo([lat, lng], 15, { animate: true, duration: 0.8 }));
+                .bindPopup(popupContent, { minWidth: 220 });
+
+            const intensidadLabel = intensidad.charAt(0).toUpperCase() + intensidad.slice(1);
+            const quorumLabel = report.quorum_total !== undefined ? ` · ${report.quorum_total} pts` : '';
+            marker.bindTooltip(
+                `<span class="heat-tier-tip heat-tier-${intensidad}">${intensidadLabel}${quorumLabel}</span>`,
+                { permanent: true, direction: 'top', offset: [0, -14], className: 'heat-tier-tooltip', opacity: 1 }
+            );
+
+            marker._inundacionMeta = { id: report.id, palette: palette };
+
+            marker.on('click', function (e) {
+                L.DomEvent.stopPropagation(e);
+                if (window.selectedInundacionId === report.id) {
+                    clearInundacionSelection();
+                } else {
+                    selectInundacion(report, { fly: true });
+                }
+            });
 
             markersLayer.addLayer(marker);
 
-            let drawIndividualReports = true;
-            if (report.polygon_coords && Array.isArray(report.polygon_coords) && report.polygon_coords.length >= 3) {
-                drawIndividualReports = false;
+            const activeReps = report.reportes_activos || report.reportes || [];
 
-                const authorityPolygon = L.polygon(report.polygon_coords, {
-                    color:       '#1e3a8a', 
-                    fillColor:   '#3b82f6', 
-                    fillOpacity: 0.45,
-                    weight:      3,
-                    dashArray:   '10,5', 
-                    smoothFactor: 1.0,
-                });
+            // Epicentros = ubicación de cada reporte, para ponderar la profundidad
+            // dentro de la zona unificada (centro más intenso, bordes difuminados).
+            const epicenters = (Array.isArray(activeReps) ? activeReps : []).map(function (rep) {
+                return {
+                    lat: parseFloat(rep.lat_reporte || rep.latitud),
+                    lng: parseFloat(rep.long_reporte || rep.longitud),
+                    updated_at: rep.updated_at || rep.created_at,
+                };
+            }).filter(function (ep) { return !isNaN(ep.lat) && !isNaN(ep.lng); });
 
-                authorityPolygon.bindPopup(popupContent, { minWidth: 220 });
-                polygonLayer.addLayer(authorityPolygon);
+            // Zona UNIFICADA de la inundación: una sola mancha para todos sus reportes.
+            // 1º) el polígono unificado del backend (aunque sea fallback geométrico: sigue
+            // siendo la zona unida); 2º) si no existe, lo fusionamos en el frontend con la
+            // misma lógica del contorno. Solo si no se puede unir, caemos a manchas por reporte.
+            let unifiedRings = window.normalizePolygonRings
+                ? window.normalizePolygonRings(report.polygon_coords)
+                : [];
+
+            if (unifiedRings.length === 0 && window.computeInundacionSelectionOutline) {
+                const outline = window.computeInundacionSelectionOutline(report);
+                if (outline && outline.length >= 3) {
+                    unifiedRings = [outline];
+                }
             }
 
-            const activeReps = report.reportes_activos || report.reportes || [];
+            if (unifiedRings.length > 0) {
+                heatSources.push({
+                    lat: lat,
+                    lng: lng,
+                    polygon_coords: unifiedRings.length === 1 ? unifiedRings[0] : unifiedRings,
+                    polygon_es_fallback: false,
+                    tier: intensidad,
+                    updated_at: report.updated_at,
+                    epicenters: epicenters.length > 0 ? epicenters : undefined,
+                });
+            }
+
             if (activeReps && Array.isArray(activeReps)) {
-                allActiveReports.push(...activeReps);
-
-                const hasAuthorityPolygon = report.polygon_coords
-                    && Array.isArray(report.polygon_coords)
-                    && report.polygon_coords.length >= 3;
-
-                if (hasAuthorityPolygon) {
-                    heatSources.push({
-                        lat: lat,
-                        lng: lng,
-                        lat_reporte: lat,
-                        long_reporte: lng,
-                        polygon_coords: report.polygon_es_fallback ? null : report.polygon_coords,
-                        polygon_es_fallback: !!report.polygon_es_fallback,
-                        intensidad_propuesta: intensidad,
-                        updated_at: report.updated_at,
-                    });
-                } else {
-                    heatSources.push(...activeReps);
-                }
-                
                 activeReps.forEach(rep => {
                     const repLat = parseFloat(rep.lat_reporte || rep.latitud);
                     const repLng = parseFloat(rep.long_reporte || rep.longitud);
                     if (isNaN(repLat) || isNaN(repLng)) return;
 
-                    if (drawIndividualReports && rep.polygon_coords && Array.isArray(rep.polygon_coords) && rep.polygon_coords.length >= 3) {
-                        const repPolygon = L.polygon(rep.polygon_coords, {
-                            color: 'transparent',
-                            fillColor: '#38bdf8',
-                            fillOpacity: 0.3,
-                            interactive: false
+                    // Sin zona unificada, cada reporte aporta su propia mancha.
+                    if (unifiedRings.length === 0) {
+                        heatSources.push({
+                            lat: repLat,
+                            lng: repLng,
+                            lat_reporte: repLat,
+                            long_reporte: repLng,
+                            polygon_coords: rep.polygon_es_fallback ? null : rep.polygon_coords,
+                            polygon_es_fallback: !!rep.polygon_es_fallback,
+                            intensidad_propuesta: rep.intensidad_propuesta || rep.intensidad || 'baja',
+                            tier: intensidad,
+                            updated_at: rep.updated_at || rep.created_at,
                         });
-                        polygonLayer.addLayer(repPolygon);
                     }
 
-                    const repIcon = L.divIcon({
-                        className: 'individual-report-dot',
-                        html: `<div style="background-color:#60a5fa;width:10px;height:10px;border-radius:50%;border:1.5px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>`,
-                        iconSize: [10, 10], iconAnchor: [5, 5]
-                    });
+                    const repSelected = window.selectedInundacionId === report.id;
+                    const repIcon = buildReportIcon(repSelected);
 
                     const intensidadProp = rep.intensidad_propuesta || rep.intensidad || 'baja';
                     const repIntensityColor = { alta: 'blue', media: 'sky', baja: 'teal' }[intensidadProp] || 'gray';
@@ -442,18 +634,45 @@ function initMap() {
                     const repMarker = L.marker([repLat, repLng], { icon: repIcon })
                         .bindPopup(repPopupContent, { minWidth: 160 });
 
+                    repMarker._inundacionId = report.id;
+                    repMarker.on('click', function (e) {
+                        L.DomEvent.stopPropagation(e);
+                        selectInundacion(report, { fly: false });
+                    });
+
                     individualReportsLayer.addLayer(repMarker);
                 });
             }
         });
 
-        if (heatSources.length > 0) {
-            if (window.createSmartHeatmap) {
-                window.smartHeatmapInstance = window.createSmartHeatmap(map, heatSources, {
-                    targetLayer: polygonLayer,
-                    mode: 'auto',
-                    ttlHours: 3,
+        const heatLegend = document.getElementById('heat-intensity-legend');
+        if (heatSources.length > 0 && window.createSmartHeatmap) {
+            window.smartHeatmapInstance = window.createSmartHeatmap(map, heatSources, {
+                targetLayer: polygonLayer,
+                mode: 'auto',
+                ttlHours: 3,
+                sampleStepM: 12,
+            });
+
+            if (heatLegend && window.smartHeatmapInstance && window.smartHeatmapInstance.tiers) {
+                const tiers = window.smartHeatmapInstance.tiers;
+                heatLegend.classList.remove('hidden');
+                heatLegend.querySelectorAll('[data-heat-tier]').forEach(function (row) {
+                    row.style.display = tiers.indexOf(row.getAttribute('data-heat-tier')) !== -1 ? '' : 'none';
                 });
+            }
+        } else if (heatLegend) {
+            heatLegend.classList.add('hidden');
+        }
+
+        if (window.selectedInundacionId) {
+            const selected = reportsData.find(function (r) {
+                return r.id === window.selectedInundacionId;
+            });
+            if (selected) {
+                selectInundacion(selected, { fly: false });
+            } else {
+                clearInundacionSelection();
             }
         }
     }

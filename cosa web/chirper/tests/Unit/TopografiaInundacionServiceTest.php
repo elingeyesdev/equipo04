@@ -53,6 +53,59 @@ describe('PoligonoTopografiaCacheService', function () {
 
         expect(Cache::get($service->cacheKey('reporte', 42)))->toBe($payload);
     });
+
+    it('construye un GeoJSON MultiPolygon cuando hay varios anillos', function () {
+        $service = new PoligonoTopografiaCacheService();
+
+        $ring1 = [[-17.78, -63.18], [-17.781, -63.18], [-17.781, -63.181]];
+        $ring2 = [[-17.79, -63.19], [-17.791, -63.19], [-17.791, -63.191]];
+
+        $geoJson = $service->construirGeoJson([$ring1, $ring2], -17.785, -63.185, 'media', false);
+
+        expect($geoJson['geometry']['type'])->toBe('MultiPolygon')
+            ->and($geoJson['properties']['es_multipolygon'])->toBeTrue()
+            ->and($geoJson['geometry']['coordinates'])->toHaveCount(2);
+    });
+});
+
+describe('TopografiaInundacionService union', function () {
+    it('une dos polígonos cercanos en un solo anillo', function () {
+        $elevation = Mockery::mock(ElevationProvider::class);
+        $service = new TopografiaInundacionService($elevation);
+
+        $p1 = $service->buildCircularFallback(-17.78, -63.18, 40.0);
+        $p2 = $service->buildCircularFallback(-17.7804, -63.1805, 40.0);
+
+        $result = $service->unirPoligonosReportes([$p1, $p2], 100.0);
+
+        expect($result['es_multipolygon'])->toBeFalse()
+            ->and($result['rings'])->toHaveCount(1)
+            ->and(count($result['polygon_coords']))->toBeGreaterThanOrEqual(3);
+    });
+
+    it('mantiene dos anillos cuando los polígonos están muy lejos', function () {
+        $elevation = Mockery::mock(ElevationProvider::class);
+        $service = new TopografiaInundacionService($elevation);
+
+        $p1 = $service->buildCircularFallback(-17.78, -63.18, 30.0);
+        $p2 = $service->buildCircularFallback(-17.79, -63.19, 30.0);
+
+        $result = $service->unirPoligonosReportes([$p1, $p2], 100.0);
+
+        expect($result['es_multipolygon'])->toBeTrue()
+            ->and($result['rings'])->toHaveCount(2);
+    });
+
+    it('devuelve el polígono tal cual si solo hay uno', function () {
+        $elevation = Mockery::mock(ElevationProvider::class);
+        $service = new TopografiaInundacionService($elevation);
+
+        $p1 = $service->buildCircularFallback(-17.78, -63.18, 30.0);
+        $result = $service->unirPoligonosReportes([$p1]);
+
+        expect($result['es_multipolygon'])->toBeFalse()
+            ->and($result['polygon_coords'])->toBe($p1);
+    });
 });
 
 describe('TopografiaInundacionService', function () {

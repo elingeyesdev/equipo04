@@ -203,10 +203,10 @@ class ReportsIndex extends Component
             'created_at_human'     => $r->created_at?->diffForHumans(),
         ])->toArray();
 
-        $ttlInicio = \Carbon\Carbon::now()->subHours(\App\Models\Inundacion::TTL_HORAS);
+        $ttlInicio = \Carbon\Carbon::now()->subHours(Inundacion::TTL_HORAS);
         
         $reportesInactivos = $i->reportes->filter(function ($r) use ($ttlInicio) {
-            if ($r->estado_validacion === \App\Models\Reporte::VALIDACION_RECHAZADO) {
+            if ($r->estado_validacion === Reporte::VALIDACION_RECHAZADO) {
                 return false;
             }
             $fecha = $r->updated_at ?? $r->created_at;

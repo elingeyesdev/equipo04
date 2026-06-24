@@ -33,6 +33,12 @@ final class TopografiaInundacionService
     /** Pausa entre lotes (ms) para respetar rate limit ~1 req/s. */
     private const ELEVATION_BATCH_DELAY_MS = 1100;
 
+    /** Celda de la grilla de unión de polígonos de reportes (metros). */
+    private const UNION_GRID_CELL_M = 10.0;
+
+    /** Distancia máxima entre bordes para fusionar polígonos de una misma inundación. */
+    public const UNION_BRIDGE_M = 100.0;
+
     public function __construct(
         private readonly ElevationProvider $elevationService,
     ) {}
@@ -119,6 +125,335 @@ final class TopografiaInundacionService
         }
 
         return $points;
+    }
+
+    /**
+     * Fusiona polígonos de reportes mediante rasterización + cierre morfológico.
+     * Rellena huecos entre manchas cercanas siguiendo la forma de los bordes.
+     *
+     * @param  array<int, array<int, array{0: float, 1: float}>>  $poligonos
+     * @return array{
+     *   rings: array<int, array<int, array{0: float, 1: float}>>,
+     *   es_multipolygon: bool,
+     *   polygon_coords: array<int, mixed>
+     * }
+     */
+    public function unirPoligonosReportes(array $poligonos, float $bridgeMeters = self::UNION_BRIDGE_M): array
+    {
+        $poligonos = array_values(array_filter($poligonos, static fn (array $p): bool => count($p) >= 3));
+
+        if ($poligonos === []) {
+            return [
+                'rings' => [],
+                'es_multipolygon' => false,
+                'polygon_coords' => [],
+            ];
+        }
+
+        if (count($poligonos) === 1) {
+            return [
+                'rings' => [$poligonos[0]],
+                'es_multipolygon' => false,
+                'polygon_coords' => $poligonos[0],
+            ];
+        }
+
+        $marginM = $bridgeMeters + self::UNION_GRID_CELL_M;
+        $bounds = $this->boundingBoxOfPolygons($poligonos, $marginM);
+        $grid = $this->buildUnionGrid($bounds);
+
+        $filled = $this->rasterizePolygonsOnGrid($poligonos, $grid);
+        $radius = max(1, (int) ceil($bridgeMeters / (2 * self::UNION_GRID_CELL_M)));
+        $closed = $this->morphologicalClose($filled, $radius);
+        $components = $this->findConnectedComponents($closed);
+
+        $rings = [];
+        foreach ($components as $component) {
+            $ring = $this->floodedCellsToPolygon($component, $grid);
+            if (count($ring) >= 3) {
+                $rings[] = $ring;
+            }
+        }
+
+        $esMultipolygon = count($rings) > 1;
+
+        return [
+            'rings' => $rings,
+            'es_multipolygon' => $esMultipolygon,
+            'polygon_coords' => $esMultipolygon ? $rings : ($rings[0] ?? []),
+        ];
+    }
+
+    /**
+     * @param  array<int, array<int, array{0: float, 1: float}>>  $poligonos
+     * @return array{min_lat: float, max_lat: float, min_lng: float, max_lng: float, center_lat: float, center_lng: float}
+     */
+    private function boundingBoxOfPolygons(array $poligonos, float $marginM): array
+    {
+        $minLat = INF;
+        $maxLat = -INF;
+        $minLng = INF;
+        $maxLng = -INF;
+
+        foreach ($poligonos as $polygon) {
+            foreach ($polygon as [$lat, $lng]) {
+                $minLat = min($minLat, $lat);
+                $maxLat = max($maxLat, $lat);
+                $minLng = min($minLng, $lng);
+                $maxLng = max($maxLng, $lng);
+            }
+        }
+
+        $marginDeg = $marginM / 111_320.0;
+        $centerLat = ($minLat + $maxLat) / 2;
+        $cosLat = max(cos(deg2rad($centerLat)), 0.01);
+        $marginLng = $marginM / (111_320.0 * $cosLat);
+
+        return [
+            'min_lat' => $minLat - $marginDeg,
+            'max_lat' => $maxLat + $marginDeg,
+            'min_lng' => $minLng - $marginLng,
+            'max_lng' => $maxLng + $marginLng,
+            'center_lat' => $centerLat,
+            'center_lng' => ($minLng + $maxLng) / 2,
+        ];
+    }
+
+    /**
+     * @param  array{min_lat: float, max_lat: float, min_lng: float, max_lng: float, center_lat: float, center_lng: float}  $bounds
+     * @return array<string, mixed>
+     */
+    private function buildUnionGrid(array $bounds): array
+    {
+        $cellM = self::UNION_GRID_CELL_M;
+        $centerLat = $bounds['center_lat'];
+        $centerLng = $bounds['center_lng'];
+        $cosLat = max(cos(deg2rad($centerLat)), 0.01);
+
+        $northExtentM = ($bounds['max_lat'] - $bounds['min_lat']) / 2 * 111_320.0;
+        $eastExtentM = ($bounds['max_lng'] - $bounds['min_lng']) / 2 * 111_320.0 * $cosLat;
+
+        $radiusRows = max(1, (int) ceil($northExtentM / $cellM));
+        $radiusCols = max(1, (int) ceil($eastExtentM / $cellM));
+        $rows = $radiusRows * 2 + 1;
+        $cols = $radiusCols * 2 + 1;
+        $centerRow = $radiusRows;
+        $centerCol = $radiusCols;
+
+        $halfNorthDeg = ($cellM / 2) / 111_320.0;
+        $halfEastDeg = ($cellM / 2) / (111_320.0 * $cosLat);
+
+        $cells = [];
+        for ($row = 0; $row < $rows; $row++) {
+            $cells[$row] = [];
+            for ($col = 0; $col < $cols; $col++) {
+                $northM = ($centerRow - $row) * $cellM;
+                $eastM = ($col - $centerCol) * $cellM;
+                [$cellLat, $cellLng] = $this->offsetByNorthEast($centerLat, $centerLng, $northM, $eastM);
+                $cells[$row][$col] = ['lat' => $cellLat, 'lng' => $cellLng];
+            }
+        }
+
+        return [
+            'rows' => $rows,
+            'cols' => $cols,
+            'cells' => $cells,
+            'half_north_deg' => $halfNorthDeg,
+            'half_east_deg' => $halfEastDeg,
+        ];
+    }
+
+    /**
+     * @param  array<int, array<int, array{0: float, 1: float}>>  $poligonos
+     * @param  array<string, mixed>  $grid
+     * @return array<int, array<int, bool>>
+     */
+    private function rasterizePolygonsOnGrid(array $poligonos, array $grid): array
+    {
+        $rows = $grid['rows'];
+        $cols = $grid['cols'];
+        $cells = $grid['cells'];
+        $filled = array_fill(0, $rows, array_fill(0, $cols, false));
+
+        for ($row = 0; $row < $rows; $row++) {
+            for ($col = 0; $col < $cols; $col++) {
+                $lat = $cells[$row][$col]['lat'];
+                $lng = $cells[$row][$col]['lng'];
+
+                foreach ($poligonos as $polygon) {
+                    if ($this->pointInPolygon($lat, $lng, $polygon)) {
+                        $filled[$row][$col] = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        return $filled;
+    }
+
+    /**
+     * @param  array<int, array<int, bool>>  $grid
+     * @return array<int, array<int, bool>>
+     */
+    private function morphologicalClose(array $grid, int $radius): array
+    {
+        return $this->erodeGrid($this->dilateGrid($grid, $radius), $radius);
+    }
+
+    /**
+     * @param  array<int, array<int, bool>>  $grid
+     * @return array<int, array<int, bool>>
+     */
+    private function dilateGrid(array $grid, int $radius): array
+    {
+        $rows = count($grid);
+        $cols = count($grid[0] ?? []);
+        $result = array_fill(0, $rows, array_fill(0, $cols, false));
+        $radiusSq = $radius * $radius;
+
+        for ($row = 0; $row < $rows; $row++) {
+            for ($col = 0; $col < $cols; $col++) {
+                if (!$grid[$row][$col]) {
+                    continue;
+                }
+
+                for ($dr = -$radius; $dr <= $radius; $dr++) {
+                    for ($dc = -$radius; $dc <= $radius; $dc++) {
+                        if ($dr * $dr + $dc * $dc > $radiusSq) {
+                            continue;
+                        }
+
+                        $nr = $row + $dr;
+                        $nc = $col + $dc;
+
+                        if ($nr >= 0 && $nr < $rows && $nc >= 0 && $nc < $cols) {
+                            $result[$nr][$nc] = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param  array<int, array<int, bool>>  $grid
+     * @return array<int, array<int, bool>>
+     */
+    private function erodeGrid(array $grid, int $radius): array
+    {
+        $rows = count($grid);
+        $cols = count($grid[0] ?? []);
+        $result = array_fill(0, $rows, array_fill(0, $cols, false));
+        $radiusSq = $radius * $radius;
+
+        for ($row = 0; $row < $rows; $row++) {
+            for ($col = 0; $col < $cols; $col++) {
+                if (!$grid[$row][$col]) {
+                    continue;
+                }
+
+                $keep = true;
+                for ($dr = -$radius; $dr <= $radius && $keep; $dr++) {
+                    for ($dc = -$radius; $dc <= $radius; $dc++) {
+                        if ($dr * $dr + $dc * $dc > $radiusSq) {
+                            continue;
+                        }
+
+                        $nr = $row + $dr;
+                        $nc = $col + $dc;
+
+                        if ($nr < 0 || $nr >= $rows || $nc < 0 || $nc >= $cols || !$grid[$nr][$nc]) {
+                            $keep = false;
+                            break;
+                        }
+                    }
+                }
+
+                $result[$row][$col] = $keep;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param  array<int, array<int, bool>>  $grid
+     * @return array<int, array<int, array{0: int, 1: int}>>
+     */
+    private function findConnectedComponents(array $grid): array
+    {
+        $rows = count($grid);
+        $cols = count($grid[0] ?? []);
+        $visited = [];
+        $components = [];
+
+        for ($row = 0; $row < $rows; $row++) {
+            for ($col = 0; $col < $cols; $col++) {
+                $key = "{$row},{$col}";
+
+                if (!$grid[$row][$col] || isset($visited[$key])) {
+                    continue;
+                }
+
+                $component = [];
+                $queue = [[$row, $col]];
+                $visited[$key] = true;
+
+                while ($queue !== []) {
+                    [$r, $c] = array_shift($queue);
+                    $component[] = [$r, $c];
+
+                    foreach ([[-1, 0], [1, 0], [0, -1], [0, 1]] as [$dr, $dc]) {
+                        $nr = $r + $dr;
+                        $nc = $c + $dc;
+                        $nKey = "{$nr},{$nc}";
+
+                        if ($nr < 0 || $nr >= $rows || $nc < 0 || $nc >= $cols) {
+                            continue;
+                        }
+
+                        if (!$grid[$nr][$nc] || isset($visited[$nKey])) {
+                            continue;
+                        }
+
+                        $visited[$nKey] = true;
+                        $queue[] = [$nr, $nc];
+                    }
+                }
+
+                if ($component !== []) {
+                    $components[] = $component;
+                }
+            }
+        }
+
+        return $components;
+    }
+
+    /**
+     * @param  array<int, array{0: float, 1: float}>  $polygon
+     */
+    public function pointInPolygon(float $lat, float $lng, array $polygon): bool
+    {
+        $inside = false;
+        $n = count($polygon);
+
+        for ($i = 0, $j = $n - 1; $i < $n; $j = $i++) {
+            $yi = $polygon[$i][0];
+            $xi = $polygon[$i][1];
+            $yj = $polygon[$j][0];
+            $xj = $polygon[$j][1];
+
+            if ((($yi > $lat) !== ($yj > $lat))
+                && ($lng < ($xj - $xi) * ($lat - $yi) / ($yj - $yi) + $xi)) {
+                $inside = ! $inside;
+            }
+        }
+
+        return $inside;
     }
 
     /**

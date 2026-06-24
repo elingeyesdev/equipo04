@@ -205,9 +205,10 @@ class Inundacion extends Model
         }
 
         if ($sumaPesos > 0) {
-            $this->latitud  = $sumaLat / $sumaPesos;
-            $this->longitud = $sumaLng / $sumaPesos;
-            $this->save();
+            $this->update([
+                'latitud'  => (string) round($sumaLat / $sumaPesos, 7),
+                'longitud' => (string) round($sumaLng / $sumaPesos, 7),
+            ]);
 
             // Resolver municipio automáticamente después de actualizar el centroide
             $this->resolverMunicipio();

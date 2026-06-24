@@ -1,35 +1,89 @@
 /**
  * Smart Heatmap - Lógica compartida para mapas de calor
  *
- * Modos:
- *   - geometric: puntos en epicentros + puentes térmicos (comportamiento original)
- *   - topographic: muestreo dentro de polygon_coords con peso por profundidad estimada
- *   - auto (default): topographic si algún reporte tiene polígono, si no geometric
+ * El COLOR representa la intensidad de la inundación (baja/media/alta), calculada
+ * en el backend por voto ponderado de peso. Cada nivel se pinta como una capa de
+ * calor independiente con un azul fijo, así el tono no depende de la densidad de
+ * puntos sino de la intensidad real. Inundaciones distintas con distinta intensidad
+ * se ven de distinto color; reportes de una misma inundación forman una sola zona.
+ *
+ * Cada fuente puede declarar `tier` ('baja'|'media'|'alta'); si no, se infiere de
+ * su intensidad. La opacidad dentro de la mancha refleja profundidad/TTL.
  *
  * options:
  *   mode: 'auto' | 'geometric' | 'topographic'
  *   ttlHours: number (default 3)
- *   sampleStepM: number (default 20) — paso de grilla dentro del polígono
+ *   sampleStepM: number (default 12) — paso de grilla dentro del polígono
  *   targetLayer, heatOptions — sin cambios
  */
+window.SMART_HEATMAP_TIER_COLORS = {
+    baja:  '#7dd3fc',
+    media: '#0ea5e9',
+    alta:  '#1e3a8a',
+};
+
+const SMART_HEATMAP_TIER_ORDER = ['baja', 'media', 'alta'];
+
+function normalizeTier(value) {
+    if (value === 'alta' || value === 'media' || value === 'baja') return value;
+    return 'baja';
+}
+
+function hexToRgba(hex, alpha) {
+    const h = hex.replace('#', '');
+    const r = parseInt(h.substring(0, 2), 16);
+    const g = parseInt(h.substring(2, 4), 16);
+    const b = parseInt(h.substring(4, 6), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+}
+
+function tierGradient(hex) {
+    return {
+        0.0: hexToRgba(hex, 0),
+        0.2: hexToRgba(hex, 0.28),
+        0.5: hexToRgba(hex, 0.6),
+        0.8: hexToRgba(hex, 0.85),
+        1.0: hex,
+    };
+}
+
 window.createSmartHeatmap = function (map, reports, options = {}) {
     if (!map || !window.L || !window.L.heatLayer) return null;
 
     const mode = options.mode || 'auto';
     const ttlHours = options.ttlHours || 3;
-    const sampleStepM = options.sampleStepM || 20;
+    const sampleStepM = options.sampleStepM || 12;
 
     const parsedReports = reports.map(function (r) {
         const lat = parseFloat(r.lat || r.lat_reporte || r.latitud);
         const lng = parseFloat(r.lng || r.long_reporte || r.longitud);
         const esFallback = r.polygon_es_fallback === true || r.polygon_es_fallback === 1;
-        const polygon = esFallback ? null : normalizePolygon(r.polygon_coords);
+        const polygonRings = esFallback ? [] : normalizePolygonRings(r.polygon_coords);
+        const intensity = r.intensidad || r.intensidad_propuesta || r.intensidad_calculada || 'baja';
+        const tier = normalizeTier(r.tier || r.intensidad_calculada || intensity);
+
+        const epicenters = Array.isArray(r.epicenters) && r.epicenters.length > 0
+            ? r.epicenters.map(function (ep) {
+                return {
+                    lat: parseFloat(ep.lat || ep.lat_reporte),
+                    lng: parseFloat(ep.lng || ep.long_reporte),
+                    updatedAt: ep.updated_at || ep.updatedAt || null,
+                };
+            }).filter(function (ep) {
+                return !isNaN(ep.lat) && !isNaN(ep.lng);
+            })
+            : [{
+                lat: lat,
+                lng: lng,
+                updatedAt: r.updated_at || r.updatedAt || r.created_at || null,
+            }];
 
         return {
             lat: lat,
             lng: lng,
-            intensity: r.intensidad || r.intensidad_propuesta || r.intensidad_calculada || 'baja',
-            polygon: polygon,
+            tier: tier,
+            polygonRings: polygonRings,
+            epicenters: epicenters,
             esFallback: esFallback,
             updatedAt: r.updated_at || r.updatedAt || r.created_at || null,
         };
@@ -40,93 +94,149 @@ window.createSmartHeatmap = function (map, reports, options = {}) {
     if (parsedReports.length === 0) return null;
 
     const hasPolygons = parsedReports.some(function (r) {
-        return r.polygon && r.polygon.length >= 3;
+        return r.polygonRings.length > 0;
     });
 
     const useTopographic = mode === 'topographic' || (mode === 'auto' && hasPolygons);
 
-    let heatPoints = [];
+    // Puntos de calor agrupados por nivel de intensidad (tier).
+    const pointsByTier = { baja: [], media: [], alta: [] };
+
+    function addPoints(tier, pts) {
+        if (pts.length > 0) {
+            pointsByTier[tier] = pointsByTier[tier].concat(pts);
+        }
+    }
 
     if (useTopographic) {
         parsedReports.forEach(function (rep) {
-            if (rep.polygon && rep.polygon.length >= 3) {
-                heatPoints = heatPoints.concat(
-                    samplePolygonHeatPoints(rep, sampleStepM, ttlHours)
-                );
+            if (rep.polygonRings.length > 0) {
+                rep.polygonRings.forEach(function (ring) {
+                    addPoints(rep.tier, samplePolygonHeatPoints(ring, rep.epicenters, sampleStepM, ttlHours));
+                });
             } else {
-                heatPoints.push(buildCenterPoint(rep, ttlHours));
+                addPoints(rep.tier, sampleGeometricHeatPoints(rep.lat, rep.lng, rep.tier, rep.updatedAt, ttlHours));
             }
         });
-
-        // Puentes térmicos solo entre reportes sin polígono topográfico
-        const geometricOnly = parsedReports.filter(function (r) {
-            return !r.polygon || r.polygon.length < 3;
-        });
-        heatPoints = heatPoints.concat(buildThermalBridges(geometricOnly));
     } else {
         parsedReports.forEach(function (rep) {
-            heatPoints.push(buildCenterPoint(rep, ttlHours));
+            addPoints(rep.tier, sampleGeometricHeatPoints(rep.lat, rep.lng, rep.tier, rep.updatedAt, ttlHours));
         });
-        heatPoints = heatPoints.concat(buildThermalBridges(parsedReports));
+        SMART_HEATMAP_TIER_ORDER.forEach(function (tier) {
+            const tierReports = parsedReports.filter(function (r) { return r.tier === tier; });
+            addPoints(tier, buildThermalBridges(tierReports));
+        });
     }
 
-    if (heatPoints.length === 0) return null;
+    const tiersPresent = SMART_HEATMAP_TIER_ORDER.filter(function (tier) {
+        return pointsByTier[tier].length > 0;
+    });
+
+    if (tiersPresent.length === 0) return null;
 
     const avgTtl = parsedReports.reduce(function (sum, r) {
         return sum + ttlFactor(r.updatedAt, ttlHours);
     }, 0) / parsedReports.length;
 
-    let initialZoom = map.getZoom();
-    let initialRadius = Math.max(12, Math.round(35 * Math.pow(1.5, initialZoom - 16)));
-    let initialBlur = Math.max(10, Math.round(initialRadius * 0.8));
+    // El radio del "blob" se fija en METROS reales y se convierte a píxeles según
+    // el zoom. La escala del mapa crece x2 por nivel de zoom; si el radio no sigue
+    // esa misma escala (antes crecía solo x1.4), a mucho zoom los puntos de la grilla
+    // se separan y aparecen círculos sueltos y colores sólidos en vez de un degradado.
+    const HEAT_RADIUS_M = Math.max(sampleStepM * 3.5, 42); // cobertura real del blob
+    const MIN_RADIUS_PX = 16;
+    const MAX_RADIUS_PX = 240;
 
-    const defaultHeatOptions = {
-        radius: initialRadius,
-        blur: initialBlur,
-        minOpacity: Math.max(0.2, Math.min(0.65, 0.25 + 0.4 * avgTtl)),
-        maxZoom: 18,
-        gradient: {
-            0.2: '#38bdf8',
-            0.5: '#2563eb',
-            1.0: '#1e3a8a',
-        },
-    };
-
-    const heatLayer = L.heatLayer(heatPoints, Object.assign(
-        defaultHeatOptions,
-        options.heatOptions || {}
-    ));
-
-    if (options.targetLayer) {
-        options.targetLayer.addLayer(heatLayer);
-    } else {
-        heatLayer.addTo(map);
+    function metersPerPixel(lat, zoom) {
+        return 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom);
     }
 
+    function radiusForZoom(zoom) {
+        const lat = map.getCenter().lat;
+        const mpp = metersPerPixel(lat, zoom) || 1;
+        const px = HEAT_RADIUS_M / mpp;
+        return Math.round(Math.max(MIN_RADIUS_PX, Math.min(MAX_RADIUS_PX, px)));
+    }
+
+    function blurForRadius(radius) {
+        return Math.max(12, Math.round(radius * 0.85));
+    }
+
+    const initialRadius = radiusForZoom(map.getZoom());
+    const initialBlur = blurForRadius(initialRadius);
+    const minOpacity = Math.max(0.18, Math.min(0.45, 0.16 + 0.3 * avgTtl));
+
+    // Una capa de calor por nivel; orden baja→media→alta (alta arriba).
+    const heatLayers = [];
+
+    tiersPresent.forEach(function (tier) {
+        const color = window.SMART_HEATMAP_TIER_COLORS[tier];
+        const layerOptions = Object.assign({
+            radius: initialRadius,
+            blur: initialBlur,
+            minOpacity: minOpacity,
+            max: 1.0,
+            maxZoom: 18,
+        }, options.heatOptions || {});
+        // El gradiente por nivel manda; no permitir override del color.
+        layerOptions.gradient = tierGradient(color);
+
+        const layer = L.heatLayer(pointsByTier[tier], layerOptions);
+
+        if (options.targetLayer) {
+            options.targetLayer.addLayer(layer);
+        } else {
+            layer.addTo(map);
+        }
+
+        heatLayers.push(layer);
+    });
+
     const zoomListener = function () {
-        let zoom = map.getZoom();
-        let newRadius = Math.max(12, Math.round(35 * Math.pow(1.5, zoom - 16)));
-        let newBlur = Math.max(10, Math.round(newRadius * 0.8));
-        heatLayer.setOptions({ radius: newRadius, blur: newBlur });
+        const newRadius = radiusForZoom(map.getZoom());
+        const newBlur = blurForRadius(newRadius);
+        heatLayers.forEach(function (layer) {
+            layer.setOptions({ radius: newRadius, blur: newBlur });
+        });
     };
 
     map.on('zoomend', zoomListener);
 
     return {
-        layer: heatLayer,
+        layers: heatLayers,
+        tiers: tiersPresent,
         mode: useTopographic ? 'topographic' : 'geometric',
         remove: function () {
-            if (options.targetLayer) {
-                options.targetLayer.removeLayer(heatLayer);
-            } else {
-                map.removeLayer(heatLayer);
-            }
+            heatLayers.forEach(function (layer) {
+                if (options.targetLayer) {
+                    options.targetLayer.removeLayer(layer);
+                } else {
+                    map.removeLayer(layer);
+                }
+            });
             map.off('zoomend', zoomListener);
         },
     };
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
+
+function isMultiPolygon(coords) {
+    if (!coords || !Array.isArray(coords) || coords.length === 0) return false;
+    return Array.isArray(coords[0]) && Array.isArray(coords[0][0]);
+}
+
+function normalizePolygonRings(coords) {
+    if (!coords || !Array.isArray(coords) || coords.length === 0) return [];
+
+    if (isMultiPolygon(coords)) {
+        return coords.map(normalizePolygon).filter(function (ring) {
+            return ring && ring.length >= 3;
+        });
+    }
+
+    const ring = normalizePolygon(coords);
+    return ring && ring.length >= 3 ? [ring] : [];
+}
 
 function normalizePolygon(coords) {
     if (!coords || !Array.isArray(coords) || coords.length < 3) return null;
@@ -142,12 +252,6 @@ function normalizePolygon(coords) {
     }).filter(function (p) {
         return p && !isNaN(p[0]) && !isNaN(p[1]);
     });
-}
-
-function intensityWeight(intensity) {
-    if (intensity === 'alta') return 1.0;
-    if (intensity === 'media') return 0.6;
-    return 0.3;
 }
 
 function ttlFactor(updatedAt, ttlHours) {
@@ -191,13 +295,27 @@ function pointInPolygon(lat, lng, polygon) {
     return inside;
 }
 
-function buildCenterPoint(rep, ttlHours) {
-    const weight = intensityWeight(rep.intensity) * ttlFactor(rep.updatedAt, ttlHours);
-    return [rep.lat, rep.lng, weight];
+function nearestEpicenter(lat, lng, epicenters) {
+    let nearest = epicenters[0];
+    let minDist = Infinity;
+
+    epicenters.forEach(function (ep) {
+        const dist = haversineM(lat, lng, ep.lat, ep.lng);
+        if (dist < minDist) {
+            minDist = dist;
+            nearest = ep;
+        }
+    });
+
+    return { epicenter: nearest, distance: minDist };
 }
 
-function samplePolygonHeatPoints(rep, stepM, ttlHours) {
-    const polygon = rep.polygon;
+/**
+ * Muestrea puntos dentro del polígono. El peso = profundidad estimada × TTL
+ * (NO intensidad: el color lo define la capa por nivel). Centro más sólido,
+ * bordes difuminados, para una mancha suave.
+ */
+function samplePolygonHeatPoints(polygon, epicenters, stepM, ttlHours) {
     const lats = polygon.map(function (p) { return p[0]; });
     const lngs = polygon.map(function (p) { return p[1]; });
     const minLat = Math.min.apply(null, lats);
@@ -205,34 +323,65 @@ function samplePolygonHeatPoints(rep, stepM, ttlHours) {
     const minLng = Math.min.apply(null, lngs);
     const maxLng = Math.max.apply(null, lngs);
 
-    const cosLat = Math.cos(rep.lat * Math.PI / 180);
+    const centerLat = (minLat + maxLat) / 2;
+    const cosLat = Math.cos(centerLat * Math.PI / 180);
     const stepLat = stepM / 111320;
     const stepLng = stepM / (111320 * Math.max(cosLat, 0.01));
 
-    const maxDist = Math.max.apply(null, polygon.map(function (p) {
-        return haversineM(rep.lat, rep.lng, p[0], p[1]);
+    const maxDist = Math.max.apply(null, epicenters.map(function (ep) {
+        return Math.max.apply(null, polygon.map(function (p) {
+            return haversineM(ep.lat, ep.lng, p[0], p[1]);
+        }));
     }));
 
-    const baseWeight = intensityWeight(rep.intensity);
-    const ttl = ttlFactor(rep.updatedAt, ttlHours);
     const points = [];
 
     for (let lat = minLat; lat <= maxLat; lat += stepLat) {
         for (let lng = minLng; lng <= maxLng; lng += stepLng) {
             if (!pointInPolygon(lat, lng, polygon)) continue;
 
-            const dist = haversineM(rep.lat, rep.lng, lat, lng);
-            const depthFactor = Math.max(0.2, 1 - 0.75 * (dist / (maxDist || stepM)));
-            const weight = baseWeight * depthFactor * ttl;
+            const nearest = nearestEpicenter(lat, lng, epicenters);
+            const ttl = ttlFactor(nearest.epicenter.updatedAt, ttlHours);
+            const depthFactor = Math.max(0.25, 1 - 0.7 * (nearest.distance / (maxDist || stepM)));
+            const weight = depthFactor * ttl;
 
-            if (weight > 0.04) {
+            if (weight > 0.02) {
                 points.push([lat, lng, weight]);
             }
         }
     }
 
-    // Epicentro con profundidad máxima estimada
-    points.push([rep.lat, rep.lng, baseWeight * ttl]);
+    return points;
+}
+
+/**
+ * Mancha suave circular cuando no hay polígono topográfico (fallback geométrico).
+ * El peso = profundidad × TTL; el color lo define la capa por nivel.
+ */
+function sampleGeometricHeatPoints(lat, lng, tier, updatedAt, ttlHours) {
+    const radiusM = tier === 'alta' ? 130 : (tier === 'media' ? 90 : 55);
+    const stepM = 10;
+    const ttl = ttlFactor(updatedAt, ttlHours);
+    const points = [];
+    const cosLat = Math.cos(lat * Math.PI / 180);
+    const stepLat = stepM / 111320;
+    const stepLng = stepM / (111320 * Math.max(cosLat, 0.01));
+    const latDelta = radiusM / 111320;
+    const lngDelta = radiusM / (111320 * Math.max(cosLat, 0.01));
+
+    for (let dLat = -latDelta; dLat <= latDelta; dLat += stepLat) {
+        for (let dLng = -lngDelta; dLng <= lngDelta; dLng += stepLng) {
+            const dist = haversineM(lat, lng, lat + dLat, lng + dLng);
+            if (dist > radiusM) continue;
+
+            const falloff = Math.max(0.2, 1 - Math.pow(dist / radiusM, 1.4));
+            const weight = falloff * ttl;
+
+            if (weight > 0.02) {
+                points.push([lat + dLat, lng + dLng, weight]);
+            }
+        }
+    }
 
     return points;
 }
@@ -269,3 +418,7 @@ function buildThermalBridges(reports) {
 
     return bridges;
 }
+
+// Export helpers for reports-map
+window.normalizePolygonRings = normalizePolygonRings;
+window.isMultiPolygon = isMultiPolygon;

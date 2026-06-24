@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\Inundacion;
 use App\Models\Reporte;
+use App\Support\PolygonCoordsHelper;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -16,7 +17,7 @@ final class PoligonoTopografiaCacheService
     private const CACHE_TTL_HOURS = 24;
 
     /**
-     * @param  array<int, array{0: float, 1: float}>  $polygonCoords
+     * @param  array<int, mixed>  $polygonCoords  Anillo único o array de anillos (MultiPolygon)
      * @return array<string, mixed>
      */
     public function construirGeoJson(
@@ -26,13 +27,35 @@ final class PoligonoTopografiaCacheService
         string $intensidad,
         bool $esFallback,
     ): array {
-        $coordinates = array_map(
-            static fn (array $point): array => [(float) $point[1], (float) $point[0]],
-            $polygonCoords
+        $rings = PolygonCoordsHelper::normalizarAnillos($polygonCoords);
+        $esMultipolygon = count($rings) > 1;
+
+        $geoRings = array_map(
+            static function (array $ring): array {
+                $coordinates = array_map(
+                    static fn (array $point): array => [(float) $point[1], (float) $point[0]],
+                    $ring
+                );
+
+                if ($coordinates !== [] && $coordinates[0] !== $coordinates[count($coordinates) - 1]) {
+                    $coordinates[] = $coordinates[0];
+                }
+
+                return $coordinates;
+            },
+            $rings
         );
 
-        if ($coordinates !== [] && $coordinates[0] !== $coordinates[count($coordinates) - 1]) {
-            $coordinates[] = $coordinates[0];
+        if ($esMultipolygon) {
+            $geometry = [
+                'type' => 'MultiPolygon',
+                'coordinates' => array_map(static fn (array $ring): array => [$ring], $geoRings),
+            ];
+        } else {
+            $geometry = [
+                'type' => 'Polygon',
+                'coordinates' => [$geoRings[0] ?? []],
+            ];
         }
 
         return [
@@ -40,14 +63,12 @@ final class PoligonoTopografiaCacheService
             'properties' => [
                 'intensidad' => $intensidad,
                 'es_fallback' => $esFallback,
+                'es_multipolygon' => $esMultipolygon,
                 'fuente' => $esFallback ? 'geometric_fallback' : 'topographic',
                 'centro' => ['lat' => $lat, 'lng' => $lng],
                 'calculado_at' => now()->toIso8601String(),
             ],
-            'geometry' => [
-                'type' => 'Polygon',
-                'coordinates' => [$coordinates],
-            ],
+            'geometry' => $geometry,
         ];
     }
 

@@ -62,5 +62,9 @@ final class ReporteValidacionService
     private function dispatchTopografia(Reporte $reporte): void
     {
         CalcularPoligonoInundacion::dispatch($reporte->id);
+
+        if ($reporte->inundacion_id !== null) {
+            CalcularPoligonoInundacion::dispatch($reporte->inundacion_id, 'inundacion');
+        }
     }
 }

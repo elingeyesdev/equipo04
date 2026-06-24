@@ -8,6 +8,7 @@ use App\Models\Inundacion;
 use App\Models\Reporte;
 use App\Services\PoligonoTopografiaCacheService;
 use App\Services\TopografiaInundacionService;
+use App\Support\PolygonCoordsHelper;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -17,7 +18,7 @@ use Illuminate\Support\Facades\Log;
  *
  * Calcula el polígono de área de inundación mediante region growing
  * sobre una grilla de elevación (Open Topo Data / SRTM 30 m).
- * Persiste polygon_coords, GeoJSON y caché para consumo del mapa.
+ * Para inundaciones, fusiona los polígonos de sus reportes vinculados.
  */
 final class CalcularPoligonoInundacion implements ShouldQueue
 {
@@ -59,6 +60,7 @@ final class CalcularPoligonoInundacion implements ShouldQueue
 
         if (!empty($reporte->polygon_coords)) {
             Log::info("CalcularPoligonoInundacion: Reporte #{$this->entityId} ya tiene polígono topográfico.");
+            $this->dispatchUnionInundacion($reporte->inundacion_id);
 
             return;
         }
@@ -91,13 +93,15 @@ final class CalcularPoligonoInundacion implements ShouldQueue
         );
 
         Log::info("CalcularPoligonoInundacion: Topografía guardada para Reporte #{$this->entityId} ({$resultado['fuente']}).");
+
+        $this->dispatchUnionInundacion($reporte->fresh()?->inundacion_id);
     }
 
     private function calcularParaInundacion(
         TopografiaInundacionService $topografia,
         PoligonoTopografiaCacheService $cacheService,
     ): void {
-        $inundacion = Inundacion::find($this->entityId);
+        $inundacion = Inundacion::with('reportes')->find($this->entityId);
 
         if ($inundacion === null) {
             Log::warning("CalcularPoligonoInundacion: Inundación #{$this->entityId} no encontrada.");
@@ -105,8 +109,8 @@ final class CalcularPoligonoInundacion implements ShouldQueue
             return;
         }
 
-        if ($inundacion->polygon_editado_autoridad || !empty($inundacion->polygon_coords)) {
-            Log::info("CalcularPoligonoInundacion: Inundación #{$this->entityId} ya tiene polígono.");
+        if ($inundacion->polygon_editado_autoridad) {
+            Log::info("CalcularPoligonoInundacion: Inundación #{$this->entityId} tiene polígono editado por autoridad.");
 
             return;
         }
@@ -118,24 +122,70 @@ final class CalcularPoligonoInundacion implements ShouldQueue
             return;
         }
 
-        Log::info("CalcularPoligonoInundacion: Region growing para Inundación #{$this->entityId}.");
+        $poligonosReportes = $inundacion->reportes
+            ->filter(static fn (Reporte $r): bool => PolygonCoordsHelper::tieneGeometriaValida((array) ($r->polygon_coords ?? [])))
+            ->map(static fn (Reporte $r): array => PolygonCoordsHelper::normalizarAnillos((array) $r->polygon_coords)[0])
+            ->values()
+            ->all();
 
-        $resultado = $topografia->calcularResultado($lat, $lng, 'media');
+        $intensidad = $inundacion->intensidadCalculada() ?? 'media';
+        $esFallback = false;
+        $fuente = 'union_reportes';
+
+        if (count($poligonosReportes) >= 2) {
+            Log::info('CalcularPoligonoInundacion: Unión de '.count($poligonosReportes)." polígonos para Inundación #{$this->entityId}.");
+
+            $union = $topografia->unirPoligonosReportes($poligonosReportes);
+            $polygonCoords = $union['polygon_coords'];
+
+            $esFallback = $inundacion->reportes->contains(
+                static fn (Reporte $r): bool => (bool) $r->polygon_es_fallback
+            );
+        } elseif (count($poligonosReportes) === 1) {
+            $polygonCoords = $poligonosReportes[0];
+            $esFallback = (bool) $inundacion->reportes->first(
+                static fn (Reporte $r): bool => PolygonCoordsHelper::tieneGeometriaValida((array) ($r->polygon_coords ?? []))
+            )?->polygon_es_fallback;
+            $fuente = 'reporte_unico';
+        } else {
+            Log::info("CalcularPoligonoInundacion: Sin polígonos de reportes, region growing para Inundación #{$this->entityId}.");
+
+            $resultado = $topografia->calcularResultado($lat, $lng, $intensidad);
+            $polygonCoords = $resultado['polygon_coords'];
+            $esFallback = $resultado['es_fallback'];
+            $fuente = $resultado['fuente'];
+        }
+
+        if (!PolygonCoordsHelper::tieneGeometriaValida($polygonCoords)) {
+            Log::warning("CalcularPoligonoInundacion: Inundación #{$this->entityId} sin geometría válida tras cálculo.");
+
+            return;
+        }
+
         $geoJson = $cacheService->construirGeoJson(
-            $resultado['polygon_coords'],
+            $polygonCoords,
             $lat,
             $lng,
-            'media',
-            $resultado['es_fallback'],
+            $intensidad,
+            $esFallback,
         );
 
         $cacheService->persistirInundacion(
             $inundacion,
-            $resultado['polygon_coords'],
+            $polygonCoords,
             $geoJson,
-            $resultado['es_fallback'],
+            $esFallback,
         );
 
-        Log::info("CalcularPoligonoInundacion: Topografía guardada para Inundación #{$this->entityId} ({$resultado['fuente']}).");
+        Log::info("CalcularPoligonoInundacion: Topografía guardada para Inundación #{$this->entityId} ({$fuente}).");
+    }
+
+    private function dispatchUnionInundacion(?int $inundacionId): void
+    {
+        if ($inundacionId === null) {
+            return;
+        }
+
+        self::dispatch($inundacionId, 'inundacion');
     }
 }

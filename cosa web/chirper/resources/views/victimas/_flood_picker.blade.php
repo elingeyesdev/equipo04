@@ -25,7 +25,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-<script src="{{ asset('js/smart-heatmap.js') }}"></script>
+<script src="{{ asset('js/smart-heatmap.js') }}?v=20260623f"></script>
 @endonce
 
 {{-- ─── Input hidden real (va en el form) ───────────────────────────────── --}}
@@ -213,26 +213,41 @@
     }
 
     function buildHeatData(flood, lat, lng) {
-        const hasAuthorityPolygon = flood
-            && flood.polygon_coords
-            && Array.isArray(flood.polygon_coords)
-            && flood.polygon_coords.length >= 3;
+        const hasAuthorityPolygon = window.normalizePolygonRings
+            ? window.normalizePolygonRings(flood.polygon_coords).length > 0
+            : (flood
+                && flood.polygon_coords
+                && Array.isArray(flood.polygon_coords)
+                && flood.polygon_coords.length >= 3);
+
+        const floodTier = (flood && flood.intensidad_calculada) || 'media';
 
         if (hasAuthorityPolygon) {
+            const reportes = flood.reportes || [];
             return [{
                 lat: lat,
                 lng: lng,
                 polygon_coords: flood.polygon_coords,
                 intensidad_propuesta: flood.intensidad_calculada || 'media',
+                tier: floodTier,
                 updated_at: flood.updated_at,
+                epicenters: reportes.map(function (rep) {
+                    return {
+                        lat: parseFloat(rep.lat_reporte || rep.lat),
+                        lng: parseFloat(rep.long_reporte || rep.lng),
+                        updated_at: rep.updated_at,
+                    };
+                }),
             }];
         }
 
         if (flood && flood.reportes && flood.reportes.length > 0) {
-            return flood.reportes;
+            return flood.reportes.map(function (rep) {
+                return Object.assign({}, rep, { tier: floodTier });
+            });
         }
 
-        return [{ lat: lat, lng: lng, intensidad_propuesta: 'media' }];
+        return [{ lat: lat, lng: lng, intensidad_propuesta: 'media', tier: floodTier }];
     }
 
     function renderCard(f, isSelected) {

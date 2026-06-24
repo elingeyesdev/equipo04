@@ -40,59 +40,65 @@ class CommandCenterController extends Controller
         ])->get();
 
         // Podríamos mapear la estructura para facilitar la vida al frontend
-        $data = $inundaciones->map(function ($inundacion) {
-            return [
-                'id' => $inundacion->id,
-                'estado' => $inundacion->estado,
-                'municipio_id' => $inundacion->municipio_id,
-                'municipio' => $inundacion->municipio->nombre ?? null,
-                'provincia' => $inundacion->municipio->provincia->nombre ?? null,
-                'centroide' => [
-                    'lat' => $inundacion->latitud,
-                    'lng' => $inundacion->longitud,
-                ],
-                'polygon_coords' => $inundacion->polygon_coords, // Puede ser null
-                'polygon_es_fallback' => (bool) $inundacion->polygon_es_fallback,
-                'created_at' => $inundacion->created_at,
-                'updated_at' => $inundacion->updated_at,
-                'intensidad_calculada' => $inundacion->intensidadCalculada(),
-                'reportes' => $inundacion->reportes->map(function ($r) {
-                    return [
-                        'id' => $r->id,
-                        'lat' => $r->lat_reporte,
-                        'lng' => $r->long_reporte,
-                        'lat_reporte' => $r->lat_reporte,
-                        'long_reporte' => $r->long_reporte,
-                        'intensidad' => $r->intensidad_propuesta,
-                        'intensidad_propuesta' => $r->intensidad_propuesta,
-                        'polygon_coords' => $r->polygon_coords,
-                        'polygon_es_fallback' => (bool) $r->polygon_es_fallback,
-                        'updated_at' => $r->updated_at,
-                        'created_at' => $r->created_at,
-                    ];
-                }),
-                'victimas' => $inundacion->victimas->map(function ($v) {
-                    return [
-                        'id' => $v->id,
-                        'estado' => $v->estado,
-                        'created_at' => $v->created_at
-                    ];
-                }),
-                'danos_materiales' => $inundacion->danosMateriales->map(function ($d) {
-                    return [
-                        'id' => $d->id,
-                        'tipo' => $d->tipo,
-                        'descripcion' => $d->descripcion,
-                        'lat' => $d->latitud,
-                        'lng' => $d->longitud,
-                        'estado' => $d->estado,
-                        'created_at' => $d->created_at
-                    ];
-                }),
-            ];
-        });
+        $data = $inundaciones->map(fn (Inundacion $inundacion) => $this->serializarInundacionParaComando($inundacion));
 
         return response()->json($data);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializarInundacionParaComando(Inundacion $inundacion): array
+    {
+        return [
+            'id' => $inundacion->id,
+            'estado' => $inundacion->estado,
+            'municipio_id' => $inundacion->municipio_id,
+            'municipio' => $inundacion->municipio->nombre ?? null,
+            'provincia' => $inundacion->municipio->provincia->nombre ?? null,
+            'centroide' => [
+                'lat' => $inundacion->latitud,
+                'lng' => $inundacion->longitud,
+            ],
+            'polygon_coords' => $inundacion->polygon_coords,
+            'polygon_es_fallback' => (bool) $inundacion->polygon_es_fallback,
+            'created_at' => $inundacion->created_at,
+            'updated_at' => $inundacion->updated_at,
+            'intensidad_calculada' => $inundacion->intensidadCalculada(),
+            'reportes' => $inundacion->reportes->map(function (Reporte $r) {
+                return [
+                    'id' => $r->id,
+                    'lat' => $r->lat_reporte,
+                    'lng' => $r->long_reporte,
+                    'lat_reporte' => $r->lat_reporte,
+                    'long_reporte' => $r->long_reporte,
+                    'intensidad' => $r->intensidad_propuesta,
+                    'intensidad_propuesta' => $r->intensidad_propuesta,
+                    'polygon_coords' => $r->polygon_coords,
+                    'polygon_es_fallback' => (bool) $r->polygon_es_fallback,
+                    'updated_at' => $r->updated_at,
+                    'created_at' => $r->created_at,
+                ];
+            }),
+            'victimas' => $inundacion->victimas->map(function (Victima $v) {
+                return [
+                    'id' => $v->id,
+                    'estado' => $v->estado,
+                    'created_at' => $v->created_at,
+                ];
+            }),
+            'danos_materiales' => $inundacion->danosMateriales->map(function (DanoMaterial $d) {
+                return [
+                    'id' => $d->id,
+                    'tipo' => $d->tipo,
+                    'descripcion' => $d->descripcion,
+                    'lat' => $d->latitud,
+                    'lng' => $d->longitud,
+                    'estado' => $d->estado,
+                    'created_at' => $d->created_at,
+                ];
+            }),
+        ];
     }
 
     /**

@@ -276,7 +276,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-<script src="{{ asset('js/smart-heatmap.js') }}"></script>
+<script src="{{ asset('js/smart-heatmap.js') }}?v=20260623f"></script>
 
 
 <!-- Drawer (Flood Picker Dark Mode) -->
@@ -463,9 +463,13 @@
             if (activeReports.length > 0) {
                 allActiveReports.push(...activeReports);
 
-                const hasAuthorityPolygon = inun.polygon_coords
-                    && Array.isArray(inun.polygon_coords)
-                    && inun.polygon_coords.length >= 3;
+                const hasAuthorityPolygon = window.normalizePolygonRings
+                    ? window.normalizePolygonRings(inun.polygon_coords).length > 0
+                    : (inun.polygon_coords
+                        && Array.isArray(inun.polygon_coords)
+                        && inun.polygon_coords.length >= 3);
+
+                const inunTier = inun.intensidad_calculada || 'baja';
 
                 if (hasAuthorityPolygon) {
                     heatSources.push({
@@ -473,10 +477,20 @@
                         lng: parseFloat(inun.centroide.lng),
                         polygon_coords: inun.polygon_coords,
                         intensidad_propuesta: inun.intensidad_calculada,
+                        tier: inunTier,
                         updated_at: inun.updated_at,
+                        epicenters: activeReports.map(function (rep) {
+                            return {
+                                lat: parseFloat(rep.lat || rep.lat_reporte),
+                                lng: parseFloat(rep.lng || rep.long_reporte),
+                                updated_at: rep.updated_at,
+                            };
+                        }),
                     });
                 } else {
-                    heatSources.push(...activeReports);
+                    activeReports.forEach(function (rep) {
+                        heatSources.push(Object.assign({}, rep, { tier: inunTier }));
+                    });
                 }
             }
 
