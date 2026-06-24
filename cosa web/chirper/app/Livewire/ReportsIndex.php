@@ -158,7 +158,13 @@ class ReportsIndex extends Component
                     $a    = sin($dLat / 2) ** 2 + cos($lat1) * cos($lat2) * sin($dLon / 2) ** 2;
                     $dist = 6371000 * 2 * atan2(sqrt($a), sqrt(1 - $a));
                     if ($dist <= 300) {
-                        $cercanas[] = $activa;
+                        $cercanas[] = [
+                            'id'                   => $activa->id,
+                            'latitud'              => $activa->latitud,
+                            'longitud'             => $activa->longitud,
+                            'polygon_coords'       => $activa->polygon_coords,
+                            'intensidad_calculada' => $activa->intensidadCalculada(),
+                        ];
                     }
                 }
                 $rep->cercanas = collect($cercanas);

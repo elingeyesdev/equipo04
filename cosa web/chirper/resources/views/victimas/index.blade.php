@@ -20,15 +20,6 @@
         @endif
     </div>
 
-    @if (session('success'))
-        <div class="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800 flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-            </svg>
-            {{ session('success') }}
-        </div>
-    @endif
-
     {{-- ══════════════════════════════════════════════════════════════════
          FILTROS — 100% client-side, sin recarga de página
     ══════════════════════════════════════════════════════════════════ --}}
@@ -209,7 +200,7 @@
                                         </a>
                                         <form method="POST"
                                               action="{{ route('victimas.destroy', ['id' => $victima->id], false) }}"
-                                              onsubmit="return confirm('¿Eliminar a {{ addslashes($victima->nombre_completo) }}?')">
+                                              onsubmit="confirmForm(event, '¿Eliminar a {{ addslashes($victima->nombre_completo) }}?')">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit"

@@ -22,6 +22,8 @@
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
 
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     @endif
@@ -274,6 +276,58 @@
     </script>
 
     @include('chat.widget')
+
+    {{-- SweetAlert2: toasts globales para mensajes flash + helper de confirmación --}}
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof Swal === 'undefined') return;
+
+            const Toast = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true,
+                didOpen: (toast) => {
+                    toast.addEventListener('mouseenter', Swal.stopTimer);
+                    toast.addEventListener('mouseleave', Swal.resumeTimer);
+                }
+            });
+
+            @if(session('success'))
+                Toast.fire({ icon: 'success', title: {!! json_encode(session('success')) !!} });
+            @elseif(session('error'))
+                Toast.fire({ icon: 'error', title: {!! json_encode(session('error')) !!} });
+            @elseif(session('status'))
+                Toast.fire({ icon: 'info', title: {!! json_encode(session('status')) !!} });
+            @endif
+        });
+
+        // Reemplazo global de onsubmit="return confirm('...')" usando SweetAlert2.
+        function confirmForm(event, message) {
+            event.preventDefault();
+            const form = event.target;
+            if (typeof Swal === 'undefined') {
+                if (confirm(message || '¿Estás seguro?')) form.submit();
+                return false;
+            }
+            Swal.fire({
+                title: '¿Estás seguro?',
+                text: message || 'Esta acción no se puede deshacer.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Sí, continuar',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    form.submit();
+                }
+            });
+            return false;
+        }
+    </script>
 </body>
 
 <script>
