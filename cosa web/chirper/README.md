@@ -15,13 +15,17 @@ Santa Cruz presenta un desafío geográfico único: es una ciudad caracterizada 
 
 ## 🏗️ Arquitectura y Tecnologías
 
-El proyecto sigue una arquitectura monolítica moderna impulsada por eventos, utilizando el ecosistema de Laravel.
+El proyecto sigue una arquitectura monolítica moderna impulsada por eventos, utilizando el ecosistema de Laravel. La capa web no consulta los modelos directamente: usa `FloodApiClient` para invocar una **API REST interna** (autenticada con Sanctum), que es la fuente de verdad del negocio.
 
-* **Backend:** Laravel 11 (PHP 8.2+).
-* **Frontend:** Blade Templates + Tailwind CSS (Glassmorphism & Diseño Premium) + JS Vainilla.
-* **Base de Datos:** PostgreSQL.
+* **Backend:** Laravel 13 (PHP 8.3+; entorno actual 8.4).
+* **Frontend:** Blade Templates + Livewire + Tailwind CSS 4 (Glassmorphism & Diseño Premium) + JS Vainilla.
+* **Tiempo real:** Laravel Reverb (WebSockets) + Laravel Echo para el chat de autoridades.
+* **Base de Datos:** PostgreSQL (campos `jsonb` para polígonos y clima).
 * **Mapas y GIS:** Leaflet.js + Leaflet.heat (Capa de Calor).
-* **Infraestructura Local:** Laravel Sail (Docker).
+* **Colas:** driver `database` (procesamiento topográfico asíncrono vía `queue:work`).
+* **Infraestructura Local:** Docker Compose (`postgres_db`, `web_app`, `queue_worker`).
+
+> 📐 Para una descripción técnica completa (arquitectura, componentes, dependencias y flujo de datos) consulta **[`SCD.md`](SCD.md)**.
 
 ---
 
@@ -37,21 +41,40 @@ Las inundaciones son eventos dinámicos que aparecen y desaparecen.
 * Si el tiempo (`updated_at` + 3h) se agota, el reporte pasa a estar "Caducado" o inactivo, y sus puntos de calor se retiran automáticamente del mapa principal, reduciendo la intensidad de la inundación de forma realista a medida que el agua drena.
 
 ### 2. Motor Topográfico (`CalcularPoligonoInundacion` Job)
-Cuando se aprueba un reporte, el sistema no asume que el agua se queda en un punto exacto (1 metro cuadrado). El agua fluye:
-1. El backend lanza un **Job asíncrono/síncrono** que se conecta a un servicio de elevación externa.
-2. Lee la latitud y longitud del reporte, y muestrea 8 puntos a su alrededor (como los radios de una bicicleta) a diferentes distancias (ej. 15, 35 o 60 metros dependiendo de la "Intensidad" reportada).
-3. Evalúa el terreno: **El agua solo fluye hacia áreas que tengan una elevación igual o menor** al epicentro (con un margen de error de `0.5 metros` por bordes de calle/acera).
-4. Genera un **Casco Convexo (Convex Hull)** con los puntos inundables y guarda este polígono en la base de datos (`polygon_coords`).
-5. **Resultado:** En lugar de un círculo perfecto, el frontend dibuja la forma irregular real de cómo se empozó el agua en la calle.
+Cuando se valida un reporte, el sistema no asume que el agua se queda en un punto exacto. El agua fluye según el terreno:
+1. El backend encola un **Job** (`CalcularPoligonoInundacion`) que consulta elevación del terreno vía **Open Topo Data** (dataset SRTM 30 m, **sin API key**), con caché de 24 h.
+2. Aplica **region growing** sobre una grilla de elevación (celda ≈ 25 m, radio máximo 100/200/300 m según intensidad baja/media/alta).
+3. Evalúa el terreno: **el agua solo fluye hacia celdas con elevación igual o menor** al epicentro (margen `0.5 m` por bordes de calle/acera).
+4. Genera el polígono del área inundable y lo guarda en `polygon_coords`. Si la API de elevación falla, usa un **fallback geométrico** (círculo) marcado `polygon_es_fallback`.
+5. **Resultado:** en lugar de un círculo perfecto, se obtiene la forma irregular real de cómo se empozó el agua.
 
-### 3. Puentes Térmicos (Fusión de Mapas de Calor)
-Si llueve fuerte en el 4to Anillo, es probable que haya múltiples reportes en la misma avenida.
-* El mapa extrae todos los reportes activos vinculados a la misma inundación.
-* Si la distancia entre dos reportes es entre **10 y 250 metros**, el algoritmo de JavaScript inyecta automáticamente puntos de interpolación térmica en el medio (uno cada 15 metros).
-* El motor `leaflet.heat` renderiza estos puntos con una opacidad calculada, lo que resulta en la ilusión visual de un **río continuo** que conecta los reportes ciudadanos, reflejando el colapso de un canal o avenida entera.
+### 3. Unificación de Zona (una sola mancha por inundación)
+Si llueve fuerte en una avenida habrá múltiples reportes en la misma inundación. El objetivo es mostrarlos como **una sola zona continua**, no como puntos sueltos:
+* El Job de la **inundación** fusiona los polígonos de todos sus reportes mediante **cierre morfológico** (rasterizar → dilatar → erosionar → componentes conexas; celda 10 m, puente 100 m), produciendo un `Polygon` o `MultiPolygon` unificado.
+* En el frontend, si aún no existe el polígono unificado del backend, `flood-outline.js` fusiona en el cliente los polígonos de los reportes en **un único contorno suavizado** (cierre morfológico + suavizado de Chaikin, con convex hull de respaldo).
+* Así, reportes de una misma inundación forman **una zona unida**; inundaciones distintas se mantienen separadas.
 
-### 4. Capa de Intervención de Autoridades
-El sistema reconoce que el cálculo algorítmico puede no ser suficiente en desastres mayores. Una Autoridad puede usar herramientas de dibujo (`L.Draw`) para "manchar el mapa" manualmente. Si el backend detecta que la *Inundación* (no el reporte individual) tiene un polígono trazado por una autoridad, este tiene **absoluta prioridad**. Se oculta la simulación ciudadana y se dibuja un polígono de borde azul punteado indicando una "Zona de Desastre Oficial".
+### 4. Mapa de Calor por Intensidad
+El color del mapa de calor representa la **intensidad real de la inundación** (calculada por voto ponderado de peso), no la densidad de puntos:
+* Se renderiza **una capa por nivel** con un azul fijo: **baja** `#7dd3fc`, **media** `#0ea5e9`, **alta** `#1e3a8a`. El peso de cada punto modula únicamente la opacidad (centro sólido, bordes difuminados).
+* El **radio del blob se fija en metros reales** y escala con el zoom, manteniendo la forma a cualquier acercamiento (sin círculos sueltos).
+* Una **leyenda** en el mapa explica los tres niveles, y cada inundación muestra una **etiqueta** con su intensidad.
+
+### 5. Capa de Intervención de Autoridades
+Una Autoridad puede dibujar manualmente la zona de desastre. Si la *Inundación* tiene un polígono editado por autoridad (`polygon_editado_autoridad`), este tiene **absoluta prioridad** y el sistema **no lo sobrescribe** en los recálculos automáticos.
+
+---
+
+## ⚙️ Operación y Configuración Clave
+
+* **Zona horaria:** la app usa `America/La_Paz` (UTC‑4, Santa Cruz/Bolivia) vía `APP_TIMEZONE`. Todos los `create`/`update` guardan y muestran la hora local de Bolivia.
+* **Procesamiento asíncrono:** los polígonos topográficos se calculan en **cola** (`QUEUE_CONNECTION=database`). El contenedor `queue_worker` (`php artisan queue:work`) debe estar activo para que los cálculos se procesen automáticamente al validar reportes.
+* **Recálculo manual (backfill):** para regenerar polígonos de inundaciones antiguas o tras un fallo del worker:
+  ```bash
+  docker compose exec web_app php artisan topografia:recalcular-inundaciones
+  ```
+* **Claves de API:** se almacenan solo en `.env` (gitignoreado) y se leen vía `config/services.php` (`OPEN_ROUTE_SERVICE_KEY`, `OPENTOPOGRAPHY_API_KEY`, credenciales OpenWeatherMap). No se exponen en el frontend (salvo OpenRouteService, requerida por el cliente para rutas).
+* **Tras cambiar `.env`/config:** `php artisan config:clear` y reinicia `queue_worker`.
 
 ---
 

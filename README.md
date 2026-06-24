@@ -15,13 +15,17 @@ Este sistema aborda el problema combinando la **participación ciudadana (Crowds
 
 ## 🏗️ Arquitectura y Tecnologías
 
-El proyecto sigue una arquitectura monolítica moderna impulsada por eventos, utilizando el ecosistema de Laravel.
+El proyecto sigue una arquitectura monolítica moderna impulsada por eventos, utilizando el ecosistema de Laravel. La capa web usa `FloodApiClient` para invocar una **API REST interna** (Sanctum), que es la fuente de verdad del negocio.
 
-* **Backend:** Laravel 11 (PHP 8.2+).
-* **Frontend:** Blade Templates + Tailwind CSS (Glassmorphism & Diseño Premium) + JS Vainilla.
-* **Base de Datos:** PostgreSQL.
+* **Backend:** Laravel 13 (PHP 8.3+; entorno actual 8.4).
+* **Frontend:** Blade Templates + Livewire + Tailwind CSS 4 (Glassmorphism & Diseño Premium) + JS Vainilla.
+* **Tiempo real:** Laravel Reverb (WebSockets) + Laravel Echo.
+* **Base de Datos:** PostgreSQL (campos `jsonb`).
 * **Mapas y GIS:** Leaflet.js + Leaflet.heat (Capa de Calor).
-* **Infraestructura Local:** Laravel Sail (Docker).
+* **Colas:** driver `database` (cálculo topográfico asíncrono).
+* **Infraestructura Local:** Docker Compose (`postgres_db`, `web_app`, `queue_worker`).
+
+> 📐 Descripción técnica completa en **[`cosa web/chirper/SCD.md`](cosa%20web/chirper/SCD.md)**.
 
 ---
 
@@ -37,21 +41,24 @@ Las inundaciones son eventos dinámicos que aparecen y desaparecen.
 * Si el tiempo (`updated_at` + 3h) se agota, el reporte pasa a estar "Caducado" o inactivo, y sus puntos de calor se retiran automáticamente del mapa principal, reduciendo la intensidad de la inundación de forma realista a medida que el agua drena.
 
 ### 2. Motor Topográfico (`CalcularPoligonoInundacion` Job)
-Cuando se aprueba un reporte, el sistema no asume que el agua se queda en un punto exacto (1 metro cuadrado). El agua fluye:
-1. El backend lanza un **Job asíncrono/síncrono** que se conecta a un servicio de elevación externa.
-2. Lee la latitud y longitud del reporte, y muestrea 8 puntos a su alrededor (como los radios de una bicicleta) a diferentes distancias (ej. 15, 35 o 60 metros dependiendo de la "Intensidad" reportada).
-3. Evalúa el terreno: **El agua solo fluye hacia áreas que tengan una elevación igual o menor** al epicentro (con un margen de error de `0.5 metros` por bordes de calle/acera).
-4. Genera un **Casco Convexo (Convex Hull)** con los puntos inundables y guarda este polígono en la base de datos (`polygon_coords`).
-5. **Resultado:** En lugar de un círculo perfecto, el frontend dibuja la forma irregular real de cómo se empozó el agua en la calle.
+Cuando se valida un reporte, el sistema simula cómo fluye el agua según el terreno:
+1. El backend encola un **Job** que consulta elevación vía **Open Topo Data** (SRTM 30 m, **sin API key**), con caché de 24 h.
+2. Aplica **region growing** sobre una grilla de elevación (celda ≈ 25 m, radio 100/200/300 m según intensidad).
+3. **El agua solo fluye hacia celdas con elevación igual o menor** al epicentro (margen `0.5 m`).
+4. Guarda el polígono en `polygon_coords`. Si la API falla, usa un **fallback geométrico** (`polygon_es_fallback`).
 
-### 3. Puentes Térmicos (Fusión de Mapas de Calor)
-Si llueve fuerte en el 4to Anillo, es probable que haya múltiples reportes en la misma avenida.
-* El mapa extrae todos los reportes activos vinculados a la misma inundación.
-* Si la distancia entre dos reportes es entre **10 y 250 metros**, el algoritmo de JavaScript inyecta automáticamente puntos de interpolación térmica en el medio (uno cada 15 metros).
-* El motor `leaflet.heat` renderiza estos puntos con una opacidad calculada, lo que resulta en la ilusión visual de un **río continuo** que conecta los reportes ciudadanos, reflejando el colapso de un canal o avenida entera.
+### 3. Unificación de Zona (una sola mancha por inundación)
+Los reportes de una misma inundación se muestran como **una sola zona continua**:
+* El Job de la inundación fusiona los polígonos de sus reportes por **cierre morfológico** (rasterizar → dilatar → erosionar → componentes conexas) en un `Polygon`/`MultiPolygon` unificado.
+* En el frontend, `flood-outline.js` puede fusionarlos en el cliente en un **contorno único suavizado** (Chaikin) cuando el backend aún no lo calculó.
 
-### 4. Capa de Intervención de Autoridades
-El sistema reconoce que el cálculo algorítmico puede no ser suficiente en desastres mayores. Una Autoridad puede usar herramientas de dibujo (`L.Draw`) para "manchar el mapa" manualmente. Si el backend detecta que la *Inundación* (no el reporte individual) tiene un polígono trazado por una autoridad, este tiene **absoluta prioridad**. Se oculta la simulación ciudadana y se dibuja un polígono de borde azul punteado indicando una "Zona de Desastre Oficial".
+### 4. Mapa de Calor por Intensidad
+El color representa la **intensidad de la inundación** (voto ponderado por peso), no la densidad:
+* Una capa por nivel con azul fijo: **baja** `#7dd3fc`, **media** `#0ea5e9`, **alta** `#1e3a8a`; el peso modula la opacidad.
+* El radio del blob se fija en **metros reales** y escala con el zoom (sin círculos sueltos). Incluye **leyenda** y **etiqueta de intensidad** por inundación.
+
+### 5. Capa de Intervención de Autoridades
+Una Autoridad puede dibujar la zona de desastre manualmente. Si la *Inundación* tiene `polygon_editado_autoridad`, este polígono tiene **absoluta prioridad** y no se sobrescribe en los recálculos automáticos.
 
 ---
 

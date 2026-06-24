@@ -203,14 +203,17 @@ class ReportsIndex extends Component
             'created_at_human'     => $r->created_at?->diffForHumans(),
         ])->toArray();
 
-        $ttlInicio = \Carbon\Carbon::now()->subHours(Inundacion::TTL_HORAS);
-        
-        $reportesInactivos = $i->reportes->filter(function ($r) use ($ttlInicio) {
+        // Los inactivos son el complemento de los activos: todo reporte vinculado
+        // (no rechazado) que NO esté dentro de la ventana TTL actual. Calcularlo por
+        // diferencia evita que un reporte se pierda del historial si su timestamp
+        // queda fuera del rango [now-TTL, now] (p. ej. registros antiguos).
+        $idsActivos = $i->reportesActivosTTL->pluck('id')->all();
+
+        $reportesInactivos = $i->reportes->filter(function ($r) use ($idsActivos) {
             if ($r->estado_validacion === Reporte::VALIDACION_RECHAZADO) {
                 return false;
             }
-            $fecha = $r->updated_at ?? $r->created_at;
-            return $fecha && $fecha->lt($ttlInicio);
+            return ! in_array($r->id, $idsActivos, true);
         })->map(fn ($r) => [
             'id'                   => $r->id,
             'peso'                 => $r->peso,
