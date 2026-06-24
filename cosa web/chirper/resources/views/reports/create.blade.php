@@ -23,10 +23,10 @@
                 <p id="distanceWarning" class="mt-2 text-sm text-red-600 hidden">El marcador está demasiado lejos de tu ubicación real (máximo 500m).</p>
             </div>
 
-            <!-- Calculado automáticamente (Oculto visualmente pero útil para validación o info extra) -->
-            <div class="bg-gray-50 p-3 rounded-md border border-gray-200 pointer-events-none opacity-70">
-                <p class="text-xs text-gray-500 mb-2">Calculado automáticamente:</p>
-                <x-location-filter idPrefix="form" />
+            <!-- Selección de Región/Provincia/Municipio -->
+            <div class="bg-white p-4 rounded-md border border-gray-200 shadow-sm hidden">
+                <p class="text-sm font-medium text-gray-700 mb-3">Región y Municipio (Autocompletado por GPS)</p>
+                <x-location-filter idPrefix="form" :requireFields="false" />
             </div>
 
             <!-- Address -->
@@ -109,31 +109,7 @@ document.addEventListener('DOMContentLoaded', function() {
     fetch('/provinces.geojson').then(res => res.json()).then(data => provincesData = data);
     fetch('/municipalities.geojson').then(res => res.json()).then(data => municipalitiesData = data);
 
-    function makeReadonlyDisplay(id) {
-        const sel = document.getElementById(id);
-        if (!sel) return;
 
-        const display = document.createElement('div');
-        display.id    = id + '_display';
-        display.className = 'w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700 min-h-[38px] break-words flex items-center mt-1';
-        display.textContent = sel.options[sel.selectedIndex]?.text || sel.value || '—';
-        
-        sel.parentNode.insertBefore(display, sel);
-        sel.style.display = 'none';
-
-        sel.addEventListener('change', function () {
-            let text = this.value;
-            for(let opt of this.options) {
-                if(opt.value === this.value) { text = opt.text; break; }
-            }
-            display.textContent = text || '—';
-        });
-    }
-
-    setTimeout(() => {
-        makeReadonlyDisplay('form_provincia');
-        makeReadonlyDisplay('form_municipio');
-    }, 100);
 
     function getDistanceFromLatLonInM(lat1, lon1, lat2, lon2) {
         const R = 6371000;
@@ -147,6 +123,16 @@ document.addEventListener('DOMContentLoaded', function() {
         return R * c; 
     }
     function deg2rad(deg) { return deg * (Math.PI/180); }
+
+    window.normalizeProvName = function(name) {
+        if (!name) return name;
+        return name.replace(/^Provincia\s+/i, '').trim();
+    };
+
+    window.normalizeMuniName = function(name) {
+        if (!name) return name;
+        return name.replace(/^Municipio\s+(de\s+)?/i, '').trim();
+    };
 
     function initMap(lat, lng) {
         if (!map) {
@@ -188,35 +174,44 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateLocationText(lat, lng) {
-        if (santaCruzPolygon && typeof turf !== 'undefined') {
-            const pt = turf.point([lng, lat]);
-            if (!turf.booleanPointInPolygon(pt, santaCruzPolygon)) {
-                return;
-            }
+        if (!santaCruzPolygon || !provincesData || !municipalitiesData || typeof turf === 'undefined') {
+            setTimeout(() => updateLocationText(lat, lng), 500);
+            return;
+        }
 
-            let foundProv = null;
-            let foundMuni = null;
+        const pt = turf.point([lng, lat]);
+        if (!turf.booleanPointInPolygon(pt, santaCruzPolygon)) {
+            return;
+        }
 
-            if (provincesData && municipalitiesData) {
-                for (let feature of provincesData.features) {
-                    if (turf.booleanPointInPolygon(pt, feature)) {
-                        foundProv = window.normalizeProvName ? window.normalizeProvName(feature.properties.name) : feature.properties.name;
-                        break;
-                    }
-                }
-                for (let feature of municipalitiesData.features) {
-                    if (turf.booleanPointInPolygon(pt, feature)) {
-                        foundMuni = window.normalizeMuniName ? window.normalizeMuniName(feature.properties.name) : feature.properties.name;
-                        break;
-                    }
-                }
+        let foundProv = null;
+        let foundMuni = null;
+
+        for (let feature of provincesData.features) {
+            if (turf.booleanPointInPolygon(pt, feature)) {
+                foundProv = window.normalizeProvName ? window.normalizeProvName(feature.properties.name) : feature.properties.name;
+                break;
             }
+        }
+        for (let feature of municipalitiesData.features) {
+            if (turf.booleanPointInPolygon(pt, feature)) {
+                foundMuni = window.normalizeMuniName ? window.normalizeMuniName(feature.properties.name) : feature.properties.name;
+                break;
+            }
+        }
 
             if (foundProv) {
                 const provSelect = document.getElementById('form_provincia');
                 if (provSelect) {
+                    if (provSelect.options.length <= 1) {
+                        setTimeout(() => updateLocationText(lat, lng), 500);
+                        return;
+                    }
+                    const norm = str => str ? str.normalize('NFD').replace(/[\u0300-\u036f]/g, "").toLowerCase() : '';
+                    const foundProvNorm = norm(foundProv);
+                    
                     for (let opt of provSelect.options) {
-                        if (opt.value && opt.value.toLowerCase() === foundProv.toLowerCase()) {
+                        if (opt.value && norm(opt.value) === foundProvNorm) {
                             provSelect.value = opt.value;
                             break;
                         }
@@ -227,8 +222,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         setTimeout(() => {
                             const munSelect = document.getElementById('form_municipio');
                             if (munSelect) {
+                                const foundMuniNorm = norm(foundMuni);
                                 for (let opt of munSelect.options) {
-                                    if (opt.value && opt.value.toLowerCase() === foundMuni.toLowerCase()) {
+                                    if (opt.value && norm(opt.value) === foundMuniNorm) {
                                         munSelect.value = opt.value;
                                         break;
                                     }
@@ -237,7 +233,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             }
                         }, 100);
                     }
-                }
             }
         }
     }
@@ -339,10 +334,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
             
             if (response.ok) {
+                let etaMsg = '';
+                if (result.eta) {
+                    etaMsg = `<br><span class="font-bold text-sm">Tiempo estimado de ayuda: ~${result.eta.eta_minutes} min (desde ${result.eta.name}, a ${result.eta.distance_km}km).</span>`;
+                }
+                document.getElementById('successMessage').innerHTML = 'Reporte creado exitosamente.' + etaMsg;
                 document.getElementById('successMessage').classList.remove('hidden');
                 setTimeout(() => {
                     window.location.href = '/reports';
-                }, 2000);
+                }, 3500);
             } else {
                 document.getElementById('errorMessage').textContent = 'Error: ' + (result.message || 'Error desconocido');
                 document.getElementById('errorMessage').classList.remove('hidden');

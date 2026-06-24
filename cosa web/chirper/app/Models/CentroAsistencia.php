@@ -49,4 +49,9 @@ class CentroAsistencia extends Model
     {
         return $this->belongsTo(Municipio::class, 'municipio_id');
     }
+
+    public function inventario()
+    {
+        return $this->hasMany(Inventario::class, 'centro_id', 'id_centro');
+    }
 }

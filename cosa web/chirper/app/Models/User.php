@@ -53,4 +53,23 @@ class User extends Authenticatable
     {
         return (bool) $this->is_banned;
     }
+
+    public function refreshBanStatus(): void
+    {
+        $falseReportsCount = \App\Models\Reporte::query()
+            ->where('citizen_carnet', $this->carnet)
+            ->where(function ($q) {
+                $q->where('estado_validacion', \App\Models\Reporte::VALIDACION_RECHAZADO)
+                  ->orWhereHas('inundacion', function ($q2) {
+                      $q2->where('estado', \App\Models\Inundacion::ESTADO_FALSA);
+                  });
+            })
+            ->count();
+
+        if ($falseReportsCount >= 2 && !$this->is_banned) {
+            $this->update(['is_banned' => true]);
+        } elseif ($falseReportsCount < 2 && $this->is_banned) {
+            $this->update(['is_banned' => false]);
+        }
+    }
 }

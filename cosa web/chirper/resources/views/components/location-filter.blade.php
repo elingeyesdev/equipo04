@@ -9,7 +9,12 @@
     'showEstado' => false,
     'showSearch' => false,
     'resetBelow' => false,
+    'requireFields' => null,
 ])
+
+@php
+    $isRequired = $requireFields ?? !$formAction;
+@endphp
 
 <div class="location-filter-container w-full">
     @if($formAction)
@@ -28,14 +33,14 @@
 
             <div class="flex-1 w-full">
                 <label for="{{ $idPrefix }}_provincia" class="block text-sm font-medium text-gray-700 mb-1">Provincia</label>
-                <select id="{{ $idPrefix }}_provincia" name="provincia" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" {{ !$formAction ? 'required' : '' }}>
+                <select id="{{ $idPrefix }}_provincia" name="provincia" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" {{ $isRequired ? 'required' : '' }}>
                     <option value="">-- Seleccionar Provincia --</option>
                 </select>
             </div>
 
             <div class="flex-1 w-full">
                 <label for="{{ $idPrefix }}_municipio" class="block text-sm font-medium text-gray-700 mb-1">Municipio</label>
-                <select id="{{ $idPrefix }}_municipio" name="municipio" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" {{ !$formAction ? 'required' : '' }}>
+                <select id="{{ $idPrefix }}_municipio" name="municipio" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" {{ $isRequired ? 'required' : '' }}>
                     <option value="">-- Seleccione primero región o provincia --</option>
                 </select>
             </div>
@@ -175,7 +180,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 provSelect.removeAttribute('required');
                             }
                         } else if (!this.value && !provSelect.value) {
-                            if (!provSelect.hasAttribute('required') && {{ !$formAction ? 'true' : 'false' }}) {
+                            if (!provSelect.hasAttribute('required') && {{ $isRequired ? 'true' : 'false' }}) {
                                 provSelect.setAttribute('required', 'required');
                             }
                         }
