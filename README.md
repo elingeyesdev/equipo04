@@ -9,7 +9,7 @@
 
 El **Sistema de Gestión de Inundaciones (SGI)** es una plataforma web desarrollada para monitorear, validar y visualizar eventos hidrológicos extremos en **Santa Cruz de la Sierra, Bolivia**.
 
-Santa Cruz presenta un desafío geográfico único: topografía muy plana (planicie aluvial), donde el drenaje natural y los canales concéntricos (los «Anillos») colapsan ante precipitaciones intensas. El sistema combina **participación ciudadana (crowdsourcing)** con **cálculos topográficos** para predecir y visualizar cómo se acumula el agua en tiempo real.
+Este sistema aborda el problema combinando la **participación ciudadana (Crowdsourcing)** para predecir y dibujar cómo el agua se acumula en tiempo real.
 
 ---
 
@@ -27,9 +27,25 @@ Monolito Laravel impulsado por eventos. La capa web usa `FloodApiClient` para in
 | Colas | driver `database` (`queue:work` para topografía) |
 | Infra | Docker Compose (`postgres_db`, `web_app`, `queue_worker`) |
 
-> 📐 Descripción técnica completa en **[`cosa web/chirper/SCD.md`](cosa%20web/chirper/SCD.md)**.
+---
 
-Código de la aplicación: carpeta **`cosa web/chirper/`**.
+## 🧩 Módulos del Sistema
+
+Además del núcleo de inundaciones y reportes, el SGI incluye módulos operativos para la respuesta ante desastres:
+
+| Módulo | Ruta principal | Descripción |
+|--------|----------------|-------------|
+| **Reportes e inundaciones** | `/reports` | Mapa de calor, validación ciudadana, quórum y TTL |
+| **Centro de comando** | `/command-center` | Timeline, análisis de impacto, fusión de inundaciones, daños materiales |
+| **Logística** | `/logistica` | Centros de asistencia |
+| **Víctimas** | `/victimas` | Registro y seguimiento de afectados |
+| **Inventario** | `/inventario` | Stock por centro de asistencia |
+| **Vehículos** | `/vehiculos/mapa` | Flota en mapa y gestión (autoridad) |
+| **Chat** | `/chat` | Mensajería entre autoridades (Reverb) |
+| **Perfil** | `/perfil` | Datos del usuario autenticado |
+| **Sugerencias / FAQ** | `/sugerencias`, `/faq` | Retroalimentación y ayuda pública |
+
+Los roles son **ciudadano** (reporta y consulta) y **autoridad** (valida, opera logística, gestiona flota y datos sensibles).
 
 ---
 
@@ -66,11 +82,21 @@ El SGI no muestra solo marcadores estáticos: simula acumulación de agua según
 
 `polygon_editado_autoridad` tiene prioridad absoluta sobre recálculos.
 
-### 6. Validación de reportes (`/reports`)
+### 6. Validación de reportes
 
-Livewire **`ReportsIndex`** → [`resources/views/livewire/reports-index.blade.php`](cosa%20web/chirper/resources/views/livewire/reports-index.blade.php).
+El panel de reportes está implementado con **varios componentes Livewire** y partials compartidos. La navegación entre secciones está en el menú desplegable **Reportes** de la barra superior.
 
-Ambos paneles de autoridad usan la misma **tabla de 5 columnas** (clase CSS `report-validation-table`), labels `.report-field-label` / valores `.report-field-value`, y minimapas Leaflet inline.
+| Ruta | Componente | Acceso |
+|------|------------|--------|
+| `/reports` | `ReportsHub` | Sesión — vista general con mapa e inundaciones activas |
+| `/reports/mis-reportes` | `ReportsMisReportes` | Sesión — reportes del usuario |
+| `/reports/historial` | `ReportsHistorial` | Sesión — inundaciones terminadas |
+| `/reports/pendientes` | `ReportsPendientes` | Autoridad — cola de validación (paginado) |
+| `/reports/rechazados` | `ReportsRechazados` | Autoridad — auditoría con filtros (paginado) |
+
+En **`/reports`** (hub), las autoridades ven una **previsualización** de hasta 5 pendientes y 5 rechazados, con enlaces a las subpáginas completas. El mapa principal incluye rutas seguras (OpenRouteService) y capa de reportes pendientes.
+
+Ambos paneles de validación usan la misma **tabla de 5 columnas** (clase `report-validation-table`), labels `.report-field-label` / valores `.report-field-value`, y minimapas Leaflet (`public/js/report-minimaps.js`: GPS azul vs evento rojo, zoom adaptativo, carga diferida).
 
 #### Panel «Pendientes de Validación»
 
@@ -79,12 +105,12 @@ Ambos paneles de autoridad usan la misma **tabla de 5 columnas** (clase CSS `rep
 | **Foto** | Thumbnail; clic → modal pantalla completa |
 | **Reporte** | N°, Fecha, Reportado por |
 | **Detalles** | Descripción; Dirección e **Intensidad propuesta** (50/50); enlace *Ver detalle completo* |
-| **Mapa** | Minimapa: GPS reportero (azul) vs evento (rojo), distancia; pan + zoom con rueda al hover |
+| **Mapa** | Minimapa GPS vs evento; pan + zoom con rueda al hover |
 | **Acciones** | **Aprobar** · **Vincular** · **Rechazar** |
 
 #### Panel «Reportes Rechazados»
 
-Misma estructura de 5 columnas. Columna **Reporte** incluye además **Rechazado** (`updated_at`). Columna **Acciones**: formulario Livewire (Estado, Vincular a inundación, **Guardar cambios**). Sin enlace de detalle completo.
+Misma estructura de 5 columnas. Columna **Reporte** incluye fecha de rechazo, validador y motivo. Columna **Acciones**: botón **Modificar** (modal Livewire) y **Ver historial** (modal Livewire). En `/reports/rechazados` hay filtros por motivo, validador y rango de fechas.
 
 #### Modal «Ver detalle completo» (pendientes)
 
@@ -99,20 +125,21 @@ Botón **Vincular** → panel lateral con mapa ampliado, inundaciones cercanas (
 ## ⚙️ Operación y Configuración
 
 - **Zona horaria:** `America/La_Paz` (`APP_TIMEZONE`).
-- **Colas:** `QUEUE_CONNECTION=database`; worker activo obligatorio.
+- **Colas:** `QUEUE_CONNECTION=database`; el servicio `queue_worker` debe estar activo.
 - **Recálculo topográfico:** `php artisan topografia:recalcular-inundaciones`
 - **Optimizar polígonos:** `php artisan topografia:simplificar-poligonos --solo-activas`
 - **Tras cambios en Blade:** `php artisan view:clear`
 - **Tras `.env`/config:** `php artisan config:clear` y reiniciar `queue_worker`
 
-Con Docker (desde la carpeta **`equipo04/`**, donde está `docker-compose.yml`):
+Desde la carpeta **`equipo04/`** (donde está `docker-compose.yml`):
 
 ```bash
 docker compose exec web_app php artisan topografia:recalcular-inundaciones
 docker compose exec web_app php artisan topografia:simplificar-poligonos --solo-activas
+docker compose exec web_app php artisan view:clear
 ```
 
-> **Datos:** la BD vive en el volumen Docker `equipo04_pgdata`. No uses `docker compose down -v`. No ejecutes `php artisan test` dentro del contenedor salvo que confirmes SQLite de test (ver [SCD §8.1](cosa%20web/chirper/SCD.md)). Si la BD quedó vacía: `docker compose exec web_app php artisan db:seed`.
+> **Datos:** la BD persiste en el volumen Docker `equipo04_pgdata`. No uses `docker compose down -v`. No ejecutes `php artisan test` dentro del contenedor salvo que confirmes SQLite de test (ver [SCD §8.1](cosa%20web/chirper/SCD.md)). Si la BD quedó vacía: `docker compose exec web_app php artisan db:seed`.
 
 ---
 
@@ -121,32 +148,25 @@ docker compose exec web_app php artisan topografia:simplificar-poligonos --solo-
 Para Docker en Windows, ejecutar el proyecto **dentro de WSL** (no en `C:\Users\...`).
 
 1. **WSL:** `wsl --install` (PowerShell admin) y `wsl --update` si hace falta.
-2. **Copiar el repo** al filesystem Linux (ej. `/home/tu_usuario/ProyectoInundaciones2`).
-3. **Dependencias en Ubuntu:**
+2. **Clonar o copiar el repo** al filesystem Linux (ej. `/home/tu_usuario/ProyectoInundaciones2`).
+3. **Desde la carpeta `equipo04/`:**
    ```bash
-   sudo apt update
-   sudo apt install -y php-cli php-curl php-xml php-mbstring unzip nodejs npm
-   curl -sS https://getcomposer.org/installer | sudo php -- --install-dir=/usr/local/bin --filename=composer
+   docker compose up -d --build
+   docker compose exec web_app cp .env.example .env    # si aún no existe
+   docker compose exec web_app php artisan key:generate
+   docker compose exec web_app php artisan migrate --seed
    ```
-4. **Desde `cosa web/chirper`:**
-   ```bash
-   composer install
-   cp .env.example .env
-   ./vendor/bin/sail up -d
-   ./vendor/bin/sail artisan key:generate
-   ./vendor/bin/sail artisan migrate --seed
-   npm install
-   npm run dev
-   ```
-5. Abrir `http://localhost:8001` (o el puerto en `.env`).
+4. Abrir **`http://localhost:8001`**.
 
-Alternativa sin Sail local: `docker run` con imagen `laravelsail/php84-composer` para `composer install`, luego `./vendor/bin/sail up -d` (ver [`cosa web/chirper/SCD.md`](cosa%20web/chirper/SCD.md)).
+El compose levanta **PostgreSQL** (puerto host `5440`), la app web (`web_app`) y el worker de colas (`queue_worker`). Variables de entorno sensibles (`OPEN_ROUTE_SERVICE_KEY`, claves de clima, etc.) se configuran en `cosa web/chirper/.env`.
+
+Para desarrollo frontend con Vite, desde `cosa web/chirper/`: `npm install && npm run dev`.
 
 ---
 
 ## 🎨 Diseño UI/UX (`/reports` y paneles de validación)
 
-Interfaz **premium** con glassmorphism (`backdrop-blur`), tipografía **Outfit** (Google Fonts) y **SweetAlert2** para confirmaciones.
+Interfaz con glassmorphism (`backdrop-blur`), tipografía **Outfit** (Google Fonts) y **SweetAlert2** para confirmaciones.
 
 ### Jerarquía de campos
 
@@ -155,19 +175,20 @@ Interfaz **premium** con glassmorphism (`backdrop-blur`), tipografía **Outfit**
 | Cabeceras de tabla (Foto, Reporte, …) | Texto `#1F2937` |
 | Labels (DESCRIPCIÓN, DIRECCIÓN, **INTENSIDAD PROPUESTA**, …) | `#71717A` (`.report-field-label`) |
 | Valores de datos | `#1F2937` (`.report-field-value`) |
-| Enlace *Ver detalle completo* | `#4F46E5` (índigo, distinto del azul de botones) |
+| Enlace *Ver detalle completo* | `#4F46E5` (índigo) |
 
-### Botones de acción (pendientes y modal)
+### Botones de acción
 
 | Acción | Fondo | Texto / icono |
 |--------|-------|----------------|
 | **Aprobar** / Guardar cambios | `#059669` | `#FFFFFF` |
 | **Vincular** | `#2563EB` | `#FFFFFF` |
 | **Rechazar** | `#F3F4F6` | `#DC2626` |
+| **Modificar** (rechazados) | `#EEF2FF` | `#4338CA` |
 
 Pills de **intensidad propuesta** (baja/media/alta): clases `intensity-pill-*` en columna Detalles.
 
-Otros elementos: modales de foto y detalle (z-index sobre Leaflet), minimapas con `wire:ignore`, animaciones suaves en hover.
+Otros elementos: modales de foto, detalle e historial (z-index sobre Leaflet), minimapas con `wire:ignore`, animaciones suaves en hover.
 
 ---
 

@@ -98,7 +98,7 @@
                 <!-- Main Nav Links -->
                 @if (session()->has('api_token'))
                 <nav class="hidden md:flex items-center gap-1 text-sm font-medium">
-                    <a href="{{ route('reports.index', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('reports.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Reportes</a>
+                    <x-reports.nav-dropdown :api-role="$apiRole" />
                     <a href="{{ route('command-center.index', [], false) }}" class="hidden px-4 py-2 rounded-md transition-colors {{ request()->routeIs('command-center.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Análisis de Impacto</a>
                     <a href="{{ route('vehiculos.mapa', [], false) }}" class="hidden px-4 py-2 rounded-md transition-colors {{ request()->routeIs('vehiculos.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Vehículos</a>
                     <a href="{{ route('logistica.index', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('logistica.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Logística</a>
@@ -166,6 +166,12 @@
     @if (session()->has('api_token'))
     <nav class="md:hidden bg-white border-b border-gray-200 overflow-x-auto no-scrollbar flex items-center px-4 py-2 gap-2 shadow-inner">
         <a href="{{ route('reports.index', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('reports.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Reportes</a>
+        <a href="{{ route('reports.mis', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('reports.mis') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Mis reportes</a>
+        @if ($apiRole === 'authority')
+            <a href="{{ route('reports.pendientes', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('reports.pendientes') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Pendientes</a>
+            <a href="{{ route('reports.rechazados', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('reports.rechazados') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Rechazados</a>
+        @endif
+        <a href="{{ route('reports.historial', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('reports.historial') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Historial</a>
         <a href="{{ route('command-center.index', [], false) }}" class="hidden px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('command-center.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Análisis</a>
         <a href="{{ route('vehiculos.mapa', [], false) }}" class="hidden px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('vehiculos.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Vehículos</a>
         <a href="{{ route('logistica.index', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('logistica.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Logística</a>

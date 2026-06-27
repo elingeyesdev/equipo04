@@ -12,6 +12,11 @@ use App\Http\Middleware\EnsureApiAuthority;
 use App\Http\Middleware\RedirectIfApiAuthenticated;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SugerenciaController;
+use App\Livewire\ReportsHistorial;
+use App\Livewire\ReportsHub;
+use App\Livewire\ReportsMisReportes;
+use App\Livewire\ReportsPendientes;
+use App\Livewire\ReportsRechazados;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -52,11 +57,19 @@ Route::post('/sugerencias/{sugerencia}/like', [SugerenciaController::class, 'inc
 Route::middleware(ApiAuthenticate::class)->group(function () {
     Route::get('/api/topografia/reportes/{id}', [\App\Http\Controllers\TopografiaController::class, 'showReporte'])->name('topografia.reporte');
     Route::get('/api/topografia/inundaciones/{id}', [\App\Http\Controllers\TopografiaController::class, 'showInundacion'])->name('topografia.inundacion');
-    Route::get('/reports', \App\Livewire\ReportsIndex::class)->name('reports.index');
+    Route::get('/reports', ReportsHub::class)->name('reports.index');
+    Route::get('/reports/mis-reportes', ReportsMisReportes::class)->name('reports.mis');
+    Route::get('/reports/historial', ReportsHistorial::class)->name('reports.historial');
     Route::get('/reports/create', [ReportController::class, 'create'])->name('reports.create');
     Route::post('/reports', [ReportController::class, 'store'])->name('reports.store');
     Route::get('/reports/notifications/feed', [ReportController::class, 'notificationsFeed'])->name('reports.notifications.feed');
-    Route::get('/reports/{id}', [ReportController::class, 'show'])->name('reports.show');
+
+    Route::middleware(EnsureApiAuthority::class)->group(function () {
+        Route::get('/reports/pendientes', ReportsPendientes::class)->name('reports.pendientes');
+        Route::get('/reports/rechazados', ReportsRechazados::class)->name('reports.rechazados');
+    });
+
+    Route::get('/reports/{id}', [ReportController::class, 'show'])->name('reports.show')->where('id', '[0-9]+');
 
     Route::middleware(EnsureApiAuthority::class)->group(function () {
         Route::post('/reports/{id}/responses', [ReportController::class, 'storeResponse'])->name('reports.responses.store');

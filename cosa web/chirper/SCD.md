@@ -151,73 +151,131 @@ flowchart LR
 - Recursos: **`InundacionResource`** expone datos calculados (quórum, intensidad, confirmación, desglose) + polígonos + reportes activos.
 
 ### 4.6 Capa Web (`routes/web.php`)
-- Auth de sesión (`AuthController`), `reports.*` (Livewire `ReportsIndex` + `ReportController`), `command-center.*`, `vehiculos.*`, `victimas.*`, `inventario.*`, `logistica.*`, `authorities.*`, `chat.*`, `profile.*`, `sugerencias.*`.
+- Auth de sesión (`AuthController`), módulo **`reports.*`** (Livewire modular + `ReportController`), `command-center.*`, `vehiculos.*`, `victimas.*`, `inventario.*`, `logistica.*`, `authorities.*`, `chat.*`, `profile.*`, `sugerencias.*`.
 - Proxies: `weather/tiles/...` (`WeatherController`), `api/elevation` (`ElevationController`).
 - Middleware: **`ApiAuthenticate`** (token en sesión), **`EnsureApiAuthority`** (rol autoridad), **`RedirectIfApiAuthenticated`**.
 - **UX global:** SweetAlert2 en `layouts/app.blade.php` — toasts para `session('success'|'error'|'status')` y helper `confirmForm()` para confirmaciones destructivas (p. ej. eliminar víctimas).
+- **Navegación de reportes:** menú desplegable **Reportes** en `layouts/app.blade.php` (`<x-reports.nav-dropdown>`), con badge de pendientes para autoridades (contador vía `View::composer` en `AppServiceProvider`).
 
-### 4.7 Livewire — Panel de reportes (`ReportsIndex`)
+#### Rutas Livewire del módulo de reportes
 
-**Ruta:** `GET /reports` → `App\Livewire\ReportsIndex` → `resources/views/livewire/reports-index.blade.php`.
+| Ruta | Componente | Acceso | Descripción |
+|------|------------|--------|-------------|
+| `GET /reports` | `ReportsHub` | Sesión | Vista general: mapa, inundaciones activas, previsualización (5 filas) de pendientes/rechazados |
+| `GET /reports/mis-reportes` | `ReportsMisReportes` | Sesión | Reportes enviados por el usuario |
+| `GET /reports/historial` | `ReportsHistorial` | Sesión | Inundaciones terminadas (paginado 15) |
+| `GET /reports/pendientes` | `ReportsPendientes` | Autoridad | Cola completa de validación (paginado 10) |
+| `GET /reports/rechazados` | `ReportsRechazados` | Autoridad | Auditoría con filtros (paginado 15) |
+| `GET /reports/create`, `POST /reports` | `ReportController` | Sesión | Alta de reportes |
+| `GET /reports/{id}` | `ReportController` | Sesión | Ficha de reporte |
 
-Listado de inundaciones activas/terminadas y mapa principal (`<x-reports-map>`). **Reportes activos vs inactivos (TTL):** los inactivos se calculan como complemento de los activos (no rechazados), evitando que reportes caducados desaparezcan del historial desplegable.
+> Las rutas específicas (`/reports/pendientes`, `/reports/rechazados`, etc.) se registran **antes** de `/reports/{id}` para evitar colisiones.
 
-#### Datos cargados (rol `authority`)
-- `reportesPendientes`: `Reporte` sin `inundacion_id`, `estado_validacion = pendiente`, con relación `citizen` (nombre del reportero).
-- `reportesRechazados`: reportes rechazados, también con `citizen`.
-- Por cada pendiente se calcula `cercanas` (inundaciones activas a ≤300 m vía Haversine); solo se envían metadatos ligeros al HTML — los polígonos se resuelven en JS desde `window.floodReports` (inyectado por `<x-reports-map>`).
+### 4.7 Livewire — Panel de reportes (modular)
+
+El antiguo monolito **`ReportsIndex`** fue sustituido por **varios componentes Livewire** que comparten lógica vía traits y partials Blade reutilizables.
+
+#### Componentes (`app/Livewire/`)
+
+| Clase | Vista | Rol |
+|-------|-------|-----|
+| `ReportsHub` | `reports-hub.blade.php` | Hub principal: mapa, filtros geo, inundaciones activas, preview de pendientes/rechazados (máx. 5 filas c/u) |
+| `ReportsPendientes` | `reports-pendientes.blade.php` | Tabla paginada (10) + drawer/modales de validación |
+| `ReportsRechazados` | `reports-rechazados.blade.php` | Tabla paginada (15) + barra de filtros + modales |
+| `ReportsMisReportes` | `reports-mis-reportes.blade.php` | Reportes del ciudadano autenticado |
+| `ReportsHistorial` | `reports-historial.blade.php` | Historial de inundaciones terminadas |
+
+#### Traits compartidos (`app/Livewire/Concerns/`)
+
+- **`ManagesReportValidation`** — estado de filtros rechazados (`filtroRechazoMotivo`, `filtroRechazoValidador`, `filtroRechazoDesde`, `filtroRechazoHasta`), queries `queryReportesPendientes()` / `queryReportesRechazados()`, modales de historial y modificación, `updateEstadoValidacion()`, `limpiarFiltrosRechazados()`.
+- **`SerializesInundaciones`** — serialización de inundaciones activas/terminadas para tablas y mapa.
+
+#### Partials Blade (`resources/views/components/reports/`)
+
+| Archivo | Uso |
+|---------|-----|
+| `styles.blade.php` | CSS compartido (glass, minimapas, filtros, botones de validación) |
+| `pending-table.blade.php` | Tabla 5 columnas de pendientes |
+| `rejected-table.blade.php` | Tabla 5 columnas de rechazados (botones **Modificar** + **Ver historial**) |
+| `filter-bar.blade.php` | Filtros de rechazados (motivo, validador, rango de fechas); recibe props explícitas desde Livewire |
+| `pagination.blade.php` | Paginación reutilizable |
+| `nav-dropdown.blade.php` | Submenú Reportes en barra superior |
+| `validation-scripts.blade.php` | JS de validación rápida, modales y review drawer (envuelto en `wire:ignore`) |
+| `modals/historial.blade.php` | Modal Livewire de historial de validación |
+| `modals/modificar-rechazado.blade.php` | Modal Livewire para modificar reporte rechazado |
+
+#### Hub (`ReportsHub`) — vista general
+
+- Mapa principal (`<x-reports-map>`) con rutas seguras y reportes pendientes en capa.
+- **Inundaciones activas:** tabla expandible con quórum, desglose de puntos, renovación TTL (`renovarReporte`).
+- **Previsualización autoridad:** hasta **5** pendientes y **5** rechazados, con enlaces permanentes a las subpáginas completas.
+- Ciudadanos ven tarjeta resumen con enlace a **Mis reportes**.
+- Tarjeta **Historial de inundaciones** con enlace a `/reports/historial`.
 
 #### Panel «Pendientes de Validación» (tabla `report-validation-table`, 5 columnas)
 
 | Columna | Implementación |
 |---------|----------------|
-| Foto | Thumbnail `w-24`; `openImageModal()` |
+| Foto | Thumbnail; `openImageModal()` |
 | Reporte | N°, Fecha (`created_at`), Reportado por (`citizen`) |
 | Detalles | Descripción; fila 50/50 Dirección + **Intensidad propuesta** (pill `intensity-pill-*`); enlace *Ver detalle completo* → `openReportDetailModal()` |
-| Mapa | `#report-minimap-pending-{id}` con `wire:ignore`; `initReportLocationMinimap()` |
-| Acciones | **Aprobar** (`btn-report-aprobar` / `validarRapido(id,'crear')`); **Vincular** (`btn-report-vincular` / `openReviewDrawer()`; disabled sin cercanas ≤300 m); **Rechazar** (`btn-report-rechazar`) |
+| Mapa | `#report-minimap-pending-{id}` con `wire:ignore`; `report-minimaps.js` |
+| Acciones | **Aprobar** (`validarRapido(id,'crear')`); **Vincular** (`openReviewDrawer()`); **Rechazar** |
 
-#### Panel «Reportes Rechazados» (misma tabla `report-validation-table`, 5 columnas)
+En `/reports/pendientes`: misma tabla, paginación 10, scripts de validación completos.
+
+#### Panel «Reportes Rechazados» (misma tabla, 5 columnas)
 
 | Columna | Implementación |
 |---------|----------------|
 | Foto | Mismo markup que pendientes |
-| Reporte | N°, Fecha, Reportado por, **Rechazado** (`updated_at`) |
-| Detalles | Descripción; Dirección + Intensidad propuesta (50/50); sin modal de detalle |
-| Mapa | `#report-minimap-rejected-{id}`; minimapa completo (sin `--compact`) |
-| Acciones | Formulario Livewire `updateEstadoValidacion`: Estado + Vincular a inundación + **Guardar cambios** (`btn-report-aprobar`); clase `report-validation-form` |
+| Reporte | N°, Fecha, Reportado por, **Rechazado** (`rechazado_at`), **Validador**, **Motivo** |
+| Detalles | Descripción; Dirección + Intensidad propuesta (50/50); badges GPS/lluvia/peso |
+| Mapa | `#report-minimap-rejected-{id}`; minimapa vía `report-minimaps.js` |
+| Acciones | **Modificar** → modal Livewire (`abrirModificarRechazado`); **Ver historial** → modal Livewire (`verHistorial`) |
+
+En `/reports/rechazados`: barra de filtros (`<x-reports.filter-bar>`), paginación 15, botón **Limpiar filtros** cuando hay criterios activos. **No** hay exportación CSV.
 
 #### Sistema de diseño en paneles de validación
 
-- **Labels:** `.report-field-label` — texto `#71717A`, uppercase (ej. INTENSIDAD PROPUESTA).
+- **Labels:** `.report-field-label` — texto `#71717A`, uppercase.
 - **Valores:** `.report-field-value` — texto `#1F2937`.
-- **Cabeceras `th`:** `#1F2937`, padding alineado con celdas (`0.5rem 0.75rem`), `vertical-align: top`.
-- **Botones:** Aprobar/Guardar `#059669`; Vincular `#2563EB`; Rechazar fondo `#F3F4F6` texto `#DC2626`.
+- **Cabeceras `th`:** `#1F2937`, padding alineado con celdas.
+- **Botones:** Aprobar/Guardar `#059669`; Vincular `#2563EB`; Rechazar fondo `#F3F4F6` texto `#DC2626`; Modificar `#EEF2FF` / `#4338CA`.
+- **Filtros:** grid `.report-filter-grid` con controles `.report-filter-control`.
 - **Enlace detalle:** `.report-detail-link` `#4F46E5`.
 
-#### JavaScript de minimapas (inline en Blade)
-- **`initReportLocationMinimap()`** — Leaflet embebido por fila: marcador azul (`lat_gps`/`long_gps`), rojo (`lat_reporte`/`long_reporte`), polyline punteada y etiqueta de distancia (misma semántica que el drawer).
-- **`initAllReportMinimaps()`** — registry `reportMinimaps`; re-inicializa tras `Livewire.dispatch('refreshReports')` y en `morph.updated` (solo contenedores sin instancia Leaflet).
-- Interacción: `dragging: true`; `scrollWheelZoom` habilitado solo con cursor sobre el minimapa (`mouseenter`/`mouseleave`).
-- Contenedores con `wire:ignore` para evitar mapas «muertos» tras morph de Livewire.
+#### JavaScript de minimapas (`public/js/report-minimaps.js`)
 
-#### Review Drawer (vinculación)
-Panel lateral fijo (`#review-drawer`, z-index 2500+). **`initReviewMap()`** reconstruye el mapa en cada apertura. Muestra GPS, evento, distancia e inundaciones cercanas seleccionables. Confirmación vía **`validarRapido(id, 'vincular', inundacion_id)`** → `POST /api/reportes/{id}/validar` (Sanctum token en sesión).
+Extraído del Blade monolítico anterior. Responsabilidades:
 
-#### Modales auxiliares
-- **`#imageModal`** (z-index 10000): foto ampliada del reporte.
-- **`#reportDetailModal`**: Reportado por, Fecha, Intensidad propuesta, descripción y dirección completas, minimapa `#report-detail-minimap`, footer con Aprobar / Vincular / Rechazar (misma lógica que la fila). Payload de vinculación tomado del botón Vincular de la fila (no duplicado en `data-report` del enlace).
+- **`initReportLocationMinimap()`** — Leaflet por fila: marcador azul (GPS), rojo (evento), polyline y distancia.
+- **Zoom dinámico** — `fitBounds` con `maxZoom` según distancia GPS↔evento (`maxZoomForDistance`).
+- **Tooltips** cortos «GPS» / «Evento».
+- **Lazy init** — `IntersectionObserver` para instanciar mapas solo al entrar en viewport.
+- Registry `reportMinimaps`; re-inicialización tras `livewire:navigated` y morph (debounce).
+- Contenedores con `wire:ignore`.
+
+#### Review Drawer y modales auxiliares
+
+- **`#review-drawer`** (z-index 2500+): vinculación con mapa ampliado e inundaciones cercanas (≤300 m). Confirmación → `POST /api/reportes/{id}/validar`.
+- **`#rejectModal`**, **`#approveModal`**, **`#imageModal`**, **`#reportDetailModal`**: validación rápida y detalle (scripts en `validation-scripts.blade.php`, envueltos en `wire:ignore`).
+- Modales Livewire: historial de validación y modificación de rechazados.
 
 #### Refresco en tiempo real
-- Listeners Livewire: `refreshReports`, Echo `ReporteCreado`, `InundacionActualizada`.
+
+- Listeners Livewire: `refreshReports`, Echo `ReporteCreado`, `InundacionActualizada` (en hub y pendientes).
 - Confirmaciones SweetAlert2 en acciones de validación.
 
-### 4.8 Frontend de mapas (`public/js` + inline)
+> **Legacy:** `reports-index.blade.php` y `ReportsIndex.php` permanecen en el repo pero **no están enrutados**; la referencia activa es el módulo modular descrito arriba.
+
+### 4.8 Frontend de mapas (`public/js` + partials)
 - **`smart-heatmap.js`** — render del mapa de calor. Una **capa por nivel de intensidad** con color azul fijo (baja `#7dd3fc`, media `#0ea5e9`, alta `#1e3a8a`); el peso de cada punto modula sólo la opacidad. Radio del blob fijado en **metros reales** convertidos a píxeles por zoom (mantiene la forma a cualquier escala). Muestreo dentro del polígono (paso 12 m) o fallback geométrico.
 - **`flood-outline.js`** — fusiona en el cliente todos los polígonos de los reportes de una inundación en un **único contorno suavizado** (cierre morfológico + suavizado de Chaikin; convex hull de respaldo). Usado para el contorno de selección y como respaldo de unificación de la zona de calor.
 - **`safe-routing.js`** — rutas seguras (OpenRouteService) evitando inundaciones.
+- **`report-minimaps.js`** — minimapas inline en tablas de validación (GPS vs evento, zoom adaptativo, lazy load).
 
-> **Nota:** los minimapas de validación viven en `reports-index.blade.php` (JS inline), no en `public/js`. Comparten Leaflet 1.9.4 (CDN) con el mapa principal y el review drawer.
+> Los scripts de validación rápida (drawer, modales de aprobar/rechazar) viven en `components/reports/validation-scripts.blade.php` e incluyen Leaflet compartido con el mapa principal.
 
 ---
 
@@ -344,17 +402,19 @@ cosa web/chirper/
 │   │   ├── Middleware/        # ApiAuthenticate, EnsureApiAuthority, ...
 │   │   └── Resources/         # InundacionResource, ...
 │   ├── Jobs/                  # CalcularPoligonoInundacion
-│   ├── Livewire/              # ReportsIndex (panel reportes + validación)
+│   ├── Livewire/              # ReportsHub, ReportsPendientes, ReportsRechazados, …
+│   │   └── Concerns/          # ManagesReportValidation, SerializesInundaciones
 │   ├── Models/                # Inundacion, Reporte, ...
-│   ├── Providers/             # AppServiceProvider (bind ElevationProvider)
+│   ├── Providers/             # AppServiceProvider (bind ElevationProvider, badge pendientes)
 │   ├── Services/              # Topografia, Elevation, Cache, Validacion, FloodApiClient
 │   └── Support/               # PolygonCoordsHelper, PolygonSimplifier
 ├── tests/Unit/                # TopografiaInundacionServiceTest, PolygonSimplifierTest, ...
 ├── database/migrations/       # esquema (inundaciones, reportes, polígonos, módulos)
-├── public/js/                 # smart-heatmap.js, flood-outline.js, safe-routing.js
+├── public/js/                 # smart-heatmap.js, flood-outline.js, safe-routing.js, report-minimaps.js
 ├── resources/views/
-│   ├── livewire/reports-index.blade.php   # Panel validación + minimapas + drawer (activo)
-│   └── ...                    # command-center, victimas, vehiculos, ...
+│   ├── livewire/              # reports-hub, reports-pendientes, reports-rechazados, …
+│   ├── components/reports/    # partials compartidos (tablas, filtros, modales, nav)
+│   └── ...                    # command-center, victimas, vehiculos, …
 ├── routes/                    # web.php, api.php
 ├── config/                    # app.php (timezone), services.php (claves)
 └── docker-compose.yml         # postgres_db, web_app, queue_worker
