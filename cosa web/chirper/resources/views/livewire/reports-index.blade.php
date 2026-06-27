@@ -38,6 +38,29 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
+        .report-location-minimap {
+            width: 11rem;
+            height: 5rem;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            background: #f1f5f9;
+            position: relative;
+            z-index: 0;
+            isolation: isolate;
+        }
+        .report-location-minimap .leaflet-container {
+            z-index: 1 !important;
+        }
+        @media (min-width: 768px) {
+            .report-location-minimap {
+                width: 12.5rem;
+                height: 5.5rem;
+            }
+        }
+        .approve-dropdown-menu {
+            min-width: 13rem;
+        }
     </style>
 
     <!-- Main Container with custom gradient background -->
@@ -349,57 +372,100 @@
                     <table class="w-full text-sm glass-table rounded-xl overflow-hidden">
                         <thead class="text-slate-600">
                             <tr>
-                                <th class="text-left font-semibold px-4 py-3 rounded-tl-xl w-16">Foto</th>
+                                <th class="text-left font-semibold px-4 py-3 rounded-tl-xl w-32">Foto</th>
                                 <th class="text-left font-semibold px-4 py-3">Reporte N°</th>
                                 <th class="text-left font-semibold px-4 py-3">Intensidad</th>
                                 <th class="text-left font-semibold px-4 py-3">Detalles</th>
-                                <th class="text-right font-semibold px-4 py-3 rounded-tr-xl">Acciones</th>
+                                <th class="text-left font-semibold px-4 py-3">Ubicación</th>
+                                <th class="text-left font-semibold px-4 py-3 rounded-tr-xl">Acciones</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-200/50">
                             @forelse ($reportesPendientes ?? [] as $rep)
-                                @php /** @var \App\Models\Reporte $rep */ @endphp
+                                @php
+                                    /** @var \App\Models\Reporte $rep */
+                                    $reporterName = $rep->citizen?->name
+                                        ?? ($rep->citizen_carnet ? 'Carnet ' . $rep->citizen_carnet : 'Ciudadano anónimo');
+                                @endphp
                                 <tr class="transition-colors duration-200 hover:bg-white/30">
                                     <td class="px-4 py-3">
-                                        @if(!empty($rep->foto_path))
-                                            <img src="{{ asset('storage/' . $rep->foto_path) }}" alt="Foto" onclick="openImageModal('{{ asset('storage/' . $rep->foto_path) }}')" class="w-10 h-10 object-cover rounded-lg shadow-sm border border-gray-200 cursor-pointer hover:scale-105 transition-transform">
-                                        @else
-                                            <div class="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center">
-                                                <svg class="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                                            </div>
-                                        @endif
+                                        <div class="w-24 md:w-32 flex-shrink-0 flex items-center justify-center bg-white/50 border border-white/60 rounded-2xl overflow-hidden h-32 shadow-sm">
+                                            @if(!empty($rep->foto_path))
+                                                <img src="{{ asset('storage/' . $rep->foto_path) }}" alt="Foto del reporte N°{{ $rep->id }}" onclick="openImageModal('{{ asset('storage/' . $rep->foto_path) }}')" class="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity">
+                                            @else
+                                                <div class="flex flex-col items-center justify-center">
+                                                    <svg class="w-8 h-8 opacity-20 mb-1 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                                    <span class="text-[9px] font-bold text-slate-400 uppercase text-center leading-tight px-2">Sin foto<br>adjunta</span>
+                                                </div>
+                                            @endif
+                                        </div>
                                     </td>
                                     <td class="px-4 py-3">
                                         <span class="font-bold text-slate-700 block">N°{{ $rep->id }}</span>
-                                        <span class="text-[10px] text-slate-500">{{ $rep->created_at->format('d/m/Y H:i') }}</span>
+                                        <span class="text-[10px] text-slate-500 block">{{ $rep->created_at->format('d/m/Y H:i') }}</span>
+                                        <span class="text-[10px] text-slate-600 block mt-1" title="{{ $reporterName }}">
+                                            <span class="font-semibold text-slate-500">Por:</span> {{ $reporterName }}
+                                        </span>
                                     </td>
                                     <td class="px-4 py-3">
                                         <span class="inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold uppercase bg-amber-100 text-amber-800 shadow-sm">
                                             {{ $rep->intensidad_propuesta }}
                                         </span>
                                     </td>
-                                    <td class="px-4 py-3">
-                                        <p class="text-xs text-slate-600 max-w-xs truncate" title="{{ !empty($rep->address) ? $rep->address : 'Ubicación GPS' }}">
-                                            <span class="font-bold text-slate-700">Dir:</span> {{ !empty($rep->address) ? $rep->address : 'Ubicación GPS' }}
-                                        </p>
-                                        <p class="text-xs text-slate-500 max-w-xs truncate" title="{{ !empty($rep->description) ? $rep->description : 'Sin descripción.' }}">
+                                    <td class="px-4 py-3 align-top">
+                                        <p class="text-xs text-slate-500 max-w-[14rem] whitespace-normal break-words leading-relaxed">
                                             {{ !empty($rep->description) ? $rep->description : 'Sin descripción.' }}
                                         </p>
                                     </td>
-                                    <td class="px-4 py-3 text-right">
-                                        <div class="flex items-center justify-end gap-2 flex-wrap min-w-[280px]">
-                                            <button onclick="validarRapido({{ $rep->id }}, 'crear')" class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 text-xs rounded-lg font-bold shadow-sm transition-colors">
-                                                Aprobar como Nueva Inundación
-                                            </button>
-                                            
-                                            @if(count($rep->cercanas ?? []) > 0)
-                                                <button data-report="{{ json_encode($rep) }}" onclick="openReviewDrawer(this)" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-xs rounded-lg font-bold shadow-sm transition-colors flex items-center gap-1">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
-                                                    Vincular (Ver Mapa)
+                                    <td class="px-4 py-3">
+                                        <p class="text-xs text-slate-600 max-w-[10rem] truncate mb-1.5" title="{{ !empty($rep->address) ? $rep->address : 'Ubicación GPS' }}">
+                                            {{ !empty($rep->address) ? $rep->address : 'Ubicación GPS' }}
+                                        </p>
+                                        <div
+                                            id="report-minimap-pending-{{ $rep->id }}"
+                                            class="report-location-minimap"
+                                            wire:ignore
+                                            aria-label="Mapa de ubicación del reporte N°{{ $rep->id }}"
+                                            data-lat-gps="{{ $rep->lat_gps }}"
+                                            data-lng-gps="{{ $rep->long_gps }}"
+                                            data-lat-rep="{{ $rep->lat_reporte }}"
+                                            data-lng-rep="{{ $rep->long_reporte }}"
+                                        ></div>
+                                        <p class="text-[9px] text-slate-400 mt-1"><span class="text-blue-500">●</span> Usuario <span class="text-rose-500 ml-1">●</span> Evento</p>
+                                    </td>
+                                    <td class="px-4 py-3 align-top">
+                                        <div class="flex items-start gap-2 flex-nowrap">
+                                            <div class="relative approve-dropdown">
+                                                <button type="button" onclick="toggleApproveMenu({{ $rep->id }}, event)" class="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white pl-3 pr-2.5 py-2 text-xs rounded-lg font-bold shadow-sm transition-colors">
+                                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+                                                    <span>Aprobar</span>
+                                                    <svg class="w-3.5 h-3.5 shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
                                                 </button>
-                                            @endif
-                                            
-                                            <button onclick="validarRapido({{ $rep->id }}, 'rechazar')" class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-3 py-1.5 text-xs rounded-lg font-bold shadow-sm transition-colors">
+                                                <div id="approve-menu-{{ $rep->id }}" class="approve-dropdown-menu hidden absolute left-0 top-full mt-1 z-20 bg-white rounded-xl shadow-lg border border-slate-200 py-1 overflow-hidden">
+                                                    <button type="button" onclick="closeApproveMenus(); validarRapido({{ $rep->id }}, 'crear')" class="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-semibold text-slate-700 hover:bg-emerald-50 transition-colors text-left">
+                                                        <svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+                                                        Como Nueva Inundación
+                                                    </button>
+                                                    @if(count($rep->cercanas ?? []) > 0)
+                                                        @php
+                                                            $reportDrawerPayload = array_merge($rep->toArray(), [
+                                                                'cercanas' => collect($rep->cercanas ?? [])->values()->all(),
+                                                            ]);
+                                                        @endphp
+                                                        <button type="button" id="review-trigger-{{ $rep->id }}" data-report="{{ json_encode($reportDrawerPayload) }}" onclick="closeApproveMenus(); openReviewDrawer(this)" class="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-semibold text-slate-700 hover:bg-blue-50 transition-colors text-left border-t border-slate-100">
+                                                            <svg class="w-4 h-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                                            Como Vinculada (Ver Mapa)
+                                                        </button>
+                                                    @else
+                                                        <span class="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-medium text-slate-400 border-t border-slate-100 cursor-not-allowed" title="Sin inundaciones activas cercanas">
+                                                            <svg class="w-4 h-4 text-slate-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                                            Como Vinculada (Ver Mapa)
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                            <button type="button" onclick="validarRapido({{ $rep->id }}, 'rechazar')" class="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-600 border border-slate-300 px-3 py-2 text-xs rounded-lg font-bold shadow-sm transition-colors">
+                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
                                                 Rechazar
                                             </button>
                                         </div>
@@ -407,7 +473,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="px-4 py-8 text-center text-slate-500 font-medium">
+                                    <td colspan="6" class="px-4 py-8 text-center text-slate-500 font-medium">
                                         No hay reportes pendientes de revisión.
                                     </td>
                                 </tr>
@@ -429,7 +495,11 @@
                 </div>
                 <div class="divide-y divide-gray-200/50">
                     @forelse ($reportesRechazados ?? [] as $rep)
-                        @php /** @var \App\Models\Reporte $rep */ @endphp
+                        @php
+                            /** @var \App\Models\Reporte $rep */
+                            $reporterName = $rep->citizen?->name
+                                ?? ($rep->citizen_carnet ? 'Carnet ' . $rep->citizen_carnet : 'Ciudadano anónimo');
+                        @endphp
                         <div class="p-5 flex flex-col md:flex-row gap-5 hover:bg-white/30 transition-colors">
                             <div class="w-full md:w-32 flex-shrink-0 flex items-center justify-center bg-white/50 border border-white/60 rounded-2xl overflow-hidden h-32 shadow-sm">
                                 @if($rep->foto_path)
@@ -444,12 +514,19 @@
                             
                             <div class="flex-grow grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-slate-600">
                                 <div><span class="block text-[10px] font-bold text-slate-400 uppercase">ID</span><span class="font-semibold text-slate-800">N°{{ $rep->id }}</span></div>
+                                <div><span class="block text-[10px] font-bold text-slate-400 uppercase">Reportado por</span><span class="font-medium text-xs text-slate-700 truncate block" title="{{ $reporterName }}">{{ $reporterName }}</span></div>
                                 <div><span class="block text-[10px] font-bold text-slate-400 uppercase">Intensidad</span>
                                     <span class="inline-block mt-0.5 px-2 py-0.5 bg-rose-100 text-rose-700 font-bold text-[10px] rounded uppercase">{{ $rep->intensidad_propuesta }}</span>
                                 </div>
-                                <div class="col-span-2"><span class="block text-[10px] font-bold text-slate-400 uppercase">Dirección</span><span class="font-medium text-xs">{{ !empty($rep->address) ? $rep->address : 'Ubicación GPS' }}</span></div>
                                 <div><span class="block text-[10px] font-bold text-slate-400 uppercase">Creado</span><span class="font-medium">{{ $rep->created_at->format('d/m/Y H:i') }}</span></div>
                                 <div><span class="block text-[10px] font-bold text-slate-400 uppercase">Rechazado</span><span class="font-medium">{{ $rep->updated_at->format('d/m/Y H:i') }}</span></div>
+
+                                <div class="col-span-full">
+                                    <span class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Descripción</span>
+                                    <p class="text-xs text-slate-600 whitespace-normal break-words leading-relaxed">
+                                        {{ !empty($rep->description) ? $rep->description : 'Sin descripción.' }}
+                                    </p>
+                                </div>
                                 
                                 <div class="col-span-full mt-2 pt-4 border-t border-white/40">
                                     <form wire:submit.prevent="updateEstadoValidacion({{ $rep->id }})" class="flex flex-wrap items-end gap-3">
@@ -479,6 +556,24 @@
                                         </button>
                                     </form>
                                 </div>
+                            </div>
+
+                            <div class="flex-shrink-0 w-[11rem] md:w-[12.5rem]">
+                                <span class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Ubicación</span>
+                                <p class="text-xs text-slate-600 font-medium mb-1.5 truncate" title="{{ !empty($rep->address) ? $rep->address : 'Ubicación GPS' }}">
+                                    {{ !empty($rep->address) ? $rep->address : 'Ubicación GPS' }}
+                                </p>
+                                <div
+                                    id="report-minimap-rejected-{{ $rep->id }}"
+                                    class="report-location-minimap"
+                                    wire:ignore
+                                    aria-label="Mapa de ubicación del reporte rechazado N°{{ $rep->id }}"
+                                    data-lat-gps="{{ $rep->lat_gps }}"
+                                    data-lng-gps="{{ $rep->long_gps }}"
+                                    data-lat-rep="{{ $rep->lat_reporte }}"
+                                    data-lng-rep="{{ $rep->long_reporte }}"
+                                ></div>
+                                <p class="text-[9px] text-slate-400 mt-1"><span class="text-blue-500">●</span> Usuario <span class="text-rose-500 ml-1">●</span> Evento</p>
                             </div>
                         </div>
                     @empty
@@ -644,40 +739,156 @@ window.validateReport = function(id, action) {
 
 
 <script>
-        document.addEventListener('alpine:init', () => {
-            Alpine.data('minimapComponent', (latGps, lngGps, latRep, lngRep) => ({
-                map: null,
-                init() {
-                    const lGps = parseFloat(latGps);
-                    const lnGps = parseFloat(lngGps);
-                    const lRep = parseFloat(latRep);
-                    const lnRep = parseFloat(lngRep);
-                    
-                    setTimeout(() => {
-                        this.map = L.map(this.$el, {
-                            zoomControl: true, attributionControl: false, dragging: true, scrollWheelZoom: true, doubleClickZoom: true
-                        }).setView([lRep, lnRep], 15);
-                        
-                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.map);
-                        
-                        const iconGps = L.divIcon({ className: '', html: '<div style=\'background-color: rgba(245,158,11,0.6); width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(245,158,11,0.9); box-shadow: 0 0 8px rgba(0,0,0,0.4);\'></div>', iconSize: [14, 14], iconAnchor: [7, 7] });
-                        L.marker([lGps, lnGps], { icon: iconGps })
-                            .bindTooltip("Ubicacion del usuario (GPS)", { direction: 'top' })
-                            .bindPopup("<div class='text-xs'><b>GPS del Ciudadano</b><br>Desde aquí se tomó la foto o se envió el reporte.</div>")
-                            .addTo(this.map);
-                            
-                        L.circle([lGps, lnGps], { radius: 500, color: '#3B82F6', fillColor: '#3B82F6', fillOpacity: 0.1, weight: 1.5, dashArray: '4 4' }).addTo(this.map);
-                        
-                        const iconRep = L.divIcon({ className: '', html: '<div style=\'background-color: #EF4444; width: 18px; height: 18px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(239,68,68,0.8);\'></div>', iconSize: [18, 18], iconAnchor: [9, 9] });
-                        L.marker([lRep, lnRep], { icon: iconRep })
-                            .bindTooltip("Punto Reportado", { direction: 'top', className: 'font-bold text-rose-600' })
-                            .bindPopup("<div class='text-xs text-rose-700'><b>Punto Reportado</b><br>Lugar exacto del reporte.</div>")
-                            .addTo(this.map);
-                    }, 50);
-                    
-                    
+        const reportMinimaps = new Map();
+
+        function destroyReportMinimap(id) {
+            if (reportMinimaps.has(id)) {
+                reportMinimaps.get(id).remove();
+                reportMinimaps.delete(id);
+            }
+        }
+
+        function initReportLocationMinimap(containerEl, coords) {
+            const id = containerEl.id;
+            if (!id) return;
+
+            destroyReportMinimap(id);
+
+            const latGps = parseFloat(coords.latGps);
+            const lngGps = parseFloat(coords.lngGps);
+            const latRep = parseFloat(coords.latRep);
+            const lngRep = parseFloat(coords.lngRep);
+
+            const hasUser = !isNaN(latGps) && !isNaN(lngGps);
+            const hasEvent = !isNaN(latRep) && !isNaN(lngRep);
+
+            if (!hasUser && !hasEvent) {
+                containerEl.innerHTML = '<div class="flex items-center justify-center h-full text-[10px] text-slate-400 font-medium px-2 text-center">Sin coordenadas</div>';
+                return;
+            }
+
+            containerEl.innerHTML = '';
+
+            const centerLat = hasEvent ? latRep : latGps;
+            const centerLng = hasEvent ? lngRep : lngGps;
+
+            const map = L.map(containerEl, {
+                zoomControl: false,
+                attributionControl: false,
+                dragging: true,
+                scrollWheelZoom: false,
+                doubleClickZoom: false,
+                boxZoom: false,
+                keyboard: false,
+            }).setView([centerLat, centerLng], 15);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+            const bounds = L.latLngBounds();
+            let addedUser = false;
+            let addedEvent = false;
+
+            if (hasUser) {
+                const userIcon = L.divIcon({
+                    className: 'custom-leaflet-user',
+                    html: '<div style="background-color:#3b82f6;width:10px;height:10px;border-radius:50%;border:2px solid white;box-shadow:0 0 5px rgba(0,0,0,0.4);"></div>',
+                    iconSize: [10, 10],
+                    iconAnchor: [5, 5],
+                });
+                L.marker([latGps, lngGps], { icon: userIcon })
+                    .bindTooltip('Ubicación del Reportero (GPS)', { direction: 'top', className: 'text-[10px]' })
+                    .addTo(map);
+                bounds.extend([latGps, lngGps]);
+                addedUser = true;
+            }
+
+            if (hasEvent) {
+                const eventIcon = L.divIcon({
+                    className: 'custom-leaflet-event',
+                    html: '<div style="background-color:#f43f5e;width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 0 8px rgba(0,0,0,0.5);"></div>',
+                    iconSize: [12, 12],
+                    iconAnchor: [6, 6],
+                });
+                L.marker([latRep, lngRep], { icon: eventIcon })
+                    .bindTooltip('Punto de Evento Reportado', { direction: 'top', className: 'text-[10px] font-bold' })
+                    .addTo(map);
+                bounds.extend([latRep, lngRep]);
+                addedEvent = true;
+            }
+
+            if (addedUser && addedEvent && (latGps !== latRep || lngGps !== lngRep)) {
+                L.polyline([[latGps, lngGps], [latRep, lngRep]], {
+                    color: '#94a3b8',
+                    weight: 2,
+                    dashArray: '4, 4',
+                }).addTo(map);
+
+                const dist = map.distance([latGps, lngGps], [latRep, lngRep]);
+                L.marker([(latGps + latRep) / 2, (lngGps + lngRep) / 2], {
+                    icon: L.divIcon({
+                        className: 'dist-label',
+                        html: '<div style="background:rgba(255,255,255,0.9);color:#64748b;font-size:8px;font-weight:bold;padding:1px 3px;border-radius:3px;border:1px solid #cbd5e1;">' + Math.round(dist) + 'm</div>',
+                        iconSize: [36, 14],
+                        iconAnchor: [18, 7],
+                    }),
+                }).addTo(map);
+            }
+
+            if (bounds.isValid()) {
+                map.fitBounds(bounds, { padding: [8, 8] });
+            }
+
+            reportMinimaps.set(id, map);
+            setTimeout(() => map.invalidateSize(), 100);
+        }
+
+        function initAllReportMinimaps(force = false) {
+            document.querySelectorAll('.report-location-minimap').forEach((el) => {
+                if (!el.id) return;
+                const hasMap = el.querySelector('.leaflet-container');
+                if (force || !hasMap) {
+                    initReportLocationMinimap(el, {
+                        latGps: el.dataset.latGps,
+                        lngGps: el.dataset.lngGps,
+                        latRep: el.dataset.latRep,
+                        lngRep: el.dataset.lngRep,
+                    });
                 }
-            }));
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initAllReportMinimaps();
+        });
+
+        document.addEventListener('livewire:initialized', () => {
+            initAllReportMinimaps();
+            Livewire.on('refreshReports', () => {
+                setTimeout(() => initAllReportMinimaps(true), 100);
+            });
+            Livewire.hook('morph.updated', () => {
+                setTimeout(() => initAllReportMinimaps(false), 50);
+            });
+        });
+
+        function toggleApproveMenu(id, event) {
+            event.stopPropagation();
+            const menu = document.getElementById('approve-menu-' + id);
+            const isOpen = menu && !menu.classList.contains('hidden');
+            closeApproveMenus();
+            if (menu && !isOpen) {
+                menu.classList.remove('hidden');
+            }
+        }
+
+        function closeApproveMenus() {
+            document.querySelectorAll('[id^="approve-menu-"]').forEach((el) => el.classList.add('hidden'));
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.approve-dropdown')) {
+                closeApproveMenus();
+            }
         });
 
         function toggleDetails(id) {
@@ -734,6 +945,7 @@ window.validateReport = function(id, action) {
 
 
         function openImageModal(src) {
+            closeApproveMenus();
             const modal = document.getElementById('imageModal');
             const img = document.getElementById('modalImage');
             img.src = src;
@@ -752,7 +964,7 @@ window.validateReport = function(id, action) {
     </script>
 
     <!-- Image Modal -->
-    <div id="imageModal" class="fixed inset-0 z-[100] hidden bg-slate-900/90 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity duration-300 opacity-0" onclick="closeImageModal()">
+    <div id="imageModal" class="fixed inset-0 z-[10000] hidden bg-slate-900/90 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity duration-300 opacity-0" onclick="closeImageModal()">
         <div class="relative max-w-5xl w-full max-h-[90vh] flex flex-col items-center justify-center" onclick="event.stopPropagation()">
             <button onclick="closeImageModal()" class="absolute -top-12 right-0 sm:-right-12 sm:top-0 text-white hover:text-rose-400 bg-white/10 hover:bg-white/20 rounded-full p-2 transition-colors">
                 <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>

@@ -137,10 +137,12 @@ class ReportsIndex extends Component
         if ($this->role === 'authority') {
             $reportesPendientes = Reporte::whereNull('inundacion_id')
                 ->where('estado_validacion', Reporte::VALIDACION_PENDIENTE)
+                ->with('citizen')
                 ->latest()
                 ->get();
 
             $reportesRechazados = Reporte::where('estado_validacion', Reporte::VALIDACION_RECHAZADO)
+                ->with('citizen')
                 ->latest('updated_at')
                 ->get();
 
