@@ -167,17 +167,33 @@ Listado de inundaciones activas/terminadas y mapa principal (`<x-reports-map>`).
 - `reportesRechazados`: reportes rechazados, también con `citizen`.
 - Por cada pendiente se calcula `cercanas` (inundaciones activas a ≤300 m vía Haversine); solo se envían metadatos ligeros al HTML — los polígonos se resuelven en JS desde `window.floodReports` (inyectado por `<x-reports-map>`).
 
-#### Panel «Pendientes de Validación» (tabla, 5 columnas)
+#### Panel «Pendientes de Validación» (tabla `report-validation-table`, 5 columnas)
+
 | Columna | Implementación |
 |---------|----------------|
-| Foto | Thumbnail ~96 px; `openImageModal()` |
-| Reporte | N° + pill intensidad + fecha + `citizen.name` |
-| Detalles | Descripción + dirección (separador punteado); `openReportDetailModal()` |
-| Mapa | `#report-minimap-pending-{id}` con `wire:ignore` |
-| Acciones | Columna vertical: Aprobar → `validarRapido(id,'crear')`; Vincular → `openReviewDrawer()`; Rechazar → `validarRapido(id,'rechazar')` |
+| Foto | Thumbnail `w-24`; `openImageModal()` |
+| Reporte | N°, Fecha (`created_at`), Reportado por (`citizen`) |
+| Detalles | Descripción; fila 50/50 Dirección + **Intensidad propuesta** (pill `intensity-pill-*`); enlace *Ver detalle completo* → `openReportDetailModal()` |
+| Mapa | `#report-minimap-pending-{id}` con `wire:ignore`; `initReportLocationMinimap()` |
+| Acciones | **Aprobar** (`btn-report-aprobar` / `validarRapido(id,'crear')`); **Vincular** (`btn-report-vincular` / `openReviewDrawer()`; disabled sin cercanas ≤300 m); **Rechazar** (`btn-report-rechazar`) |
 
-#### Panel «Reportes Rechazados»
-Layout flex: foto, grid (ID, reportero, intensidad, fechas, descripción, formulario `updateEstadoValidacion`), bloque mapa (`#report-minimap-rejected-{id}`).
+#### Panel «Reportes Rechazados» (misma tabla `report-validation-table`, 5 columnas)
+
+| Columna | Implementación |
+|---------|----------------|
+| Foto | Mismo markup que pendientes |
+| Reporte | N°, Fecha, Reportado por, **Rechazado** (`updated_at`) |
+| Detalles | Descripción; Dirección + Intensidad propuesta (50/50); sin modal de detalle |
+| Mapa | `#report-minimap-rejected-{id}`; minimapa completo (sin `--compact`) |
+| Acciones | Formulario Livewire `updateEstadoValidacion`: Estado + Vincular a inundación + **Guardar cambios** (`btn-report-aprobar`); clase `report-validation-form` |
+
+#### Sistema de diseño en paneles de validación
+
+- **Labels:** `.report-field-label` — texto `#71717A`, uppercase (ej. INTENSIDAD PROPUESTA).
+- **Valores:** `.report-field-value` — texto `#1F2937`.
+- **Cabeceras `th`:** `#1F2937`, padding alineado con celdas (`0.5rem 0.75rem`), `vertical-align: top`.
+- **Botones:** Aprobar/Guardar `#059669`; Vincular `#2563EB`; Rechazar fondo `#F3F4F6` texto `#DC2626`.
+- **Enlace detalle:** `.report-detail-link` `#4F46E5`.
 
 #### JavaScript de minimapas (inline en Blade)
 - **`initReportLocationMinimap()`** — Leaflet embebido por fila: marcador azul (`lat_gps`/`long_gps`), rojo (`lat_reporte`/`long_reporte`), polyline punteada y etiqueta de distancia (misma semántica que el drawer).
@@ -190,7 +206,7 @@ Panel lateral fijo (`#review-drawer`, z-index 2500+). **`initReviewMap()`** reco
 
 #### Modales auxiliares
 - **`#imageModal`** (z-index 10000): foto ampliada del reporte.
-- **`#reportDetailModal`**: descripción y dirección completas cuando el texto no cabe en la fila.
+- **`#reportDetailModal`**: Reportado por, Fecha, Intensidad propuesta, descripción y dirección completas, minimapa `#report-detail-minimap`, footer con Aprobar / Vincular / Rechazar (misma lógica que la fila). Payload de vinculación tomado del botón Vincular de la fila (no duplicado en `data-report` del enlace).
 
 #### Refresco en tiempo real
 - Listeners Livewire: `refreshReports`, Echo `ReporteCreado`, `InundacionActualizada`.
