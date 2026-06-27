@@ -1,28 +1,28 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="command-center-container bg-slate-900 text-slate-100 min-h-screen -mt-6 -mx-4 p-4 lg:p-6 flex flex-col font-sans">
+<div class="command-center-container bg-slate-50 text-slate-800 min-h-screen -mt-6 -mx-4 p-4 lg:p-6 flex flex-col font-sans">
     
     <div class="flex items-center justify-between mb-4">
         <div>
-            <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-                <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"></path></svg>
+            <h1 class="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"></path></svg>
                 Centro de Comando (Análisis de Impacto)
             </h1>
-            <p class="mt-1 text-sm text-slate-400">Visualización interactiva de daños materiales, víctimas y avance geográfico.</p>
+            <p class="mt-1 text-sm text-slate-500">Visualización interactiva de daños materiales, víctimas y avance geográfico.</p>
 <style>
-    /* Custom Map Tooltips for Dark Mode */
-    .dark-tooltip {
-        background-color: #1e293b !important;
-        color: #f8fafc !important;
-        border: 1px solid #475569 !important;
+    /* Custom Map Tooltips for Light Mode */
+    .light-tooltip {
+        background-color: #ffffff !important;
+        color: #1e293b !important;
+        border: 1px solid #cbd5e1 !important;
         border-radius: 0.5rem !important;
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5) !important;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
         font-family: 'Inter', sans-serif !important;
         font-size: 0.75rem !important;
     }
-    .dark-tooltip .leaflet-tooltip-tip {
-        border-top-color: #1e293b !important;
+    .light-tooltip .leaflet-tooltip-tip {
+        border-top-color: #ffffff !important;
     }
 </style>
         </div>
@@ -45,58 +45,61 @@
 
     <div class="flex flex-col lg:flex-row gap-4 flex-1 h-[calc(100vh-140px)]">
         <!-- Panel Izquierdo: Estadísticas -->
-        <div class="w-full lg:w-1/4 bg-slate-800 rounded-xl shadow-xl border border-slate-700 p-4 flex flex-col overflow-hidden">
-            <h2 class="text-lg font-semibold text-slate-200 mb-4 border-b border-slate-700 pb-2">Resumen de Impacto</h2>
+        <div class="w-full lg:w-1/4 bg-white/70 backdrop-blur rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col overflow-hidden">
+            <h2 class="text-lg font-bold text-slate-800 mb-4 border-b border-slate-200 pb-3">Resumen de Impacto</h2>
             
             <div class="grid grid-cols-2 gap-3 mb-6">
-                <div class="bg-slate-700 p-3 rounded-lg text-center">
-                    <span class="block text-xs text-slate-400 uppercase tracking-wider">Inundaciones</span>
-                    <span class="block text-2xl font-bold text-blue-400" id="stat-inundaciones">0</span>
+                <div class="bg-white border border-slate-100 shadow-sm p-3 rounded-xl text-center">
+                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Inundaciones</span>
+                    <span class="block text-2xl font-extrabold text-blue-600" id="stat-inundaciones">0</span>
                 </div>
-                <div class="bg-slate-700 p-3 rounded-lg text-center">
-                    <span class="block text-xs text-slate-400 uppercase tracking-wider">Reportes</span>
-                    <span class="block text-2xl font-bold text-sky-400" id="stat-reportes">0</span>
+                <div class="bg-white border border-slate-100 shadow-sm p-3 rounded-xl text-center">
+                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Reportes</span>
+                    <span class="block text-2xl font-extrabold text-sky-500" id="stat-reportes">0</span>
                 </div>
-                <div class="bg-slate-700 p-3 rounded-lg text-center">
-                    <span class="block text-xs text-slate-400 uppercase tracking-wider">Víctimas</span>
-                    <span class="block text-2xl font-bold text-red-400" id="stat-victimas">0</span>
+                <div class="bg-white border border-slate-100 shadow-sm p-3 rounded-xl text-center">
+                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Víctimas</span>
+                    <span class="block text-2xl font-extrabold text-rose-500" id="stat-victimas">0</span>
                 </div>
-                <div class="bg-slate-700 p-3 rounded-lg text-center">
-                    <span class="block text-xs text-slate-400 uppercase tracking-wider">Daños Mat.</span>
-                    <span class="block text-2xl font-bold text-orange-400" id="stat-danos">0</span>
+                <div class="bg-white border border-slate-100 shadow-sm p-3 rounded-xl text-center">
+                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Daños Mat.</span>
+                    <span class="block text-2xl font-extrabold text-orange-500" id="stat-danos">0</span>
                 </div>
             </div>
 
-            <h3 class="text-sm font-semibold text-slate-300 mb-2">Detalle de Eventos (Seleccionado)</h3>
-            <div id="detail-panel" class="flex-1 overflow-y-auto pr-2 custom-scrollbar text-sm text-slate-400">
-                <p class="text-center mt-10">Haz clic en una inundación o reporte en el mapa para ver los detalles.</p>
+            <h3 class="text-sm font-bold text-slate-700 mb-3">Detalle de Eventos (Seleccionado)</h3>
+            <div id="detail-panel" class="flex-1 overflow-y-auto pr-2 custom-scrollbar text-sm text-slate-600">
+                <p class="text-center mt-10 font-medium text-slate-400">Haz clic en una inundación o reporte en el mapa para ver los detalles.</p>
             </div>
         </div>
 
         <!-- Panel Derecho: Mapa y Timeline -->
         <div class="w-full lg:w-3/4 flex flex-col gap-4 relative">
             <!-- Contenedor del Mapa -->
-            <div class="flex-1 bg-slate-800 rounded-xl shadow-xl border border-slate-700 relative overflow-hidden z-0">
+            <div class="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden z-0">
                 <div id="cc-map" class="absolute inset-0 z-0"></div>
                 
                 <!-- Leyenda -->
-                <div class="absolute top-4 right-4 bg-slate-800/90 backdrop-blur border border-slate-600 p-3 rounded-lg shadow-lg z-[1000] text-xs">
-                    <div class="font-bold mb-2 text-slate-200">Convenciones</div>
-                    <div class="flex items-center gap-2 mb-1"><div class="w-3 h-3 bg-blue-600 rounded"></div> <span class="text-slate-300">Inundación Alta</span></div>
-                    <div class="flex items-center gap-2 mb-1"><div class="w-3 h-3 bg-sky-500 rounded"></div> <span class="text-slate-300">Inundación Media</span></div>
-                    <div class="flex items-center gap-2 mb-1"><div class="w-3 h-3 bg-teal-500 rounded"></div> <span class="text-slate-300">Inundación Baja</span></div>
-                    <div class="flex items-center gap-2 mb-1"><div class="w-3 h-3 border-2 border-red-500 rounded-full"></div> <span class="text-slate-300">Víctima</span></div>
-                    <div class="flex items-center gap-2"><div class="w-3 h-3 border-2 border-orange-500 rounded-none transform rotate-45"></div> <span class="text-slate-300">Daño Material</span></div>
+                <div class="absolute top-4 right-4 bg-white/95 backdrop-blur border border-slate-200 p-4 rounded-xl shadow-lg z-[1000] text-xs">
+                    <div class="font-bold mb-3 text-slate-800 uppercase tracking-wide text-[10px]">Convenciones</div>
+                    <div class="flex items-center gap-2 mb-2"><div class="w-3 h-3 bg-blue-600 rounded"></div> <span class="text-slate-600 font-medium">Inundación Alta</span></div>
+                    <div class="flex items-center gap-2 mb-2"><div class="w-3 h-3 bg-sky-500 rounded"></div> <span class="text-slate-600 font-medium">Inundación Media</span></div>
+                    <div class="flex items-center gap-2 mb-2"><div class="w-3 h-3 bg-teal-500 rounded"></div> <span class="text-slate-600 font-medium">Inundación Baja</span></div>
+                    <div class="flex items-center gap-2 mb-2"><div class="w-3 h-3 border-2 border-red-500 rounded-full"></div> <span class="text-slate-600 font-medium">Víctima</span></div>
+                    <div class="flex items-center gap-2"><div class="w-3 h-3 border-2 border-orange-500 rounded-none transform rotate-45"></div> <span class="text-slate-600 font-medium">Daño Material</span></div>
                 </div>
             </div>
 
             <!-- Timeline Slider -->
-            <div class="h-24 bg-slate-800 rounded-xl shadow-xl border border-slate-700 p-4 flex flex-col justify-center">
-                <div class="flex justify-between items-center mb-2">
-                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Línea de Tiempo del Desastre</span>
-                    <span id="timeline-display" class="text-sm font-bold text-blue-400 bg-slate-700 px-3 py-1 rounded">Cargando fechas...</span>
+            <div class="h-24 bg-white/70 backdrop-blur rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col justify-center">
+                <div class="flex justify-between items-center mb-3">
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                        <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Evolución en el Tiempo
+                    </span>
+                    <span id="timeline-display" class="text-sm font-bold text-blue-700 bg-blue-50 border border-blue-100 px-3 py-1 rounded-lg shadow-sm">Cargando fechas...</span>
                 </div>
-                <input type="range" id="timeline-slider" min="0" max="100" value="100" class="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer">
+                <input type="range" id="timeline-slider" min="0" max="100" value="100" class="w-full h-2.5 bg-slate-200 rounded-full appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
         </div>
     </div>
@@ -104,9 +107,9 @@
 
 <!-- Modal: Registrar Daño Material -->
 <div id="modal-dano" class="hidden fixed inset-0 z-[2000] bg-black/60 backdrop-blur-sm flex items-center justify-center">
-    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-3xl shadow-2xl flex flex-col max-h-[90vh]">
-        <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
-            <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+    <div class="bg-white border border-slate-200 rounded-2xl p-6 w-full max-w-3xl shadow-2xl flex flex-col max-h-[90vh]">
+        <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
             Registrar Daño Material
         </h3>
         <form id="form-dano" onsubmit="submitDano(event)" class="flex flex-col flex-1 overflow-y-auto custom-scrollbar pr-2">
@@ -116,39 +119,39 @@
                 <!-- Columna Izquierda: Datos -->
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Inundación Asociada</label>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Inundación Asociada</label>
                         <input type="hidden" name="inundacion_id" id="dano_inundacion_id" required>
                         
                         <!-- Trigger del Drawer -->
                         <div id="dano_fp_trigger">
-                            <button type="button" onclick="openFloodDrawer()" class="w-full flex items-center justify-between bg-slate-700 hover:bg-slate-600 border border-slate-500 border-dashed text-slate-300 rounded p-3 transition-colors group">
+                            <button type="button" onclick="openFloodDrawer()" class="w-full flex items-center justify-between bg-slate-50 hover:bg-slate-100 border border-slate-300 border-dashed text-slate-600 rounded-xl p-3 transition-colors group">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded bg-slate-800 flex items-center justify-center group-hover:bg-blue-900 transition-colors">
-                                        <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                                    <div class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                                        <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                                     </div>
                                     <div class="text-left">
-                                        <span class="block text-sm font-medium text-white">Buscar inundación</span>
-                                        <span class="block text-[10px] text-slate-400">Clic para explorar eventos registrados</span>
+                                        <span class="block text-sm font-bold text-slate-700">Buscar inundación</span>
+                                        <span class="block text-[10px] text-slate-500">Clic para explorar eventos registrados</span>
                                     </div>
                                 </div>
                             </button>
                         </div>
                         
                         <!-- Selected Chip -->
-                        <div id="dano_fp_selected" class="hidden rounded-lg border border-blue-500/50 bg-blue-900/20 overflow-hidden shadow-lg">
-                            <div class="flex items-center justify-between p-3 border-b border-blue-500/20 bg-blue-900/30">
+                        <div id="dano_fp_selected" class="hidden rounded-xl border border-blue-200 bg-blue-50 overflow-hidden shadow-sm">
+                            <div class="flex items-center justify-between p-3 border-b border-blue-200 bg-white">
                                 <div class="flex items-center gap-2">
                                     <div class="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></div>
-                                    <span id="dano_fp_label" class="text-xs font-bold text-blue-200">#000</span>
+                                    <span id="dano_fp_label" class="text-xs font-bold text-blue-700">#000</span>
                                 </div>
-                                <button type="button" onclick="openFloodDrawer()" class="text-[10px] uppercase font-bold text-blue-300 hover:text-white transition-colors">Cambiar</button>
+                                <button type="button" onclick="openFloodDrawer()" class="text-[10px] uppercase font-bold text-blue-600 hover:text-blue-800 transition-colors">Cambiar</button>
                             </div>
-                            <div id="dano_fp_chip_map" class="h-28 w-full bg-slate-900 z-0 border-b border-blue-500/20"></div>
+                            <div id="dano_fp_chip_map" class="h-28 w-full bg-slate-100 z-0 border-b border-blue-200"></div>
                         </div>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Tipo de Infraestructura</label>
-                        <select id="dano_tipo" required class="w-full bg-slate-700 border border-slate-600 text-white rounded p-2 text-sm focus:ring-blue-500 focus:border-blue-500">
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Tipo de Infraestructura</label>
+                        <select id="dano_tipo" required class="w-full bg-white border border-slate-300 text-slate-800 rounded-lg p-2.5 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm">
                             <option value="puente">Puente</option>
                             <option value="carretera">Carretera / Vía</option>
                             <option value="edificio">Edificio / Vivienda</option>
@@ -158,37 +161,37 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Estado</label>
-                        <select id="dano_estado" required class="w-full bg-slate-700 border border-slate-600 text-white rounded p-2 text-sm focus:ring-blue-500 focus:border-blue-500">
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Estado</label>
+                        <select id="dano_estado" required class="w-full bg-white border border-slate-300 text-slate-800 rounded-lg p-2.5 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm">
                             <option value="dañado">Dañado</option>
                             <option value="destruido">Destruido</option>
                             <option value="bloqueado">Bloqueado</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Descripción</label>
-                        <textarea id="dano_desc" rows="3" class="w-full bg-slate-700 border border-slate-600 text-white rounded p-2 text-sm focus:ring-blue-500 focus:border-blue-500"></textarea>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Descripción</label>
+                        <textarea id="dano_desc" rows="3" class="w-full bg-white border border-slate-300 text-slate-800 rounded-lg p-2.5 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm"></textarea>
                     </div>
                 </div>
 
                 <!-- Columna Derecha: Mapa -->
                 <div class="flex flex-col">
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Ubicación Exacta del Daño</label>
-                    <p class="text-[10px] text-slate-400 mb-2">Mueve el marcador naranja en el minimapa para precisar la ubicación.</p>
-                    <div id="mini-map" class="w-full flex-1 min-h-[250px] rounded-lg border border-slate-600 z-[2001] bg-slate-800"></div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Ubicación Exacta del Daño</label>
+                    <p class="text-[10px] text-slate-500 mb-2">Mueve el marcador naranja en el minimapa para precisar la ubicación.</p>
+                    <div id="mini-map" class="w-full flex-1 min-h-[250px] rounded-xl border border-slate-300 z-[2001] bg-slate-100 overflow-hidden shadow-inner"></div>
                     <input type="hidden" id="dano_lat" required>
                     <input type="hidden" id="dano_lng" required>
                     
-                    <div class="flex items-center gap-2 mt-2 bg-slate-700 p-2 rounded text-xs text-slate-300">
-                        <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    <div class="flex items-center gap-2 mt-2 bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-xs text-slate-600 font-medium shadow-sm">
+                        <svg class="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                         <span id="dano-coords-display">Lat: --, Lng: --</span>
                     </div>
                 </div>
             </div>
 
-            <div class="flex justify-end gap-2 pt-4 border-t border-slate-700 mt-2">
-                <button type="button" onclick="closeDamageModal()" class="px-4 py-2 text-sm text-slate-300 hover:text-white transition-colors">Cancelar</button>
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors">Guardar Daño</button>
+            <div class="flex justify-end gap-2 pt-4 border-t border-slate-200 mt-2">
+                <button type="button" onclick="closeDamageModal()" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors font-medium">Cancelar</button>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors">Guardar Daño</button>
             </div>
         </form>
     </div>
@@ -196,49 +199,49 @@
 
 <!-- Modal: Lista de Daños Materiales -->
 <div id="modal-lista-danos" class="hidden fixed inset-0 z-[2000] bg-black/60 backdrop-blur-sm flex items-center justify-center">
-    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]">
+    <div class="bg-white border border-slate-200 rounded-2xl p-6 w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]">
         <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                <svg class="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+            <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <svg class="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
                 Daños Materiales Registrados
             </h3>
-            <button type="button" onclick="closeDamagesListModal()" class="text-slate-400 hover:text-white transition-colors bg-slate-700 hover:bg-slate-600 p-1.5 rounded-lg"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+            <button type="button" onclick="closeDamagesListModal()" class="text-slate-500 hover:text-slate-700 transition-colors bg-slate-100 hover:bg-slate-200 p-1.5 rounded-lg"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
         </div>
-        <p id="lista-danos-subtitle" class="text-xs text-slate-400 mb-4">Mostrando daños de la Inundación N°--</p>
+        <p id="lista-danos-subtitle" class="text-xs font-medium text-slate-500 mb-4">Mostrando daños de la Inundación N°--</p>
         
         <div class="flex-1 overflow-y-auto custom-scrollbar pr-2">
             <div id="lista-danos-container" class="space-y-3">
                 <!-- JS renderiza los daños aquí -->
             </div>
         </div>
-        <div class="flex justify-end pt-4 border-t border-slate-700 mt-4">
-            <button type="button" onclick="closeDamagesListModal()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded text-sm font-medium transition-colors">Cerrar</button>
+        <div class="flex justify-end pt-4 border-t border-slate-200 mt-4">
+            <button type="button" onclick="closeDamagesListModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-2 rounded-lg text-sm font-bold transition-colors">Cerrar</button>
         </div>
     </div>
 </div>
 
 <!-- Modal: Fusión Manual -->
 <div id="modal-merge" class="hidden fixed inset-0 z-[2000] bg-black/60 backdrop-blur-sm flex items-center justify-center">
-    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-md shadow-2xl">
-        <h3 class="text-lg font-bold text-white mb-2">Fusión Manual Asistida</h3>
-        <p class="text-xs text-slate-400 mb-4">Une dos eventos de inundación. El evento de origen será absorbido (incluyendo sus reportes, víctimas y daños) por el evento destino.</p>
+    <div class="bg-white border border-slate-200 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+        <h3 class="text-lg font-bold text-slate-800 mb-2">Fusión Manual Asistida</h3>
+        <p class="text-xs text-slate-500 mb-4 font-medium">Une dos eventos de inundación. El evento de origen será absorbido (incluyendo sus reportes, víctimas y daños) por el evento destino.</p>
         <form id="form-merge" onsubmit="submitMerge(event)">
             @csrf
             <div class="mb-4">
-                <label class="block text-xs font-medium text-slate-300 mb-1">Inundación Principal (Destino)</label>
-                <select id="merge_destino_id" required class="w-full bg-slate-700 border border-slate-600 text-white rounded p-2 text-sm">
+                <label class="block text-xs font-bold text-slate-600 mb-1">Inundación Principal (Destino)</label>
+                <select id="merge_destino_id" required class="w-full bg-white border border-slate-300 text-slate-800 rounded-lg p-2.5 text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
                     <option value="">Seleccione...</option>
                 </select>
             </div>
             <div class="mb-6">
-                <label class="block text-xs font-medium text-slate-300 mb-1">Inundación a Absorber (Origen)</label>
-                <select id="merge_origen_id" required class="w-full bg-slate-700 border border-slate-600 text-white rounded p-2 text-sm">
+                <label class="block text-xs font-bold text-slate-600 mb-1">Inundación a Absorber (Origen)</label>
+                <select id="merge_origen_id" required class="w-full bg-white border border-slate-300 text-slate-800 rounded-lg p-2.5 text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
                     <option value="">Seleccione...</option>
                 </select>
             </div>
-            <div class="flex justify-end gap-2">
-                <button type="button" onclick="closeMergeModal()" class="px-4 py-2 text-sm text-slate-300 hover:text-white transition-colors">Cancelar</button>
-                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors">Fusionar Eventos</button>
+            <div class="flex justify-end gap-2 pt-2">
+                <button type="button" onclick="closeMergeModal()" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors font-medium">Cancelar</button>
+                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors">Fusionar Eventos</button>
             </div>
         </form>
     </div>
@@ -259,17 +262,18 @@
         box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
     }
     .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-    .custom-scrollbar::-webkit-scrollbar-track { background: #1e293b; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     
-    /* Leaflet Dark Tooltip/Popup */
+    /* Leaflet Light Popup */
     .leaflet-popup-content-wrapper, .leaflet-popup-tip {
-        background: #1e293b;
-        color: #f8fafc;
-        border: 1px solid #334155;
+        background: #ffffff;
+        color: #1e293b;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
     }
     .leaflet-popup-content { margin: 12px; }
-    .leaflet-container a.leaflet-popup-close-button { color: #cbd5e1; }
+    .leaflet-container a.leaflet-popup-close-button { color: #64748b; }
 </style>
 
 <!-- Scripts de Mapas -->
@@ -279,36 +283,36 @@
 <script src="{{ asset('js/smart-heatmap.js') }}?v=20260623f"></script>
 
 
-<!-- Drawer (Flood Picker Dark Mode) -->
+<!-- Drawer (Flood Picker Light Mode) -->
 <div id="fp-drawer-backdrop" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[2500] hidden transition-opacity duration-300 opacity-0" onclick="closeFloodDrawer()"></div>
-<div id="fp-drawer" class="fixed inset-y-0 right-0 w-full max-w-sm bg-slate-800 border-l border-slate-700 shadow-[0_0_40px_rgba(0,0,0,0.5)] z-[2501] flex flex-col translate-x-full transition-transform duration-300 ease-in-out">
-    <div class="flex items-center justify-between px-5 py-4 border-b border-slate-700 bg-slate-900/50">
-        <h3 class="text-base font-bold text-white flex items-center gap-2">
-            <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+<div id="fp-drawer" class="fixed inset-y-0 right-0 w-full max-w-sm bg-white border-l border-slate-200 shadow-[0_0_40px_rgba(0,0,0,0.1)] z-[2501] flex flex-col translate-x-full transition-transform duration-300 ease-in-out">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50">
+        <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
             Seleccionar Inundación
         </h3>
-        <button type="button" onclick="closeFloodDrawer()" class="text-slate-400 hover:text-white transition-colors bg-slate-800 hover:bg-slate-700 p-1.5 rounded-lg"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+        <button type="button" onclick="closeFloodDrawer()" class="text-slate-500 hover:text-slate-800 transition-colors bg-white hover:bg-slate-100 border border-slate-200 p-1.5 rounded-lg"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
     </div>
-    <div class="p-4 border-b border-slate-700 space-y-3 bg-slate-800">
+    <div class="p-4 border-b border-slate-200 space-y-3 bg-white">
         <div class="relative">
-            <svg class="w-4 h-4 text-slate-500 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-            <input type="text" id="fp_search" placeholder="Buscar por ID..." class="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm rounded-lg pl-9 pr-3 py-2 focus:border-blue-500 focus:outline-none" oninput="renderFloodList()">
+            <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            <input type="text" id="fp_search" placeholder="Buscar por ID..." class="w-full bg-white border border-slate-300 text-slate-800 text-sm rounded-lg pl-9 pr-3 py-2 focus:border-blue-500 focus:outline-none shadow-sm" oninput="renderFloodList()">
         </div>
         <div class="flex gap-2">
-            <select id="fp_provincia" class="w-1/2 bg-slate-900 border border-slate-600 text-slate-300 text-xs rounded-lg px-2 py-1.5 focus:border-blue-500 focus:outline-none" onchange="updateMunicipiosDropdown(); renderFloodList()">
+            <select id="fp_provincia" class="w-1/2 bg-white border border-slate-300 text-slate-600 text-xs rounded-lg px-2 py-2 focus:border-blue-500 focus:outline-none shadow-sm" onchange="updateMunicipiosDropdown(); renderFloodList()">
                 <option value="">Cualquier Provincia</option>
             </select>
-            <select id="fp_municipio" class="w-1/2 bg-slate-900 border border-slate-600 text-slate-300 text-xs rounded-lg px-2 py-1.5 focus:border-blue-500 focus:outline-none" onchange="renderFloodList()">
+            <select id="fp_municipio" class="w-1/2 bg-white border border-slate-300 text-slate-600 text-xs rounded-lg px-2 py-2 focus:border-blue-500 focus:outline-none shadow-sm" onchange="renderFloodList()">
                 <option value="">Cualquier Municipio</option>
             </select>
         </div>
         <div class="flex items-center gap-2">
-            <input type="date" id="fp_date_from" class="w-1/2 bg-slate-900 border border-slate-600 text-slate-400 text-xs rounded-lg px-2 py-1.5 focus:border-blue-500 focus:outline-none" onchange="renderFloodList()">
-            <span class="text-slate-500 text-xs">-</span>
-            <input type="date" id="fp_date_to" class="w-1/2 bg-slate-900 border border-slate-600 text-slate-400 text-xs rounded-lg px-2 py-1.5 focus:border-blue-500 focus:outline-none" onchange="renderFloodList()">
+            <input type="date" id="fp_date_from" class="w-1/2 bg-white border border-slate-300 text-slate-600 text-xs rounded-lg px-2 py-2 focus:border-blue-500 focus:outline-none shadow-sm" onchange="renderFloodList()">
+            <span class="text-slate-400 text-xs">-</span>
+            <input type="date" id="fp_date_to" class="w-1/2 bg-white border border-slate-300 text-slate-600 text-xs rounded-lg px-2 py-2 focus:border-blue-500 focus:outline-none shadow-sm" onchange="renderFloodList()">
         </div>
     </div>
-    <div id="fp_results" class="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-3 bg-slate-900/30">
+    <div id="fp_results" class="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-3 bg-slate-50/50">
         <!-- JS Cards -->
     </div>
 </div>
@@ -357,10 +361,10 @@
     });
 
     function initMap() {
-        // CartoDB Dark Matter para un look "Centro de Comando"
+        // OpenStreetMap para look institucional/claro
         ccMap = L.map('cc-map', { preferCanvas: true }).setView([-17.7833, -63.1821], 12);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; CartoDB',
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap',
             maxZoom: 19
         }).addTo(ccMap);
         
@@ -370,8 +374,8 @@
     function initMiniMap() {
         if (!miniMap) {
             miniMap = L.map('mini-map').setView([-17.7833, -63.1821], 12);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; CartoDB', maxZoom: 19
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap', maxZoom: 19
             }).addTo(miniMap);
 
             const icon = L.divIcon({
@@ -503,10 +507,10 @@
                 const hull = getConvexHull(hullPoints);
                 if (hull && hull.length >= 3) {
                     L.polygon(hull, {
-                        color: isSelected ? '#ffffff' : style.color,
-                        fillColor: isSelected ? '#ffffff' : '#ffffff',
-                        fillOpacity: isSelected ? 0.15 : 0.01,
-                        weight: isSelected ? 5 : 3,
+                        color: isSelected ? '#0f172a' : style.color,
+                        fillColor: isSelected ? '#3b82f6' : style.color,
+                        fillOpacity: isSelected ? 0.2 : 0.05,
+                        weight: isSelected ? 4 : 3,
                         dashArray: isSelected ? '' : '5,5',
                         interactive: true,
                         pane: 'markerPane'
@@ -517,10 +521,10 @@
                 hullPoints.forEach(pt => {
                     L.circle([pt.lat, pt.lng], {
                         radius: 300,
-                        color: isSelected ? '#ffffff' : style.color,
-                        fillColor: isSelected ? '#ffffff' : '#ffffff',
-                        fillOpacity: isSelected ? 0.15 : 0.01,
-                        weight: isSelected ? 5 : 3,
+                        color: isSelected ? '#0f172a' : style.color,
+                        fillColor: isSelected ? '#3b82f6' : style.color,
+                        fillOpacity: isSelected ? 0.2 : 0.05,
+                        weight: isSelected ? 4 : 3,
                         dashArray: isSelected ? '' : '5,5',
                         interactive: true,
                         pane: 'markerPane'
@@ -561,10 +565,10 @@
                     });
                     const marker = L.marker([parseFloat(dano.lat), parseFloat(dano.lng)], {icon: iconDano});
                     marker.bindTooltip(
-                        `<b class="text-orange-400">${dano.tipo_infraestructura.toUpperCase()}</b><br>
-                         <span class="text-slate-300">Estado: <span class="text-white">${dano.estado}</span></span>
-                         ${dano.descripcion ? '<br><span class="text-slate-400 italic mt-1 block">"'+dano.descripcion+'"</span>' : ''}`, 
-                        { direction: 'top', className: 'dark-tooltip' }
+                        `<b class="text-orange-600">${dano.tipo_infraestructura.toUpperCase()}</b><br>
+                         <span class="text-slate-500">Estado: <span class="text-slate-800 font-bold">${dano.estado}</span></span>
+                         ${dano.descripcion ? '<br><span class="text-slate-500 italic mt-1 block">"'+dano.descripcion+'"</span>' : ''}`, 
+                        { direction: 'top', className: 'light-tooltip' }
                     );
                     marker.on('click', (e) => {
                         L.DomEvent.stopPropagation(e); // Aísla el clic para que no seleccione la inundación detrás
@@ -691,38 +695,46 @@
         const activeDans = inun.danos_materiales ? inun.danos_materiales.filter(d => new Date(d.created_at) <= indexDate).length : 0;
 
         panel.innerHTML = `
-            <div class="bg-slate-700/50 p-4 rounded-lg border border-slate-600 mb-4 animate-fade-in">
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm mb-4 animate-fade-in">
                 <div class="flex justify-between items-start mb-2">
-                    <h4 class="text-white font-bold text-lg">Inundación #${inun.id}</h4>
-                    <span class="bg-blue-900 text-blue-200 text-[10px] uppercase px-2 py-1 rounded font-bold">${inun.intensidad_calculada || 'Indeterminado'}</span>
+                    <h4 class="text-slate-800 font-extrabold text-lg flex items-center gap-2">
+                        <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Inundación #${inun.id}
+                    </h4>
+                    <span class="bg-blue-50 text-blue-600 text-[10px] uppercase px-2.5 py-1 rounded-lg font-bold border border-blue-100">${inun.intensidad_calculada || 'Indeterminado'}</span>
                 </div>
-                <p class="text-xs text-slate-300 mb-3 line-clamp-3">${inun.reportes[0] ? (inun.reportes[0].description || 'Evento en progreso...') : 'Sin reportes.'}</p>
+                <p class="text-xs text-slate-500 mb-4 line-clamp-3">${inun.reportes[0] ? (inun.reportes[0].description || 'Evento en progreso...') : 'Sin reportes detallados.'}</p>
                 
-                <div class="grid grid-cols-3 gap-2 mb-3 text-center">
-                    <div class="bg-slate-800 rounded p-2"><span class="block text-sky-400 font-bold">${activeReps}</span><span class="text-[9px] text-slate-400 uppercase">Rep</span></div>
-                    <div class="bg-slate-800 rounded p-2"><span class="block text-red-400 font-bold">${activeVics}</span><span class="text-[9px] text-slate-400 uppercase">Vic</span></div>
-                    <div class="bg-slate-800 rounded p-2"><span class="block text-orange-400 font-bold">${activeDans}</span><span class="text-[9px] text-slate-400 uppercase">Daños</span></div>
+                <div class="grid grid-cols-3 gap-2 mb-4 text-center">
+                    <div class="bg-slate-50 rounded-xl p-2 border border-slate-100 shadow-sm"><span class="block text-sky-500 font-extrabold">${activeReps}</span><span class="text-[9px] text-slate-400 font-bold uppercase">Rep</span></div>
+                    <div class="bg-slate-50 rounded-xl p-2 border border-slate-100 shadow-sm"><span class="block text-rose-500 font-extrabold">${activeVics}</span><span class="text-[9px] text-slate-400 font-bold uppercase">Vic</span></div>
+                    <div class="bg-slate-50 rounded-xl p-2 border border-slate-100 shadow-sm"><span class="block text-orange-500 font-extrabold">${activeDans}</span><span class="text-[9px] text-slate-400 font-bold uppercase">Daños</span></div>
                 </div>
 
+                <a href="/reports/${inun.id}" target="_blank" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl shadow-sm transition-colors flex justify-center items-center gap-2 mb-3 text-sm">
+                    Ver ficha de inundación
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                </a>
+
                 <div class="flex gap-2 mb-4">
-                    <a href="/victimas?inundacion_id=${inun.id}" target="_blank" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] uppercase font-bold py-2 rounded transition-colors text-center border border-slate-600 flex flex-col items-center justify-center gap-1">
+                    <a href="/victimas?inundacion_id=${inun.id}" target="_blank" class="flex-1 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-800 text-[10px] uppercase font-bold py-2 rounded-xl transition-colors text-center border border-slate-200 flex flex-col items-center justify-center gap-1 shadow-sm">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                        Ver Víctimas
+                        Víctimas
                     </a>
-                    <button type="button" onclick="showDamagesForFlood(${inun.id})" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] uppercase font-bold py-2 rounded transition-colors text-center border border-slate-600 flex flex-col items-center justify-center gap-1">
-                        <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
-                        Ver Daños
+                    <button type="button" onclick="showDamagesForFlood(${inun.id})" class="flex-1 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-800 text-[10px] uppercase font-bold py-2 rounded-xl transition-colors text-center border border-slate-200 flex flex-col items-center justify-center gap-1 shadow-sm">
+                        <svg class="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                        Daños
                     </button>
                 </div>
 
                 @if(session('api_user') && (session('api_user')['role'] ?? '') === 'authority')
-                <button onclick="openDamageModalForFlood(${inun.id})" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2 rounded shadow transition-colors flex justify-center items-center gap-2">
+                <button onclick="openDamageModalForFlood(${inun.id})" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-xl border border-slate-200 transition-colors flex justify-center items-center gap-2 text-xs shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                     Añadir Daño Material
                 </button>
                 @endif
             </div>
-            <button onclick="clearSelection()" class="w-full text-xs text-slate-400 hover:text-white underline text-center">Limpiar Selección</button>
+            <button onclick="clearSelection()" class="w-full text-xs font-bold text-slate-400 hover:text-slate-600 underline text-center">Limpiar Selección</button>
         `;
     }
 
