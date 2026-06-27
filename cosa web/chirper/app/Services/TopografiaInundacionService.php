@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Contracts\ElevationProvider;
+use App\Support\PolygonCoordsHelper;
+use App\Support\PolygonSimplifier;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -86,6 +88,8 @@ final class TopografiaInundacionService
         if (count($polygon) < 3) {
             return $this->resultadoFallback($lat, $lng, $fallbackRadius);
         }
+
+        $polygon = PolygonSimplifier::simplificarCoords($polygon);
 
         return [
             'polygon_coords' => $polygon,
@@ -176,11 +180,21 @@ final class TopografiaInundacionService
         }
 
         $esMultipolygon = count($rings) > 1;
+        $polygonCoords = $esMultipolygon ? $rings : ($rings[0] ?? []);
+        $polygonCoords = PolygonSimplifier::simplificarCoords($polygonCoords);
+
+        if (PolygonCoordsHelper::esMultipolygon($polygonCoords)) {
+            $rings = PolygonCoordsHelper::normalizarAnillos($polygonCoords);
+            $esMultipolygon = count($rings) > 1;
+        } else {
+            $rings = PolygonCoordsHelper::normalizarAnillos($polygonCoords);
+            $esMultipolygon = false;
+        }
 
         return [
             'rings' => $rings,
             'es_multipolygon' => $esMultipolygon,
-            'polygon_coords' => $esMultipolygon ? $rings : ($rings[0] ?? []),
+            'polygon_coords' => $polygonCoords,
         ];
     }
 
@@ -635,7 +649,9 @@ final class TopografiaInundacionService
             }
         }
 
-        return $this->chainBoundaryEdges($adjacency);
+        return PolygonSimplifier::simplificarCoords(
+            $this->chainBoundaryEdges($adjacency)
+        );
     }
 
     /**
@@ -675,6 +691,22 @@ final class TopografiaInundacionService
             $currentKey = $nextKey;
             $guard++;
         } while ($currentKey !== $startKey && $guard < 10_000);
+
+        $closed = $currentKey === $startKey && count($polygon) >= 3;
+
+        // Si el contorno no cierra o acumula demasiados vértices (p. ej. 10_000 por
+        // el guard), usamos envolvente convexa de los vértices del borde.
+        if (! $closed || count($polygon) > 400 || $guard >= 9999) {
+            $hullPoints = array_map(
+                fn (string $key): array => $this->parsePointKey($key),
+                array_keys($adjacency)
+            );
+            $hull = PolygonSimplifier::convexHullLatLng($hullPoints);
+
+            if (count($hull) >= 3) {
+                return $hull;
+            }
+        }
 
         return $this->deduplicateConsecutiveVertices($polygon);
     }

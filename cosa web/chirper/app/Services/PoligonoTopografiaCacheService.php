@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Models\Inundacion;
 use App\Models\Reporte;
 use App\Support\PolygonCoordsHelper;
+use App\Support\PolygonSimplifier;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -82,6 +83,15 @@ final class PoligonoTopografiaCacheService
         array $geoJson,
         bool $esFallback,
     ): void {
+        $polygonCoords = PolygonSimplifier::simplificarCoords($polygonCoords);
+        $geoJson = $this->construirGeoJson(
+            $polygonCoords,
+            (float) $reporte->lat_reporte,
+            (float) $reporte->long_reporte,
+            (string) ($reporte->intensidad_propuesta ?? 'media'),
+            $esFallback,
+        );
+
         $reporte->update([
             'polygon_coords' => $polygonCoords,
             'polygon_geojson' => $geoJson,
@@ -102,6 +112,15 @@ final class PoligonoTopografiaCacheService
         array $geoJson,
         bool $esFallback,
     ): void {
+        $polygonCoords = PolygonSimplifier::simplificarCoords($polygonCoords);
+        $geoJson = $this->construirGeoJson(
+            $polygonCoords,
+            (float) $inundacion->latitud,
+            (float) $inundacion->longitud,
+            (string) ($inundacion->intensidadCalculada() ?? 'media'),
+            $esFallback,
+        );
+
         $inundacion->update([
             'polygon_coords' => $polygonCoords,
             'polygon_geojson' => $geoJson,

@@ -775,7 +775,7 @@ window.validateReport = function(id, action) {
 
         <div class="flex-1 overflow-y-auto custom-scrollbar bg-white flex flex-col">
             <!-- Mapa de revisión -->
-            <div class="w-full h-[350px] relative border-b border-gray-200 shrink-0">
+            <div class="w-full h-[350px] relative border-b border-gray-200 shrink-0" wire:ignore>
                 <div id="review-map" class="w-full h-full z-0"></div>
             </div>
 
@@ -887,18 +887,21 @@ window.validateReport = function(id, action) {
         }
 
         function initReviewMap(report) {
-            if (!reviewMap) {
-                reviewMap = L.map('review-map', { zoomControl: false }).setView([-17.7833, -63.1821], 13);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; OpenStreetMap'
-                }).addTo(reviewMap);
-                L.control.zoom({ position: 'topright' }).addTo(reviewMap);
-            } else {
-                reviewMap.eachLayer((layer) => {
-                    if (!layer._url) reviewMap.removeLayer(layer);
-                });
-                reviewPolygons = {};
+            // Reconstruimos el mapa en cada apertura para evitar estados obsoletos:
+            // Livewire puede morfar el DOM entre aperturas y dejar el mapa "muerto"
+            // (desconectado de la vista), lo que impedía dibujar los polígonos.
+            if (reviewMap) {
+                reviewMap.remove();
+                reviewMap = null;
             }
+            reviewPolygons = {};
+
+            reviewMap = L.map('review-map', { zoomControl: false }).setView([-17.7833, -63.1821], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap'
+            }).addTo(reviewMap);
+            L.control.zoom({ position: 'topright' }).addTo(reviewMap);
+
             const latRep = parseFloat(report.lat_reporte);
             const lngRep = parseFloat(report.long_reporte);
             const latUser = parseFloat(report.lat_gps);
@@ -946,31 +949,51 @@ window.validateReport = function(id, action) {
             }
 
             if (report.cercanas && report.cercanas.length > 0) {
+                const baseStyle = { color: '#cbd5e1', fillColor: '#94a3b8', fillOpacity: 0.2, weight: 2, dashArray: '5,5' };
+
                 report.cercanas.forEach(flood => {
                     const latC = parseFloat(flood.latitud);
                     const lngC = parseFloat(flood.longitud);
 
-                    if (flood.polygon_coords && flood.polygon_coords.length >= 3) {
-                        const polygon = L.polygon(flood.polygon_coords, {
-                            color: '#cbd5e1', fillColor: '#94a3b8', fillOpacity: 0.2, weight: 2, dashArray: '5,5'
-                        }).addTo(reviewMap);
-
-                        polygon.on('click', () => selectFloodToLink(flood.id));
-                        polygon.bindTooltip(`Inundación N°${flood.id}`, { className: 'text-xs font-bold' });
-
-                        reviewPolygons[flood.id] = polygon;
-                        bounds.extend(polygon.getBounds());
-                    } else if (!isNaN(latC) && !isNaN(lngC)) {
-                        const circle = L.circle([latC, lngC], {
-                            radius: 150, color: '#cbd5e1', fillColor: '#94a3b8', fillOpacity: 0.2, weight: 2, dashArray: '5,5'
-                        }).addTo(reviewMap);
-
-                        circle.on('click', () => selectFloodToLink(flood.id));
-                        circle.bindTooltip(`Inundación N°${flood.id}`, { className: 'text-xs font-bold' });
-
-                        reviewPolygons[flood.id] = circle;
-                        bounds.extend(circle.getBounds());
+                    // El polígono NO viaja en data-report (sería enorme). Lo buscamos en
+                    // window.floodReports (ya cargado por el mapa) por id.
+                    let floodGeom = null;
+                    if (Array.isArray(window.floodReports)) {
+                        floodGeom = window.floodReports.find(f => String(f.id) === String(flood.id));
                     }
+                    const polygonCoords = floodGeom ? floodGeom.polygon_coords : null;
+
+                    // Normalizamos igual que el mapa principal: soporta anillo simple,
+                    // multipolígono (inundaciones unificadas) y pares [lat,lng] u objetos {lat,lng}.
+                    let rings = (window.normalizePolygonRings)
+                        ? window.normalizePolygonRings(polygonCoords)
+                        : [];
+
+                    // Algunas inundaciones guardan polygon_coords como una grilla densa de
+                    // muestreo (miles de puntos sin orden de contorno). Dibujarla como
+                    // polígono produce una forma auto-intersectada. En esos casos usamos la
+                    // envolvente convexa para representar el área de forma limpia.
+                    rings = rings.map(r => r.length > 400 ? convexHullLatLng(r) : r)
+                                 .filter(r => r && r.length >= 3);
+
+                    let shape = null;
+                    if (rings.length === 1) {
+                        shape = L.polygon(rings[0], baseStyle);
+                    } else if (rings.length > 1) {
+                        // multipolígono: cada anillo es un área separada
+                        shape = L.polygon(rings.map(r => [r]), baseStyle);
+                    } else if (!isNaN(latC) && !isNaN(lngC)) {
+                        shape = L.circle([latC, lngC], { radius: 150, ...baseStyle });
+                    }
+
+                    if (!shape) return;
+
+                    shape.addTo(reviewMap);
+                    shape.on('click', () => selectFloodToLink(flood.id));
+                    shape.bindTooltip(`Inundación N°${flood.id}`, { className: 'text-xs font-bold' });
+
+                    reviewPolygons[flood.id] = shape;
+                    bounds.extend(shape.getBounds());
                 });
             }
 
@@ -999,13 +1022,16 @@ window.validateReport = function(id, action) {
         }
 
         function selectFloodToLink(floodId) {
+            // Reset de TODOS los polígonos dibujados al estilo base.
             Object.keys(reviewPolygons).forEach(idKey => {
                 reviewPolygons[idKey].setStyle({ color: '#cbd5e1', fillColor: '#94a3b8', fillOpacity: 0.2, weight: 2 });
-                const card = document.getElementById(`flood-card-${idKey}`);
-                if (card) {
-                    card.classList.remove('border-blue-500', 'bg-blue-50');
-                    card.classList.add('border-slate-200', 'bg-white');
-                }
+            });
+
+            // Reset de TODAS las tarjetas recorriendo el DOM (no reviewPolygons),
+            // así se limpian aunque una inundación no tenga polígono en el mapa.
+            document.querySelectorAll('#drawer-cercanas-list [id^="flood-card-"]').forEach(card => {
+                card.classList.remove('border-blue-500', 'bg-blue-50');
+                card.classList.add('border-slate-200', 'bg-white');
             });
 
             reviewSelectedFloodId = floodId;
@@ -1024,6 +1050,29 @@ window.validateReport = function(id, action) {
         function updateVincularButton() {
             const btn = document.getElementById('btn-vincular');
             btn.disabled = !reviewSelectedFloodId;
+        }
+
+        // Envolvente convexa (monotone chain) para puntos [lat, lng].
+        // Tratamos lng como X y lat como Y. Devuelve el anillo del casco.
+        function convexHullLatLng(points) {
+            if (!Array.isArray(points) || points.length < 3) return points;
+            const pts = points.slice().sort((a, b) => (a[1] - b[1]) || (a[0] - b[0]));
+            const cross = (o, a, b) => (a[1] - o[1]) * (b[0] - o[0]) - (a[0] - o[0]) * (b[1] - o[1]);
+
+            const lower = [];
+            for (const p of pts) {
+                while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+                lower.push(p);
+            }
+            const upper = [];
+            for (let i = pts.length - 1; i >= 0; i--) {
+                const p = pts[i];
+                while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+                upper.push(p);
+            }
+            lower.pop();
+            upper.pop();
+            return lower.concat(upper);
         }
     </script>
 </div>

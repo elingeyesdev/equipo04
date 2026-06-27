@@ -158,11 +158,14 @@ class ReportsIndex extends Component
                     $a    = sin($dLat / 2) ** 2 + cos($lat1) * cos($lat2) * sin($dLon / 2) ** 2;
                     $dist = 6371000 * 2 * atan2(sqrt($a), sqrt(1 - $a));
                     if ($dist <= 300) {
+                        // No incrustamos polygon_coords aquí: pueden ser enormes
+                        // (miles de puntos) y, multiplicados por reporte en el HTML,
+                        // rompían el render de Livewire. El drawer obtiene el polígono
+                        // desde window.floodReports (ya cargado por el mapa) usando el id.
                         $cercanas[] = [
                             'id'                   => $activa->id,
                             'latitud'              => $activa->latitud,
                             'longitud'             => $activa->longitud,
-                            'polygon_coords'       => $activa->polygon_coords,
                             'intensidad_calculada' => $activa->intensidadCalculada(),
                         ];
                     }
