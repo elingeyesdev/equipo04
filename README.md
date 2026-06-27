@@ -46,6 +46,7 @@ Cuando se valida un reporte, el sistema simula cómo fluye el agua según el ter
 2. Aplica **region growing** sobre una grilla de elevación (celda ≈ 25 m, radio 100/200/300 m según intensidad).
 3. **El agua solo fluye hacia celdas con elevación igual o menor** al epicentro (margen `0.5 m`).
 4. Guarda el polígono en `polygon_coords`. Si la API falla, usa un **fallback geométrico** (`polygon_es_fallback`).
+5. **Simplificación automática** (`PolygonSimplifier`): Douglas-Peucker, máx. 150 vértices/anillo; envolvente convexa si el contorno es demasiado denso.
 
 ### 3. Unificación de Zona (una sola mancha por inundación)
 Los reportes de una misma inundación se muestran como **una sola zona continua**:
@@ -59,6 +60,19 @@ El color representa la **intensidad de la inundación** (voto ponderado por peso
 
 ### 5. Capa de Intervención de Autoridades
 Una Autoridad puede dibujar la zona de desastre manualmente. Si la *Inundación* tiene `polygon_editado_autoridad`, este polígono tiene **absoluta prioridad** y no se sobrescribe en los recálculos automáticos.
+
+### 6. Validación con mapa (Review Drawer)
+Autoridades pueden vincular reportes pendientes usando **"Vincular (Ver Mapa)"**: drawer con mapa Leaflet, inundaciones cercanas seleccionables y confirmación SweetAlert2.
+
+---
+
+## ⚙️ Operación y Configuración Clave
+
+* **Zona horaria:** `America/La_Paz` (UTC‑4) vía `APP_TIMEZONE`.
+* **Colas:** `QUEUE_CONNECTION=database`; requiere `queue_worker` activo.
+* **Recálculo topográfico:** `php artisan topografia:recalcular-inundaciones`
+* **Optimizar polígonos:** `php artisan topografia:simplificar-poligonos --solo-activas`
+* **Tras cambios en Blade:** `php artisan view:clear`
 
 ---
 
@@ -126,7 +140,8 @@ Para maximizar el rendimiento de Docker en Windows, este proyecto se ha configur
 ## 🎨 Arquitectura del Diseño (UI/UX)
 Toda la interfaz del sistema ha sido construida siguiendo estándares **Premium**.
 * Se hace uso intensivo del concepto de **Glassmorphism**: paneles translúcidos (`backdrop-blur`) que flotan sobre un fondo vibrante.
-* Tipografía **Outfit** (Google Fonts) para un aspecto limpio y moderno.
+* Tipografía **Inter / Poppins** (Google Fonts) para un aspecto limpio y moderno.
+* **SweetAlert2** para toasts y confirmaciones.
 * Animaciones orgánicas (`hover:-translate-y`, `transition-all`) para darle reactividad al ecosistema.
 
 ---

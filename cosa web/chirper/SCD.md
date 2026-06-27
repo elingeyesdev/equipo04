@@ -15,7 +15,9 @@ Características diferenciadoras:
 - **Quórum dinámico con TTL**: las inundaciones se confirman/expiran al vuelo según el peso de reportes vivos (3 h).
 - **Topografía inteligente**: polígonos de área inundable calculados por elevación del terreno (SRTM 30 m).
 - **Unificación de zona**: los reportes de una misma inundación se fusionan en una sola mancha mediante cierre morfológico.
+- **Contornos optimizados**: simplificación Douglas-Peucker (≤150 vértices) para rendimiento en mapa, API y Livewire.
 - **Mapa de calor por niveles de intensidad** (baja/media/alta) con leyenda y etiquetas.
+- **Validación geográfica**: drawer con mapa para vincular reportes pendientes a inundaciones cercanas.
 
 ---
 
@@ -86,6 +88,7 @@ flowchart LR
 - **laravel-echo** `^2` + **pusher-js** `^8` (cliente Reverb).
 - **axios**.
 - **Leaflet 1.9.4** + **Leaflet.heat 0.2.0** (cargados por CDN en las vistas de mapa).
+- **SweetAlert2** v11 (CDN en `layouts/app.blade.php`) — toasts globales para mensajes flash y confirmaciones (`confirmForm()`).
 
 ### 3.3 Datos e Infraestructura
 - **PostgreSQL** (campos `jsonb` para polígonos y clima).
@@ -118,9 +121,11 @@ flowchart LR
 ### 4.2 Servicios (`app/Services`)
 - **`TopografiaInundacionService`** — núcleo geoespacial:
   - `calcularResultado()` — region growing sobre grilla de elevación (celda 25 m, tolerancia 0.5 m, radios por intensidad 100/200/300 m); fallback geométrico si no hay datos.
+  - `chainBoundaryEdges()` — extrae el contorno de celdas inundadas; si el contorno no cierra o supera ~400 vértices, usa **envolvente convexa** como fallback (evita polígonos rotos de miles de puntos).
   - `unirPoligonosReportes()` — **cierre morfológico** (rasterizar → dilatar → erosionar → componentes conexas) para fusionar polígonos de reportes en una zona unificada (celda 10 m, puente 100 m). Devuelve `Polygon` o `MultiPolygon`.
+  - Todos los polígonos generados pasan por **`PolygonSimplifier`** antes de persistirse.
 - **`ElevationService`** (implementa `ElevationProvider`) — consulta Open Topo Data por lotes (100 puntos, ~1 req/s) con caché de 24 h.
-- **`PoligonoTopografiaCacheService`** — construye GeoJSON (`Polygon`/`MultiPolygon`) y persiste polígonos en `Reporte`/`Inundacion`.
+- **`PoligonoTopografiaCacheService`** — construye GeoJSON (`Polygon`/`MultiPolygon`), **simplifica** `polygon_coords` y persiste en `Reporte`/`Inundacion`.
 - **`ReporteValidacionService`** — valida/vincula reportes y **dispara los jobs** de topografía (reporte + unión de inundación).
 - **`FloodApiClient`** — puente Web→API interna (reutiliza el kernel HTTP).
 - **`GeoLocationService`** — utilidades de geolocalización.
@@ -128,10 +133,16 @@ flowchart LR
 ### 4.3 Contratos y Soporte
 - **`App\Contracts\ElevationProvider`** — interfaz de proveedor de elevación (enlazada a `ElevationService` en `AppServiceProvider`).
 - **`App\Support\PolygonCoordsHelper`** — normaliza coordenadas single-ring vs MultiPolygon y valida geometría.
+- **`App\Support\PolygonSimplifier`** — reduce contornos densos a polígonos livianos:
+  - **Douglas-Peucker** en metros (tolerancia inicial 2.5 m).
+  - Tope de **150 vértices** por anillo (`MAX_VERTICES`).
+  - Envolvente convexa para anillos >200 puntos (p. ej. contornos fallidos de ~10 000 vértices).
+  - Se aplica al calcular topografía, al persistir y vía comando de mantenimiento.
 
 ### 4.4 Jobs y Comandos
 - **`Jobs\CalcularPoligonoInundacion`** — `ShouldQueue`. Calcula el polígono de un **reporte** (region growing) o de una **inundación** (unión de los polígonos de sus reportes). Reentrante: tras calcular un reporte, re-dispara la unión de su inundación. Respeta `polygon_editado_autoridad`.
 - **`Commands\RecalcularPoligonosInundacion`** (`topografia:recalcular-inundaciones`) — backfill/recálculo manual de polígonos.
+- **`Commands\SimplificarPoligonos`** (`topografia:simplificar-poligonos`) — optimiza `polygon_coords` ya guardados (reportes e inundaciones). Opciones: `--solo-activas`, `--force`. Regenera `polygon_geojson` y caché.
 - **`Commands\UpdateInundacionesStatus`** — actualización periódica de estado.
 - **`Commands\BackfillInundacionMunicipios`** — relleno de municipios.
 
@@ -143,8 +154,15 @@ flowchart LR
 - Auth de sesión (`AuthController`), `reports.*` (Livewire `ReportsIndex` + `ReportController`), `command-center.*`, `vehiculos.*`, `victimas.*`, `inventario.*`, `logistica.*`, `authorities.*`, `chat.*`, `profile.*`, `sugerencias.*`.
 - Proxies: `weather/tiles/...` (`WeatherController`), `api/elevation` (`ElevationController`).
 - Middleware: **`ApiAuthenticate`** (token en sesión), **`EnsureApiAuthority`** (rol autoridad), **`RedirectIfApiAuthenticated`**.
+- **UX global:** SweetAlert2 en `layouts/app.blade.php` — toasts para `session('success'|'error'|'status')` y helper `confirmForm()` para confirmaciones destructivas (p. ej. eliminar víctimas).
 
-### 4.7 Frontend de mapas (`public/js`)
+### 4.7 Livewire — Panel de reportes (`ReportsIndex`)
+- Listado de inundaciones activas/terminadas, reportes pendientes de validación, mapa principal (`<x-reports-map>`).
+- **Reportes activos vs inactivos (TTL):** los inactivos se calculan como **complemento** de los activos (no rechazados), evitando que reportes caducados desaparezcan del historial desplegable.
+- **Review Drawer (validación):** botón **"Vincular (Ver Mapa)"** abre un panel lateral con mapa Leaflet independiente que muestra GPS del reportero, punto del evento, distancia entre ambos e inundaciones cercanas (polígonos desde `window.floodReports`). Permite seleccionar visualmente la inundación destino antes de vincular.
+- Confirmaciones de validación (`validarRapido`) vía SweetAlert2; refresco con `Livewire.dispatch('refreshReports')`.
+
+### 4.8 Frontend de mapas (`public/js`)
 - **`smart-heatmap.js`** — render del mapa de calor. Una **capa por nivel de intensidad** con color azul fijo (baja `#7dd3fc`, media `#0ea5e9`, alta `#1e3a8a`); el peso de cada punto modula sólo la opacidad. Radio del blob fijado en **metros reales** convertidos a píxeles por zoom (mantiene la forma a cualquier escala). Muestreo dentro del polígono (paso 12 m) o fallback geométrico.
 - **`flood-outline.js`** — fusiona en el cliente todos los polígonos de los reportes de una inundación en un **único contorno suavizado** (cierre morfológico + suavizado de Chaikin; convex hull de respaldo). Usado para el contorno de selección y como respaldo de unificación de la zona de calor.
 - **`safe-routing.js`** — rutas seguras (OpenRouteService) evitando inundaciones.
@@ -180,16 +198,16 @@ sequenceDiagram
     C->>W: Crea reporte (lat/lng, intensidad, foto?)
     W->>API: POST /reportes (vía FloodApiClient)
     API->>DB: Guarda Reporte (peso, clima)
-    Note over API,V: Autoridad valida / vincula
+    Note over API,V: Autoridad valida / vincula (drawer con mapa)
     V->>DB: Asocia reporte a Inundación + recalcula centroide
     V->>Q: dispatch(reporte) y dispatch(inundación)
     Q->>J: Procesa reporte
     J->>E: Muestra elevación (region growing)
     E-->>J: Elevaciones (o fallback)
-    J->>DB: Guarda polygon_coords del reporte
+    J->>DB: Guarda polygon_coords del reporte (simplificado)
     J->>Q: dispatch unión inundación
     Q->>J: Procesa inundación
-    J->>DB: Guarda polygon_coords unificado (cierre morfológico)
+    J->>DB: Guarda polygon_coords unificado (cierre morfológico + simplificación)
     M->>API: Lee inundaciones (InundacionResource)
     M->>M: Pinta zona unificada por nivel de intensidad + leyenda
 ```
@@ -204,8 +222,19 @@ sequenceDiagram
 
 ## 7. Procesamiento Asíncrono y Recálculo
 
-- **Automático**: al validar/vincular un reporte, `ReporteValidacionService::dispatchTopografia()` encola el cálculo del reporte y la unión de la inundación; el contenedor `queue_worker` los procesa.
-- **Manual** (backfill/recuperación): `php artisan topografia:recalcular-inundaciones` — útil para datos previos a la lógica de unificación o cuando el worker estuvo caído / la API de elevación falló.
+- **Automático**: al validar/vincular un reporte, `ReporteValidacionService::dispatchTopografia()` encola el cálculo del reporte y la unión de la inundación; el contenedor `queue_worker` los procesa. Los polígonos resultantes se **simplifican** automáticamente (≤150 vértices/anillo).
+- **Manual — recálculo topográfico** (backfill/recuperación):
+  ```bash
+  php artisan topografia:recalcular-inundaciones
+  ```
+  Útil para datos previos a la lógica de unificación o cuando el worker estuvo caído / la API de elevación falló.
+- **Manual — optimización de contornos existentes**:
+  ```bash
+  php artisan topografia:simplificar-poligonos --solo-activas
+  ```
+  Reduce polígonos densos ya guardados (p. ej. contornos rotos de ~10 000 puntos) y regenera GeoJSON/caché. Opción `--force` simplifica aunque el anillo ya sea pequeño.
+
+> **Nota técnica:** si el extractor de contorno (`chainBoundaryEdges`) no cierra el polígono, puede acumular vértices hasta el límite interno (~10 000). La simplificación y el fallback a envolvente convexa convierten esos casos en contornos estables y livianos.
 
 ---
 
@@ -215,6 +244,7 @@ sequenceDiagram
 - **Colas**: `QUEUE_CONNECTION=database` (requiere worker activo).
 - **Claves**: `OPEN_ROUTE_SERVICE_KEY`, `OPENTOPOGRAPHY_API_KEY`, credenciales OpenWeatherMap — solo en `.env`.
 - **Cacheado**: tras cambiar `.env`/config ejecutar `php artisan config:clear` (y reiniciar `queue_worker`).
+- **Vistas compiladas**: tras cambios en Blade, `php artisan view:clear` (especialmente en Docker/WSL si los cambios no se reflejan).
 
 ---
 
@@ -231,7 +261,7 @@ sequenceDiagram
 ```
 cosa web/chirper/
 ├── app/
-│   ├── Console/Commands/      # topografia:recalcular-inundaciones, status, backfill
+│   ├── Console/Commands/      # topografia:recalcular-inundaciones, topografia:simplificar-poligonos, ...
 │   ├── Contracts/             # ElevationProvider
 │   ├── Events/                # ChatMessageSent (Reverb)
 │   ├── Http/
@@ -240,10 +270,12 @@ cosa web/chirper/
 │   │   ├── Middleware/        # ApiAuthenticate, EnsureApiAuthority, ...
 │   │   └── Resources/         # InundacionResource, ...
 │   ├── Jobs/                  # CalcularPoligonoInundacion
+│   ├── Livewire/              # ReportsIndex (panel reportes + validación)
 │   ├── Models/                # Inundacion, Reporte, ...
 │   ├── Providers/             # AppServiceProvider (bind ElevationProvider)
 │   ├── Services/              # Topografia, Elevation, Cache, Validacion, FloodApiClient
-│   └── Support/               # PolygonCoordsHelper
+│   └── Support/               # PolygonCoordsHelper, PolygonSimplifier
+├── tests/Unit/                # TopografiaInundacionServiceTest, PolygonSimplifierTest, ...
 ├── database/migrations/       # esquema (inundaciones, reportes, polígonos, módulos)
 ├── public/js/                 # smart-heatmap.js, flood-outline.js, safe-routing.js
 ├── resources/views/           # Blade (reports, command-center, victimas, vehiculos, ...)

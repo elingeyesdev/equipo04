@@ -46,7 +46,8 @@ Cuando se valida un reporte, el sistema no asume que el agua se queda en un punt
 2. Aplica **region growing** sobre una grilla de elevación (celda ≈ 25 m, radio máximo 100/200/300 m según intensidad baja/media/alta).
 3. Evalúa el terreno: **el agua solo fluye hacia celdas con elevación igual o menor** al epicentro (margen `0.5 m` por bordes de calle/acera).
 4. Genera el polígono del área inundable y lo guarda en `polygon_coords`. Si la API de elevación falla, usa un **fallback geométrico** (círculo) marcado `polygon_es_fallback`.
-5. **Resultado:** en lugar de un círculo perfecto, se obtiene la forma irregular real de cómo se empozó el agua.
+5. **Simplificación automática:** todo contorno pasa por `PolygonSimplifier` (Douglas-Peucker, máx. **150 vértices** por anillo). Si el extractor de borde falla y genera miles de puntos, se usa envolvente convexa como respaldo.
+6. **Resultado:** en lugar de un círculo perfecto, se obtiene la forma irregular real de cómo se empozó el agua, optimizada para mapa y API.
 
 ### 3. Unificación de Zona (una sola mancha por inundación)
 Si llueve fuerte en una avenida habrá múltiples reportes en la misma inundación. El objetivo es mostrarlos como **una sola zona continua**, no como puntos sueltos:
@@ -63,6 +64,14 @@ El color del mapa de calor representa la **intensidad real de la inundación** (
 ### 5. Capa de Intervención de Autoridades
 Una Autoridad puede dibujar manualmente la zona de desastre. Si la *Inundación* tiene un polígono editado por autoridad (`polygon_editado_autoridad`), este tiene **absoluta prioridad** y el sistema **no lo sobrescribe** en los recálculos automáticos.
 
+### 6. Validación de reportes con mapa (Review Drawer)
+En el panel de **reportes pendientes de validación** (autoridades), el botón **"Vincular (Ver Mapa)"** abre un drawer lateral con:
+* Ubicación GPS del reportero vs. punto del evento (con distancia).
+* Inundaciones activas cercanas (≤300 m) dibujadas como polígonos seleccionables.
+* Confirmación con **SweetAlert2** antes de aprobar, vincular o rechazar.
+
+Los reportes vinculados a una inundación se listan como **activos** (dentro del TTL) e **inactivos** (caducados, con botón **Renovar**).
+
 ---
 
 ## ⚙️ Operación y Configuración Clave
@@ -73,8 +82,13 @@ Una Autoridad puede dibujar manualmente la zona de desastre. Si la *Inundación*
   ```bash
   docker compose exec web_app php artisan topografia:recalcular-inundaciones
   ```
+* **Optimizar contornos existentes:** reduce polígonos densos ya guardados y regenera GeoJSON:
+  ```bash
+  docker compose exec web_app php artisan topografia:simplificar-poligonos --solo-activas
+  ```
 * **Claves de API:** se almacenan solo en `.env` (gitignoreado) y se leen vía `config/services.php` (`OPEN_ROUTE_SERVICE_KEY`, `OPENTOPOGRAPHY_API_KEY`, credenciales OpenWeatherMap). No se exponen en el frontend (salvo OpenRouteService, requerida por el cliente para rutas).
 * **Tras cambiar `.env`/config:** `php artisan config:clear` y reinicia `queue_worker`.
+* **Tras cambios en vistas Blade:** `php artisan view:clear` si el navegador no refleja cambios (común en Docker/WSL).
 
 ---
 
@@ -114,7 +128,8 @@ El proyecto utiliza **Laravel Sail**, lo que significa que solo necesitas Docker
 ## 🎨 Arquitectura del Diseño (UI/UX)
 Toda la interfaz del sistema ha sido construida siguiendo estándares **Premium**.
 * Se hace uso intensivo del concepto de **Glassmorphism**: paneles translúcidos (`backdrop-blur`) que flotan sobre un fondo vibrante.
-* Tipografía **Outfit** (Google Fonts) para un aspecto limpio y moderno.
+* Tipografía **Inter / Poppins** (Google Fonts) para un aspecto limpio y moderno.
+* **SweetAlert2** para toasts de éxito/error y confirmaciones (reemplaza `alert()`/`confirm()` nativos en flujos clave).
 * Animaciones orgánicas (`hover:-translate-y`, `transition-all`) para darle reactividad al ecosistema.
 
 ---
