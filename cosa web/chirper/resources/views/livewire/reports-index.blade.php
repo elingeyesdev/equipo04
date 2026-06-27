@@ -221,6 +221,7 @@
                                     <th class="text-left font-semibold px-4 py-3 rounded-tl-xl">ID</th>
                                     <th class="text-left font-semibold px-4 py-3">Estado</th>
                                     <th class="text-left font-semibold px-4 py-3">Intensidad</th>
+                                    <th class="text-left font-semibold px-4 py-3">Detalle</th>
                                     <th class="text-left font-semibold px-4 py-3 rounded-tr-xl">Actualización</th>
                                 </tr>
                             </thead>
@@ -235,12 +236,26 @@
                                                 {{ ucfirst((string) $rep->estado_validacion) }}
                                             </span>
                                         </td>
-                                        <td class="px-4 py-3 font-medium text-slate-600">{{ ucfirst((string) $rep->intensidad_propuesta) }}</td>
+                                        <td class="px-4 py-3 font-medium text-slate-600">
+                                            {{ ucfirst((string) $rep->intensidad_propuesta) }}
+                                            @if($rep->fueAjustado())
+                                                <span class="block text-[11px] text-indigo-600 mt-0.5">Validada: {{ ucfirst((string) $rep->intensidad_validada) }}</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-4 py-3 text-slate-600 text-xs max-w-[14rem]">
+                                            @if((string) $rep->estado_validacion === 'rechazado')
+                                                {{ $rep->motivoRechazo?->label_ciudadano ?? 'Sin motivo registrado.' }}
+                                            @elseif($rep->fueAjustado())
+                                                {{ $rep->ajuste_comentario }}
+                                            @else
+                                                —
+                                            @endif
+                                        </td>
                                         <td class="px-4 py-3 text-slate-500">{{ optional($rep->updated_at)->format('d/m/Y H:i') }}</td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td class="px-4 py-8 text-slate-500 text-center font-medium" colspan="4">Aún no has enviado reportes. ¡Tu reporte salva vidas!</td>
+                                        <td colspan="5" class="px-4 py-8 text-slate-500 text-center font-medium">Aún no has enviado reportes. ¡Tu reporte salva vidas!</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -537,6 +552,18 @@
                                                     </span>
                                                 </div>
                                             </div>
+                                            <div class="flex flex-wrap gap-2 mt-1">
+                                                @if($rep->distancia_gps_metros !== null)
+                                                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">GPS: {{ number_format((float) $rep->distancia_gps_metros, 0) }} m</span>
+                                                @endif
+                                                @if($rep->precipitacionAlReportar() !== null)
+                                                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-700">Lluvia: {{ $rep->precipitacionAlReportar() }} mm</span>
+                                                @endif
+                                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">Peso: {{ $rep->peso }}</span>
+                                                @if(($rep->rechazos_previos ?? 0) > 0)
+                                                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">{{ $rep->rechazos_previos }} rechazo(s) previo(s)</span>
+                                                @endif
+                                            </div>
                                         </div>
                                         <button
                                             type="button"
@@ -553,6 +580,11 @@
                                             data-lat-rep="{{ $rep->lat_reporte }}"
                                             data-lng-rep="{{ $rep->long_reporte }}"
                                             data-has-cercanas="{{ count($rep->cercanas ?? []) > 0 ? '1' : '0' }}"
+                                            data-distancia="{{ $rep->distancia_gps_metros ?? '' }}"
+                                            data-precipitacion="{{ $rep->precipitacionAlReportar() ?? '' }}"
+                                            data-peso="{{ $rep->peso }}"
+                                            data-cercanas="{{ count($rep->cercanas ?? []) }}"
+                                            data-rechazos="{{ $rep->rechazos_previos ?? 0 }}"
                                         >Ver detalle completo</button>
                                     </td>
                                     <td>
@@ -570,7 +602,7 @@
                                     </td>
                                     <td>
                                         <div class="flex flex-col gap-1.5 w-full max-w-[9.5rem]">
-                                            <button type="button" onclick="validarRapido({{ $rep->id }}, 'crear')" class="w-full inline-flex items-center justify-center gap-1.5 btn-report-aprobar px-3 py-2 text-xs rounded-lg font-bold shadow-sm transition-colors">
+                                            <button type="button" onclick="openApproveModal({{ $rep->id }}, 'crear', '{{ $rep->intensidad_propuesta }}')" class="w-full inline-flex items-center justify-center gap-1.5 btn-report-aprobar px-3 py-2 text-xs rounded-lg font-bold shadow-sm transition-colors">
                                                 <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
                                                 Aprobar
                                             </button>
@@ -585,7 +617,7 @@
                                                     Vincular
                                                 </button>
                                             @endif
-                                            <button type="button" onclick="validarRapido({{ $rep->id }}, 'rechazar')" class="w-full inline-flex items-center justify-center gap-1.5 btn-report-rechazar px-3 py-2 text-xs rounded-lg font-bold shadow-sm transition-colors">
+                                            <button type="button" onclick="openRejectModal({{ $rep->id }}, '{{ e($reporterName) }}', {{ $rep->distancia_gps_metros ?? 'null' }}, {{ $rep->precipitacionAlReportar() ?? 'null' }}, {{ $rep->peso }}, {{ count($rep->cercanas ?? []) }}, {{ $rep->rechazos_previos ?? 0 }})" class="w-full inline-flex items-center justify-center gap-1.5 btn-report-rechazar px-3 py-2 text-xs rounded-lg font-bold shadow-sm transition-colors">
                                                 <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
                                                 Rechazar
                                             </button>
@@ -608,11 +640,52 @@
                  PANEL: Reportes Rechazados
             ══════════════════════════════════════════════════════════════════ --}}
             <div class="bg-white rounded border border-gray-200 overflow-hidden mb-10 shadow-sm">
-                <div class="px-6 py-5 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                <div class="px-6 py-5 border-b border-gray-200 flex flex-wrap justify-between items-center gap-3 bg-gray-50">
                     <h2 class="text-xl font-semibold text-gray-800 flex items-center gap-2">
                         Reportes Rechazados
                     </h2>
-                    <span class="bg-blue-100 text-blue-800 py-1 px-3 rounded text-xs font-bold">{{ count($reportesRechazados ?? []) }} registro(s)</span>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="bg-blue-100 text-blue-800 py-1 px-3 rounded text-xs font-bold">{{ count($reportesRechazados ?? []) }} registro(s)</span>
+                        <button type="button" wire:click="exportRechazadosCsv" wire:loading.attr="disabled" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-50">
+                            <span wire:loading.remove wire:target="exportRechazadosCsv">Exportar CSV</span>
+                            <span wire:loading wire:target="exportRechazadosCsv">Exportando...</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="px-4 py-3 border-b border-gray-100 bg-slate-50/80">
+                    <div class="flex flex-wrap items-end gap-3">
+                        <div class="min-w-[10rem]">
+                            <label class="report-field-label">Motivo</label>
+                            <select wire:model.live="filtroRechazoMotivo" class="w-full text-xs rounded border-slate-200">
+                                <option value="">Todos</option>
+                                @foreach(($motivosRechazo ?? []) as $motivo)
+                                    <option value="{{ $motivo->codigo }}">{{ $motivo->label_autoridad }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="min-w-[10rem]">
+                            <label class="report-field-label">Validador</label>
+                            <select wire:model.live="filtroRechazoValidador" class="w-full text-xs rounded border-slate-200">
+                                <option value="">Todos</option>
+                                @foreach(($validadoresRechazo ?? []) as $validador)
+                                    <option value="{{ $validador->carnet }}">{{ $validador->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="report-field-label">Desde</label>
+                            <input type="date" wire:model.live="filtroRechazoDesde" class="text-xs rounded border-slate-200">
+                        </div>
+                        <div>
+                            <label class="report-field-label">Hasta</label>
+                            <input type="date" wire:model.live="filtroRechazoHasta" class="text-xs rounded border-slate-200">
+                        </div>
+                        @if($filtroRechazoMotivo || $filtroRechazoValidador || $filtroRechazoDesde || $filtroRechazoHasta)
+                            <button type="button" wire:click="limpiarFiltrosRechazados" class="text-xs font-bold text-slate-500 hover:text-slate-700 underline pb-1">
+                                Limpiar filtros
+                            </button>
+                        @endif
+                    </div>
                 </div>
                 <div class="overflow-x-auto p-2">
                     <table class="w-full text-sm glass-table rounded-xl overflow-hidden report-validation-table">
@@ -639,7 +712,7 @@
                                         default => 'intensity-pill-baja',
                                     };
                                 @endphp
-                                <tr class="transition-colors duration-200 hover:bg-white/30">
+                                <tr class="transition-colors duration-200 hover:bg-white/30" wire:key="rejected-report-{{ $rep->id }}">
                                     <td>
                                         <div class="w-[4.5rem] md:w-24 flex-shrink-0 flex items-center justify-center bg-white/50 border border-white/60 rounded-xl overflow-hidden h-[4.5rem] md:h-24 shadow-sm">
                                             @if($rep->foto_path)
@@ -665,8 +738,19 @@
                                             </div>
                                             <div>
                                                 <span class="report-field-label">Rechazado</span>
-                                                <p class="report-field-value">{{ $rep->updated_at->format('d/m/Y H:i') }}</p>
+                                                <p class="report-field-value">{{ optional($rep->rechazado_at ?? $rep->updated_at)->format('d/m/Y H:i') }}</p>
                                             </div>
+                                            <div>
+                                                <span class="report-field-label">Rechazado por</span>
+                                                <p class="report-field-value truncate max-w-[10rem]" title="{{ $rep->validador?->name ?? '—' }}">{{ $rep->validador?->name ?? '—' }}</p>
+                                            </div>
+                                            <div>
+                                                <span class="report-field-label">Motivo</span>
+                                                <p class="report-field-value text-xs leading-snug">{{ $rep->motivoRechazo?->label_autoridad ?? '—' }}</p>
+                                            </div>
+                                            <button type="button" wire:click="verHistorial({{ $rep->id }})" class="mt-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 underline">
+                                                Ver historial
+                                            </button>
                                         </div>
                                     </td>
                                     <td class="min-w-[11rem] max-w-[16rem]">
@@ -687,6 +771,18 @@
                                                     </span>
                                                 </div>
                                             </div>
+                                            @if($rep->motivo_rechazo_texto)
+                                                <p class="text-[11px] text-slate-500 italic">{{ $rep->motivo_rechazo_texto }}</p>
+                                            @endif
+                                            <div class="flex flex-wrap gap-2">
+                                                @if($rep->distancia_gps_metros !== null)
+                                                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">GPS: {{ number_format((float) $rep->distancia_gps_metros, 0) }} m</span>
+                                                @endif
+                                                @if($rep->precipitacionAlReportar() !== null)
+                                                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-700">Lluvia: {{ $rep->precipitacionAlReportar() }} mm</span>
+                                                @endif
+                                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">Peso: {{ $rep->peso }}</span>
+                                            </div>
                                         </div>
                                     </td>
                                     <td>
@@ -704,6 +800,25 @@
                                     </td>
                                     <td>
                                         <form wire:submit.prevent="updateEstadoValidacion({{ $rep->id }})" class="report-validation-form flex flex-col gap-2 w-full max-w-[9.5rem]">
+                                            <div>
+                                                <label class="report-field-label">Motivo rechazo</label>
+                                                <select wire:model="motivoRechazoUpdates.{{ $rep->id }}">
+                                                    <option value="">Seleccionar...</option>
+                                                    @foreach(($motivosRechazo ?? []) as $motivo)
+                                                        <option value="{{ $motivo->codigo }}">{{ $motivo->label_autoridad }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="report-field-label">Nota del motivo</label>
+                                                <textarea wire:model="motivoTextoUpdates.{{ $rep->id }}" rows="2" class="w-full text-xs rounded border-slate-200" placeholder="Detalle opcional u obligatorio según motivo"></textarea>
+                                            </div>
+                                            @if(($estadoValidacionUpdates[$rep->id] ?? 'rechazado') === 'pendiente')
+                                                <div>
+                                                    <label class="report-field-label">Motivo reversión</label>
+                                                    <textarea wire:model="reversionTextoUpdates.{{ $rep->id }}" rows="2" class="w-full text-xs rounded border-slate-200" placeholder="Por qué vuelve a pendiente"></textarea>
+                                                </div>
+                                            @endif
                                             <div>
                                                 <label class="report-field-label">Estado</label>
                                                 <select wire:model="estadoValidacionUpdates.{{ $rep->id }}">
@@ -742,6 +857,58 @@
                     </table>
                 </div>
             </div>
+
+            {{-- Modal historial de validación --}}
+            @if($historialReporteId)
+                <div class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40" wire:click.self="cerrarHistorial">
+                    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col" wire:click.stop>
+                        <div class="px-5 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                            <h3 class="text-lg font-bold text-gray-800">Historial de validación — Reporte N°{{ $historialReporteId }}</h3>
+                            <button type="button" wire:click="cerrarHistorial" class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+                        </div>
+                        <div class="overflow-y-auto p-5 space-y-3">
+                            @forelse($historialEntradas as $entry)
+                                @php
+                                    $accionLabel = match ($entry['accion'] ?? '') {
+                                        'rechazar' => 'Rechazo',
+                                        'aprobar_crear' => 'Aprobación (nueva inundación)',
+                                        'aprobar_vincular' => 'Aprobación (vinculado)',
+                                        'aprobar_con_ajuste' => 'Aprobación con ajuste',
+                                        'revertir_pendiente' => 'Reversión a pendiente',
+                                        're_rechazar' => 'Re-rechazo',
+                                        default => ucfirst(str_replace('_', ' ', (string) ($entry['accion'] ?? ''))),
+                                    };
+                                @endphp
+                                <div class="border border-slate-200 rounded-lg p-3 bg-slate-50/50">
+                                    <div class="flex flex-wrap justify-between gap-2 mb-1">
+                                        <span class="text-xs font-bold text-indigo-700">{{ $accionLabel }}</span>
+                                        <span class="text-[11px] text-slate-500">{{ $entry['fecha'] ?? '—' }}</span>
+                                    </div>
+                                    <p class="text-xs text-slate-600">
+                                        <span class="font-semibold">Estado:</span>
+                                        {{ $entry['estado_anterior'] ?? '—' }} → {{ $entry['estado_nuevo'] ?? '—' }}
+                                    </p>
+                                    <p class="text-xs text-slate-600"><span class="font-semibold">Validador:</span> {{ $entry['validador'] ?? '—' }}</p>
+                                    @if(!empty($entry['motivo']))
+                                        <p class="text-xs text-slate-600"><span class="font-semibold">Motivo:</span> {{ $entry['motivo'] }}</p>
+                                    @endif
+                                    @if(!empty($entry['intensidad_propuesta']) || !empty($entry['intensidad_validada']))
+                                        <p class="text-xs text-slate-600">
+                                            <span class="font-semibold">Intensidad:</span>
+                                            {{ ucfirst((string) ($entry['intensidad_propuesta'] ?? '—')) }}
+                                            @if(!empty($entry['intensidad_validada']) && ($entry['intensidad_validada'] ?? '') !== ($entry['intensidad_propuesta'] ?? ''))
+                                                → {{ ucfirst((string) $entry['intensidad_validada']) }}
+                                            @endif
+                                        </p>
+                                    @endif
+                                </div>
+                            @empty
+                                <p class="text-sm text-slate-500 text-center py-6">Sin entradas en el historial.</p>
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
+            @endif
 
             @endif {{-- end authority --}}
 
@@ -866,35 +1033,19 @@ window.renderPendingReports = function(pendingData) {
             iconAnchor: [8, 8]
         });
 
-        const contentStr = '<div class="max-w-xs"><p class="font-semibold text-sm mb-1 text-orange-600">Reporte Pendiente</p><p class="text-xs text-gray-600 mb-2"><b>Intensidad Propuesta:</b> ' + report.intensidad_propuesta + '</p><div class="flex flex-col space-y-2 mt-2"><button onclick="validateReport(' + report.id + ', \'vincular\');" class="bg-blue-500 text-white px-2 py-1 text-xs rounded">Vincular a Cercana</button><button onclick="validateReport(' + report.id + ', \'crear\');" class="bg-green-500 text-white px-2 py-1 text-xs rounded">Crear Nueva</button><button onclick="validateReport(' + report.id + ', \'rechazar\');" class="bg-red-500 text-white px-2 py-1 text-xs rounded">Rechazar</button></div></div>';
+        const contentStr = '<div class="max-w-xs"><p class="font-semibold text-sm mb-1 text-orange-600">Reporte Pendiente</p><p class="text-xs text-gray-600 mb-2"><b>Intensidad Propuesta:</b> ' + report.intensidad_propuesta + '</p><div class="flex flex-col space-y-2 mt-2"><button onclick="validateReport(' + report.id + ', \'vincular\', \'' + report.intensidad_propuesta + '\');" class="bg-blue-500 text-white px-2 py-1 text-xs rounded">Vincular a Cercana</button><button onclick="validateReport(' + report.id + ', \'crear\', \'' + report.intensidad_propuesta + '\');" class="bg-green-500 text-white px-2 py-1 text-xs rounded">Crear Nueva</button><button onclick="validateReport(' + report.id + ', \'rechazar\', \'' + report.intensidad_propuesta + '\');" class="bg-red-500 text-white px-2 py-1 text-xs rounded">Rechazar</button></div></div>';
 
         const marker = L.marker([lat, lng], { icon: customIcon }).bindPopup(contentStr, { minWidth: 200 });
         if (window.mapObj) window.mapObj.addLayer(marker);
     });
 };
 
-window.validateReport = function(id, action) {
-    let body = { action: action };
-    if (action === 'vincular') {
-        const inundacion_id = prompt('Ingrese el ID de la inundación a la que desea vincular:');
-        if (!inundacion_id) return;
-        body.inundacion_id = inundacion_id;
+window.validateReport = function(id, action, intensidadPropuesta) {
+    if (action === 'rechazar') {
+        openRejectModal(id, 'Ciudadano', null, null, 1, 0, 0);
+        return;
     }
-
-    fetch('/api/reportes/' + id + '/validar', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': 'Bearer {{ session("api_token") }}'
-        },
-        body: JSON.stringify(body)
-    })
-    .then(res => res.json())
-    .then(data => {
-        alert(data.message);
-        location.reload();
-    });
+    openApproveModal(id, action, intensidadPropuesta || 'media');
 };
 </script>
 
@@ -909,9 +1060,24 @@ window.validateReport = function(id, action) {
             }
         }
 
-        function initReportLocationMinimap(containerEl, coords) {
+        function pruneReportMinimaps() {
+            reportMinimaps.forEach((map, id) => {
+                const el = document.getElementById(id);
+                if (!el || !el.isConnected) {
+                    map.remove();
+                    reportMinimaps.delete(id);
+                }
+            });
+        }
+
+        function initReportLocationMinimap(containerEl, coords, force = false) {
             const id = containerEl.id;
             if (!id) return;
+
+            const existing = reportMinimaps.get(id);
+            if (!force && existing && containerEl.querySelector('.leaflet-container') && containerEl.isConnected) {
+                return existing;
+            }
 
             destroyReportMinimap(id);
 
@@ -1017,18 +1183,40 @@ window.validateReport = function(id, action) {
         }
 
         function initAllReportMinimaps(force = false) {
+            pruneReportMinimaps();
             document.querySelectorAll('.report-location-minimap').forEach((el) => {
                 if (!el.id) return;
-                const hasMap = el.querySelector('.leaflet-container');
-                if (force || !hasMap) {
+                if (!force && reportMinimaps.has(el.id) && el.querySelector('.leaflet-container')) {
+                    return;
+                }
+                if (force || !el.querySelector('.leaflet-container')) {
+                    initReportLocationMinimap(el, {
+                        latGps: el.dataset.latGps,
+                        lngGps: el.dataset.lngGps,
+                        latRep: el.dataset.latRep,
+                        lngRep: el.dataset.lngRep,
+                    }, force);
+                }
+            });
+        }
+
+        let minimapMorphTimer = null;
+        function scheduleMinimapInitForNewOnly() {
+            clearTimeout(minimapMorphTimer);
+            minimapMorphTimer = setTimeout(() => {
+                pruneReportMinimaps();
+                document.querySelectorAll('.report-location-minimap').forEach((el) => {
+                    if (!el.id || el.querySelector('.leaflet-container') || reportMinimaps.has(el.id)) {
+                        return;
+                    }
                     initReportLocationMinimap(el, {
                         latGps: el.dataset.latGps,
                         lngGps: el.dataset.lngGps,
                         latRep: el.dataset.latRep,
                         lngRep: el.dataset.lngRep,
                     });
-                }
-            });
+                });
+            }, 200);
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -1040,8 +1228,13 @@ window.validateReport = function(id, action) {
             Livewire.on('refreshReports', () => {
                 setTimeout(() => initAllReportMinimaps(true), 100);
             });
+            Livewire.on('reporte-ttl-renovado', ({ reporteId }) => {
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire('¡Listo!', 'Reporte #' + reporteId + ' renovado. TTL extendido 3 horas.', 'success');
+                }
+            });
             Livewire.hook('morph.updated', () => {
-                setTimeout(() => initAllReportMinimaps(false), 50);
+                scheduleMinimapInitForNewOnly();
             });
         });
 
@@ -1057,43 +1250,129 @@ window.validateReport = function(id, action) {
             }
         }
 
-        function validarRapido(id, action, inundacion_id = null) {
-            let body = { action: action };
+        const motivosRechazo = @json(($motivosRechazo ?? collect())->values());
+        let pendingValidation = { id: null, action: null, inundacionId: null, intensidadPropuesta: 'media' };
+
+        function postValidar(body) {
+            return fetch('/api/reportes/' + body.reportId + '/validar', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'Authorization': 'Bearer {{ session("api_token") }}'
+                },
+                body: JSON.stringify(body.payload)
+            }).then(async (res) => {
+                const data = await res.json();
+                if (!res.ok) {
+                    const msg = data.errors ? Object.values(data.errors).flat().join(' ') : (data.message || 'Error al procesar.');
+                    throw new Error(msg);
+                }
+                return data;
+            });
+        }
+
+        function validarRapido(id, action, inundacion_id = null, extra = {}) {
+            const payload = Object.assign({ action: action }, extra);
             if (action === 'vincular') {
                 if (!inundacion_id) return;
-                body.inundacion_id = inundacion_id;
+                payload.inundacion_id = inundacion_id;
             }
 
-            Swal.fire({
-                title: '¿Estás seguro?',
-                text: '¿Deseas ' + action + ' este reporte?',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#3085d6',
-                cancelButtonColor: '#d33',
-                confirmButtonText: 'Sí, continuar',
-                cancelButtonText: 'Cancelar'
-            }).then((result) => {
-                if (!result.isConfirmed) return;
-
-                fetch('/api/reportes/' + id + '/validar', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'Authorization': 'Bearer {{ session("api_token") }}'
-                    },
-                    body: JSON.stringify(body)
-                })
-                .then(res => res.json())
-                .then(data => {
+            postValidar({ reportId: id, payload: payload })
+                .then((data) => {
                     Swal.fire('¡Listo!', data.message, 'success');
                     Livewire.dispatch('refreshReports');
                 })
-                .catch(() => {
-                    Swal.fire('Error', 'Ocurrió un error al procesar la solicitud.', 'error');
+                .catch((err) => {
+                    Swal.fire('Error', err.message || 'Ocurrió un error al procesar la solicitud.', 'error');
                 });
+        }
+
+        function openRejectModal(id, reporter, distancia, precipitacion, peso, cercanas, rechazos) {
+            pendingValidation = { id: id, action: 'rechazar', inundacionId: null, intensidadPropuesta: 'media' };
+            document.getElementById('rejectReportId').textContent = 'N°' + id;
+            document.getElementById('rejectContext').innerHTML =
+                '<p><strong>Reportado por:</strong> ' + reporter + '</p>' +
+                (distancia !== null ? '<p><strong>Distancia GPS:</strong> ' + Math.round(distancia) + ' m</p>' : '') +
+                (precipitacion !== null ? '<p><strong>Precipitación:</strong> ' + precipitacion + ' mm</p>' : '') +
+                '<p><strong>Peso:</strong> ' + peso + '</p>' +
+                (cercanas > 0 ? '<p class="text-amber-700"><strong>Atención:</strong> ' + cercanas + ' inundación(es) activa(s) a ≤300 m.</p>' : '') +
+                (rechazos > 0 ? '<p class="text-amber-700"><strong>Historial:</strong> ' + rechazos + ' rechazo(s) previo(s) del ciudadano.</p>' : '');
+
+            const select = document.getElementById('rejectMotivoCodigo');
+            select.innerHTML = '<option value="">Seleccionar motivo...</option>';
+            motivosRechazo.forEach((m) => {
+                select.innerHTML += '<option value="' + m.codigo + '" data-requiere-nota="' + (m.requiere_nota ? '1' : '0') + '">' + m.label_autoridad + '</option>';
             });
+            document.getElementById('rejectMotivoTexto').value = '';
+            document.getElementById('rejectModal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('rejectModal').classList.remove('opacity-0'), 10);
+        }
+
+        function closeRejectModal() {
+            const modal = document.getElementById('rejectModal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 200);
+        }
+
+        function confirmRejectModal() {
+            const codigo = document.getElementById('rejectMotivoCodigo').value;
+            const texto = document.getElementById('rejectMotivoTexto').value.trim();
+            const option = document.getElementById('rejectMotivoCodigo').selectedOptions[0];
+            const requiereNota = option && option.dataset.requiereNota === '1';
+
+            if (!codigo) {
+                Swal.fire('Motivo requerido', 'Selecciona un motivo de rechazo.', 'warning');
+                return;
+            }
+            if (requiereNota && texto.length < 5) {
+                Swal.fire('Nota requerida', 'Este motivo requiere una nota más detallada.', 'warning');
+                return;
+            }
+
+            validarRapido(pendingValidation.id, 'rechazar', null, {
+                motivo_codigo: codigo,
+                motivo_texto: texto || null,
+            });
+            closeRejectModal();
+        }
+
+        function openApproveModal(id, action, intensidadPropuesta, inundacionId = null) {
+            pendingValidation = { id: id, action: action, inundacionId: inundacionId, intensidadPropuesta: intensidadPropuesta || 'media' };
+            document.getElementById('approveReportId').textContent = 'N°' + id;
+            document.getElementById('approveIntensidadPropuesta').textContent = (intensidadPropuesta || 'media').charAt(0).toUpperCase() + (intensidadPropuesta || 'media').slice(1);
+            document.getElementById('approveAjusteToggle').checked = false;
+            document.getElementById('approveAjusteFields').classList.add('hidden');
+            document.getElementById('approveIntensidadValidada').value = intensidadPropuesta || 'media';
+            document.getElementById('approveComentario').value = '';
+            document.getElementById('approveModal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('approveModal').classList.remove('opacity-0'), 10);
+        }
+
+        function closeApproveModal() {
+            const modal = document.getElementById('approveModal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 200);
+        }
+
+        function toggleApproveAjuste() {
+            const checked = document.getElementById('approveAjusteToggle').checked;
+            document.getElementById('approveAjusteFields').classList.toggle('hidden', !checked);
+        }
+
+        function confirmApproveModal() {
+            const payload = { action: pendingValidation.action };
+            if (pendingValidation.action === 'vincular' && pendingValidation.inundacionId) {
+                payload.inundacion_id = pendingValidation.inundacionId;
+            }
+            if (document.getElementById('approveAjusteToggle').checked) {
+                payload.intensidad_validada = document.getElementById('approveIntensidadValidada').value;
+                payload.ajuste_comentario = document.getElementById('approveComentario').value.trim();
+            }
+            validarRapido(pendingValidation.id, pendingValidation.action, pendingValidation.inundacionId, payload);
+            closeApproveModal();
+            closeReportDetailModal();
         }
 
 
@@ -1175,13 +1454,13 @@ window.validateReport = function(id, action) {
 
         function reportDetailAprobar() {
             if (!reportDetailCurrentData) return;
-            validarRapido(reportDetailCurrentData.id, 'crear');
-            closeReportDetailModal();
+            const intensity = document.getElementById('reportDetailIntensity').textContent.toLowerCase();
+            openApproveModal(reportDetailCurrentData.id, 'crear', intensity);
         }
 
         function reportDetailRechazar() {
             if (!reportDetailCurrentData) return;
-            validarRapido(reportDetailCurrentData.id, 'rechazar');
+            openRejectModal(reportDetailCurrentData.id, document.getElementById('reportDetailReporter').textContent, null, null, 1, 0, 0);
             closeReportDetailModal();
         }
 
@@ -1202,6 +1481,64 @@ window.validateReport = function(id, action) {
             }, 300);
         }
     </script>
+
+    <!-- Reject Modal -->
+    <div id="rejectModal" class="fixed inset-0 z-[10001] hidden bg-slate-900/90 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity duration-300 opacity-0" onclick="closeRejectModal()">
+        <div class="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden" onclick="event.stopPropagation()">
+            <div class="px-5 py-4 border-b border-slate-200 bg-slate-50">
+                <h3 class="text-base font-bold text-slate-800">Rechazar reporte <span id="rejectReportId"></span></h3>
+            </div>
+            <div class="p-5 space-y-4">
+                <div id="rejectContext" class="text-xs text-slate-600 space-y-1 bg-slate-50 rounded-lg p-3"></div>
+                <div>
+                    <label class="report-field-label">Motivo de rechazo</label>
+                    <select id="rejectMotivoCodigo" class="w-full mt-1 rounded border-slate-200 text-sm"></select>
+                </div>
+                <div>
+                    <label class="report-field-label">Nota (si aplica)</label>
+                    <textarea id="rejectMotivoTexto" rows="3" class="w-full mt-1 rounded border-slate-200 text-sm" placeholder="Detalle adicional"></textarea>
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" onclick="closeRejectModal()" class="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-200 text-slate-600">Cancelar</button>
+                    <button type="button" onclick="confirmRejectModal()" class="flex-1 px-3 py-2 text-sm rounded-lg btn-report-rechazar font-bold">Confirmar rechazo</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Approve Modal -->
+    <div id="approveModal" class="fixed inset-0 z-[10001] hidden bg-slate-900/90 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity duration-300 opacity-0" onclick="closeApproveModal()">
+        <div class="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden" onclick="event.stopPropagation()">
+            <div class="px-5 py-4 border-b border-slate-200 bg-slate-50">
+                <h3 class="text-base font-bold text-slate-800">Aprobar reporte <span id="approveReportId"></span></h3>
+            </div>
+            <div class="p-5 space-y-4">
+                <p class="text-sm text-slate-600">Intensidad propuesta: <strong id="approveIntensidadPropuesta"></strong></p>
+                <label class="flex items-center gap-2 text-sm text-slate-700">
+                    <input type="checkbox" id="approveAjusteToggle" onchange="toggleApproveAjuste()" class="rounded border-slate-300">
+                    Ajustar intensidad validada
+                </label>
+                <div id="approveAjusteFields" class="hidden space-y-3">
+                    <div>
+                        <label class="report-field-label">Intensidad validada</label>
+                        <select id="approveIntensidadValidada" class="w-full mt-1 rounded border-slate-200 text-sm">
+                            <option value="baja">Baja</option>
+                            <option value="media">Media</option>
+                            <option value="alta">Alta</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="report-field-label">Comentario del ajuste</label>
+                        <textarea id="approveComentario" rows="3" class="w-full mt-1 rounded border-slate-200 text-sm" placeholder="Explica por qué corriges la intensidad (mín. 10 caracteres)"></textarea>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" onclick="closeApproveModal()" class="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-200 text-slate-600">Cancelar</button>
+                    <button type="button" onclick="confirmApproveModal()" class="flex-1 px-3 py-2 text-sm rounded-lg btn-report-aprobar font-bold text-white">Confirmar aprobación</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Image Modal -->
     <div id="imageModal" class="fixed inset-0 z-[10000] hidden bg-slate-900/90 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity duration-300 opacity-0" onclick="closeImageModal()">
@@ -1388,7 +1725,7 @@ window.validateReport = function(id, action) {
             document.getElementById('btn-vincular').onclick = () => {
                 if (reviewSelectedFloodId) {
                     closeReviewDrawer();
-                    validarRapido(id, 'vincular', reviewSelectedFloodId);
+                    openApproveModal(id, 'vincular', reportData.intensidad_propuesta || 'media', reviewSelectedFloodId);
                 }
             };
 

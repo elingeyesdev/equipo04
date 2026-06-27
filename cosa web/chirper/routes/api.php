@@ -31,6 +31,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Nuevas rutas de validación de reportes rápidos (Autoridad)
     Route::get('reportes/pendientes', [ReporteController::class, 'pending']);
+    Route::get('reportes/motivos-rechazo', [ReporteController::class, 'motivosRechazo']);
     Route::post('reportes/{id}/validar', [ReporteController::class, 'validateReport']);
 
     // Logística: Centros de Asistencia / Acopio

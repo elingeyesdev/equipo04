@@ -298,6 +298,28 @@ sequenceDiagram
 - **Cacheado**: tras cambiar `.env`/config ejecutar `php artisan config:clear` (y reiniciar `queue_worker`).
 - **Vistas compiladas**: tras cambios en Blade, `php artisan view:clear` (especialmente en Docker/WSL si los cambios no se reflejan).
 
+### 8.1 Resguardo de datos (PostgreSQL / Docker)
+
+El stack de [`docker-compose.yml`](../../docker-compose.yml) (carpeta `equipo04/`) persiste PostgreSQL en el volumen nombrado **`equipo04_pgdata`**. Cada clon o carpeta distinta del repo puede crear **otro volumen** (p. ej. `cambios_equipo04_pgdata`) con datos **antiguos de otra copia del proyecto**; no asumir que ese volumen es el entorno activo.
+
+**Comandos que pueden vaciar la BD de desarrollo:**
+
+| Comando | Riesgo |
+|---------|--------|
+| `docker compose down -v` | **Elimina el volumen** `equipo04_pgdata` y todos los datos. |
+| `php artisan migrate:fresh` / `migrate:fresh --seed` | Borra todas las tablas y las recrea vacías. |
+| `php artisan test` **dentro de `web_app`** si los tests usan `RefreshDatabase` contra PostgreSQL | Puede ejecutar `migrate:fresh` sobre la BD real (ver `phpunit.xml`: debe ser `sqlite` + `:memory:`). |
+
+**Buenas prácticas:**
+
+1. **Nunca** usar `docker compose down -v` salvo que quieras borrar la BD a propósito.
+2. Ejecutar tests **desde el host** (con `phpunit.xml` apuntando a SQLite) o verificar antes de correr tests en Docker que `config('database.default')` sea `sqlite`.
+3. Tras `migrate` en desarrollo, si la BD quedó vacía, repoblar con `php artisan db:seed` (desde `equipo04/`: `docker compose exec web_app php artisan db:seed`).
+4. Para inspeccionar volúmenes sin tocarlos: `docker volume ls` y comparar fechas de reportes con `psql` solo en el volumen que usa **este** compose (`equipo04_pgdata`).
+5. **No reasignar** el volumen del compose a otro nombre (`external: true`) sin confirmar fechas de `reportes.updated_at`; un volumen viejo puede ser de otra copia del repo.
+
+**Incidente conocido (jun 2026):** tras `migrate` + `db:seed --class=MotivoRechazoSeeder` + `php artisan test` en el contenedor, la BD activa (`equipo04_pgdata`) quedó con esquema migrado pero **sin usuarios ni reportes**. Causa probable: `RefreshDatabase` en tests apuntando a PostgreSQL de desarrollo. Los tests del repo deben usar SQLite en memoria (`phpunit.xml`); los Feature tests incluyen una guarda que aborta si la conexión no es `sqlite`.
+
 ---
 
 ## 9. Autenticación y Roles

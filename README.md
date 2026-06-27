@@ -105,12 +105,14 @@ Botón **Vincular** → panel lateral con mapa ampliado, inundaciones cercanas (
 - **Tras cambios en Blade:** `php artisan view:clear`
 - **Tras `.env`/config:** `php artisan config:clear` y reiniciar `queue_worker`
 
-Con Docker (desde `cosa web/chirper`):
+Con Docker (desde la carpeta **`equipo04/`**, donde está `docker-compose.yml`):
 
 ```bash
 docker compose exec web_app php artisan topografia:recalcular-inundaciones
 docker compose exec web_app php artisan topografia:simplificar-poligonos --solo-activas
 ```
+
+> **Datos:** la BD vive en el volumen Docker `equipo04_pgdata`. No uses `docker compose down -v`. No ejecutes `php artisan test` dentro del contenedor salvo que confirmes SQLite de test (ver [SCD §8.1](cosa%20web/chirper/SCD.md)). Si la BD quedó vacía: `docker compose exec web_app php artisan db:seed`.
 
 ---
 

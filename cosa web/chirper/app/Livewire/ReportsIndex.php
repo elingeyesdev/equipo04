@@ -6,10 +6,15 @@ use Livewire\Component;
 use Livewire\WithPagination;
 use Livewire\Attributes\On;
 use App\Models\Inundacion;
+use App\Models\MotivoRechazo;
 use App\Models\Reporte;
+use App\Models\ReporteValidacionHistorial;
+use App\Models\User;
 use App\Services\FloodApiClient;
 use App\Services\ReporteValidacionService;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportsIndex extends Component
 {
@@ -18,9 +23,21 @@ class ReportsIndex extends Component
     public $role = '';
     public $carnet = '';
 
-    // Estado para el panel de rechazados
     public $estadoValidacionUpdates = [];
     public $inundacionVincularIds = [];
+    public $motivoRechazoUpdates = [];
+    public $motivoTextoUpdates = [];
+    public $reversionTextoUpdates = [];
+
+    /** Filtros panel reportes rechazados (fase 3) */
+    public $filtroRechazoMotivo = '';
+    public $filtroRechazoValidador = '';
+    public $filtroRechazoDesde = '';
+    public $filtroRechazoHasta = '';
+
+    /** Modal historial de validación */
+    public ?int $historialReporteId = null;
+    public array $historialEntradas = [];
 
     public function mount()
     {
@@ -28,12 +45,14 @@ class ReportsIndex extends Component
         $this->role = (string) ($user['role'] ?? '');
         $this->carnet = (string) ($user['carnet'] ?? '');
 
-        // Inicializamos los estados para los selectores del panel de rechazados
         if ($this->role === 'authority') {
             $rechazados = Reporte::where('estado_validacion', Reporte::VALIDACION_RECHAZADO)->get();
             foreach ($rechazados as $rep) {
                 $this->estadoValidacionUpdates[$rep->id] = 'rechazado';
                 $this->inundacionVincularIds[$rep->id] = $rep->inundacion_id ?? '';
+                $this->motivoRechazoUpdates[$rep->id] = $rep->motivo_rechazo_codigo ?? '';
+                $this->motivoTextoUpdates[$rep->id] = $rep->motivo_rechazo_texto ?? '';
+                $this->reversionTextoUpdates[$rep->id] = '';
             }
         }
     }
@@ -43,11 +62,14 @@ class ReportsIndex extends Component
     #[On('echo:inundaciones,InundacionActualizada')]
     public function refreshData()
     {
-        // Vacío intencionalmente, solo fuerza el re-render de Livewire
     }
 
     public function desactivar(int $id)
     {
+        if ($this->role !== 'authority') {
+            return;
+        }
+
         $api = app(FloodApiClient::class);
         $token = Session::get('api_token', '');
         try {
@@ -69,13 +91,127 @@ class ReportsIndex extends Component
                 $inundacion->touch();
             }
         }
+
         session()->flash('success', "Reporte #{$id} renovado exitosamente. Su TTL se ha extendido 3 horas.");
+        $this->dispatch('reporte-ttl-renovado', reporteId: $id);
+
+        // Evita re-render completo del panel (minimapas, tablas) — era lento y parpadeaba.
+        $this->skipRender();
+    }
+
+    public function verHistorial(int $id): void
+    {
+        if ($this->role !== 'authority') {
+            return;
+        }
+
+        $reporte = Reporte::with(['historialValidacion.validador', 'historialValidacion.motivo'])
+            ->findOrFail($id);
+
+        $this->historialReporteId = $id;
+        $this->historialEntradas = $reporte->historialValidacion->map(fn (ReporteValidacionHistorial $h) => [
+            'fecha'              => $h->fecha_accion?->format('d/m/Y H:i'),
+            'accion'             => $h->accion,
+            'estado_anterior'    => $h->estado_anterior,
+            'estado_nuevo'       => $h->estado_nuevo,
+            'validador'          => $h->validador?->name ?? '—',
+            'motivo'             => $h->motivo?->label_autoridad ?? $h->motivo_texto,
+            'intensidad_propuesta' => $h->intensidad_propuesta_snapshot,
+            'intensidad_validada'  => $h->intensidad_validada_snapshot,
+        ])->all();
+
+        $this->dispatch('historial-modal-open');
+    }
+
+    public function cerrarHistorial(): void
+    {
+        $this->historialReporteId = null;
+        $this->historialEntradas = [];
+        $this->dispatch('historial-modal-close');
+    }
+
+    public function limpiarFiltrosRechazados(): void
+    {
+        $this->filtroRechazoMotivo = '';
+        $this->filtroRechazoValidador = '';
+        $this->filtroRechazoDesde = '';
+        $this->filtroRechazoHasta = '';
+    }
+
+    public function exportRechazadosCsv(): StreamedResponse
+    {
+        if ($this->role !== 'authority') {
+            abort(403);
+        }
+
+        $reportes = $this->queryReportesRechazados()->get();
+
+        return response()->streamDownload(function () use ($reportes) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, [
+                'ID', 'Estado', 'Reportado por', 'Carnet', 'Intensidad propuesta', 'Intensidad validada',
+                'Rechazado', 'Validador', 'Motivo', 'Nota', 'Dirección', 'Descripción',
+            ]);
+
+            foreach ($reportes as $rep) {
+                fputcsv($out, [
+                    $rep->id,
+                    $rep->estado_validacion,
+                    $rep->citizen?->name ?? 'Anónimo',
+                    $rep->citizen_carnet ?? '',
+                    $rep->intensidad_propuesta,
+                    $rep->intensidad_validada ?? '',
+                    optional($rep->rechazado_at ?? $rep->updated_at)?->format('Y-m-d H:i:s'),
+                    $rep->validador?->name ?? '',
+                    $rep->motivoRechazo?->label_autoridad ?? '',
+                    $rep->motivo_rechazo_texto ?? '',
+                    $rep->address ?? '',
+                    $rep->description ?? '',
+                ]);
+            }
+
+            fclose($out);
+        }, 'reportes_rechazados_' . now()->format('Y-m-d_His') . '.csv', [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    private function queryReportesRechazados()
+    {
+        $query = Reporte::where('estado_validacion', Reporte::VALIDACION_RECHAZADO)
+            ->with(['citizen', 'validador', 'motivoRechazo']);
+
+        if ($this->filtroRechazoMotivo !== '') {
+            $query->where('motivo_rechazo_codigo', $this->filtroRechazoMotivo);
+        }
+
+        if ($this->filtroRechazoValidador !== '') {
+            $query->where('validador_id', $this->filtroRechazoValidador);
+        }
+
+        if ($this->filtroRechazoDesde !== '') {
+            $query->whereDate('rechazado_at', '>=', $this->filtroRechazoDesde);
+        }
+
+        if ($this->filtroRechazoHasta !== '') {
+            $query->whereDate('rechazado_at', '<=', $this->filtroRechazoHasta);
+        }
+
+        return $query->latest('rechazado_at')->latest('updated_at');
     }
 
     public function updateEstadoValidacion(int $id)
     {
+        if ($this->role !== 'authority' || $this->carnet === '') {
+            session()->flash('error', 'No autorizado.');
+            return;
+        }
+
         $estadoValidacion = $this->estadoValidacionUpdates[$id] ?? '';
         $inundacionId = $this->inundacionVincularIds[$id] ?? null;
+        $motivoCodigo = $this->motivoRechazoUpdates[$id] ?? '';
+        $motivoTexto = $this->motivoTextoUpdates[$id] ?? null;
+        $reversionTexto = $this->reversionTextoUpdates[$id] ?? null;
 
         if ($estadoValidacion === Reporte::VALIDACION_ACEPTADO && empty($inundacionId)) {
             session()->flash('error', 'Para marcar como aceptado debes seleccionar una inundación para vincular.');
@@ -85,24 +221,30 @@ class ReportsIndex extends Component
         $reporte = Reporte::findOrFail($id);
         $validacion = app(ReporteValidacionService::class);
 
-        if ($estadoValidacion === Reporte::VALIDACION_ACEPTADO && !empty($inundacionId)) {
-            $validacion->aceptarYVincular($reporte, (int) $inundacionId);
-        } elseif ($estadoValidacion === Reporte::VALIDACION_RECHAZADO) {
-            $validacion->rechazar($reporte);
-        } else {
-            $reporte->update([
-                'estado_validacion' => $estadoValidacion,
-                'inundacion_id'     => null,
-            ]);
-        }
+        try {
+            if ($estadoValidacion === Reporte::VALIDACION_ACEPTADO && ! empty($inundacionId)) {
+                $validacion->aceptarYVincular($reporte, (int) $inundacionId, $this->carnet);
+            } elseif ($estadoValidacion === Reporte::VALIDACION_RECHAZADO) {
+                if ($motivoCodigo === '') {
+                    session()->flash('error', 'Debes seleccionar un motivo de rechazo.');
+                    return;
+                }
+                $validacion->rechazar($reporte, $this->carnet, (string) $motivoCodigo, $motivoTexto ?: null);
+            } elseif ($estadoValidacion === Reporte::VALIDACION_PENDIENTE) {
+                $validacion->revertirAPendiente($reporte, $this->carnet, $reversionTexto);
+            } else {
+                session()->flash('error', 'Estado de validación no reconocido.');
+                return;
+            }
 
-        session()->flash('success', "Estado de validación del reporte #{$reporte->id} actualizado a \"{$estadoValidacion}\".");
+            session()->flash('success', "Estado de validación del reporte #{$reporte->id} actualizado a \"{$estadoValidacion}\".");
+        } catch (ValidationException $e) {
+            session()->flash('error', collect($e->errors())->flatten()->first() ?? 'Error de validación.');
+        }
     }
 
     public function render()
     {
-        // Lógica replicada desde ReportController@index
-        // ── Inundaciones ACTIVAS ──────────────────────────────
         $activasPaginator = Inundacion::activas()
             ->with(['reportesActivosTTL', 'reportes'])
             ->latest()
@@ -112,7 +254,6 @@ class ReportsIndex extends Component
             ->map(fn (Inundacion $i) => $this->serializarActiva($i))
             ->all();
 
-        // ── Inundaciones TERMINADAS ───
         $inundacionesTerminadas = Inundacion::terminadas()
             ->with('reportes')
             ->latest('updated_at')
@@ -120,34 +261,45 @@ class ReportsIndex extends Component
             ->map(fn (Inundacion $i) => $this->serializarTerminada($i))
             ->all();
 
-        // ── Reportes del ciudadano autenticado ────────────────────────────
         $misReportes = [];
         if ($this->carnet !== '') {
             $misReportes = Reporte::where('citizen_carnet', $this->carnet)
+                ->with('motivoRechazo')
                 ->latest('updated_at')
                 ->limit(20)
                 ->get();
         }
 
-        // ── Paneles de autoridad (pendientes + rechazados) ─────────────────
         $reportesPendientes = [];
         $reportesRechazados = [];
         $inundacionesActivasParaVincular = collect();
+        $motivosRechazo = collect();
+        $validacion = app(ReporteValidacionService::class);
 
         if ($this->role === 'authority') {
+            $motivosRechazo = MotivoRechazo::activos()->orderBy('codigo')->get();
+
             $reportesPendientes = Reporte::whereNull('inundacion_id')
                 ->where('estado_validacion', Reporte::VALIDACION_PENDIENTE)
                 ->with('citizen')
                 ->latest()
                 ->get();
 
-            $reportesRechazados = Reporte::where('estado_validacion', Reporte::VALIDACION_RECHAZADO)
-                ->with('citizen')
-                ->latest('updated_at')
-                ->get();
+            $reportesRechazados = $this->queryReportesRechazados()->get();
+
+            $validadoresRechazo = User::query()
+                ->where('role', User::ROLE_AUTHORITY)
+                ->whereIn('carnet', Reporte::query()
+                    ->where('estado_validacion', Reporte::VALIDACION_RECHAZADO)
+                    ->whereNotNull('validador_id')
+                    ->distinct()
+                    ->pluck('validador_id'))
+                ->orderBy('name')
+                ->get(['carnet', 'name']);
 
             $activas = Inundacion::activas()->get();
             $inundacionesActivasParaVincular = $activas;
+
             foreach ($reportesPendientes as $rep) {
                 $cercanas = [];
                 foreach ($activas as $activa) {
@@ -160,10 +312,6 @@ class ReportsIndex extends Component
                     $a    = sin($dLat / 2) ** 2 + cos($lat1) * cos($lat2) * sin($dLon / 2) ** 2;
                     $dist = 6371000 * 2 * atan2(sqrt($a), sqrt(1 - $a));
                     if ($dist <= 300) {
-                        // No incrustamos polygon_coords aquí: pueden ser enormes
-                        // (miles de puntos) y, multiplicados por reporte en el HTML,
-                        // rompían el render de Livewire. El drawer obtiene el polígono
-                        // desde window.floodReports (ya cargado por el mapa) usando el id.
                         $cercanas[] = [
                             'id'                   => $activa->id,
                             'latitud'              => $activa->latitud,
@@ -173,27 +321,26 @@ class ReportsIndex extends Component
                     }
                 }
                 $rep->cercanas = collect($cercanas);
+                $rep->rechazos_previos = $validacion->contarRechazosCiudadano($rep->citizen_carnet);
             }
         }
 
         return view('livewire.reports-index', [
-            'inundacionesActivas'    => $inundacionesActivas,
-            'inundacionesTerminadas' => $inundacionesTerminadas,
-            'misReportes'            => $misReportes,
-            'reportesPendientes'     => $reportesPendientes,
-            'reportesRechazados'     => $reportesRechazados,
+            'inundacionesActivas'             => $inundacionesActivas,
+            'inundacionesTerminadas'          => $inundacionesTerminadas,
+            'misReportes'                     => $misReportes,
+            'reportesPendientes'              => $reportesPendientes,
+            'reportesRechazados'              => $reportesRechazados,
             'inundacionesActivasParaVincular' => $inundacionesActivasParaVincular,
-            'ors_key' => config('services.openrouteservice.key'),
+            'motivosRechazo'                  => $motivosRechazo,
+            'validadoresRechazo'              => $validadoresRechazo ?? collect(),
+            'ors_key'                         => config('services.openrouteservice.key'),
             'meta' => [
                 'current_page' => $activasPaginator->currentPage(),
                 'last_page'    => $activasPaginator->lastPage(),
-            ]
+            ],
         ])->layout('layouts.app');
     }
-
-    // ─────────────────────────────────────────────────────────────────────
-    // Helpers de serialización (Eloquent → array plano para Blade)
-    // ─────────────────────────────────────────────────────────────────────
 
     private function serializarActiva(Inundacion $i): array
     {
@@ -203,6 +350,8 @@ class ReportsIndex extends Component
             'id'                   => $r->id,
             'peso'                 => $r->peso,
             'intensidad_propuesta' => $r->intensidad_propuesta,
+            'intensidad_validada'  => $r->intensidad_validada,
+            'intensidad_efectiva'  => $r->intensidadEfectiva(),
             'lat_reporte'          => $r->lat_reporte,
             'long_reporte'         => $r->long_reporte,
             'foto_path'            => $r->foto_path,
@@ -214,10 +363,6 @@ class ReportsIndex extends Component
             'created_at_human'     => $r->created_at?->diffForHumans(),
         ])->toArray();
 
-        // Los inactivos son el complemento de los activos: todo reporte vinculado
-        // (no rechazado) que NO esté dentro de la ventana TTL actual. Calcularlo por
-        // diferencia evita que un reporte se pierda del historial si su timestamp
-        // queda fuera del rango [now-TTL, now] (p. ej. registros antiguos).
         $idsActivos = $i->reportesActivosTTL->pluck('id')->all();
 
         $reportesInactivos = $i->reportes->filter(function ($r) use ($idsActivos) {
@@ -229,6 +374,8 @@ class ReportsIndex extends Component
             'id'                   => $r->id,
             'peso'                 => $r->peso,
             'intensidad_propuesta' => $r->intensidad_propuesta,
+            'intensidad_validada'  => $r->intensidad_validada,
+            'intensidad_efectiva'  => $r->intensidadEfectiva(),
             'lat_reporte'          => $r->lat_reporte,
             'long_reporte'         => $r->long_reporte,
             'foto_path'            => $r->foto_path,
@@ -274,6 +421,8 @@ class ReportsIndex extends Component
             'id'                   => $r->id,
             'peso'                 => $r->peso,
             'intensidad_propuesta' => $r->intensidad_propuesta,
+            'intensidad_validada'  => $r->intensidad_validada,
+            'intensidad_efectiva'  => $r->intensidadEfectiva(),
             'lat_reporte'          => $r->lat_reporte,
             'long_reporte'         => $r->long_reporte,
             'foto_path'            => $r->foto_path,

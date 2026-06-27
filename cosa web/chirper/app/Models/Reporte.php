@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property \Illuminate\Support\Collection<int, Inundacion>|null $cercanas
@@ -39,6 +40,14 @@ class Reporte extends Model
         'description',
         'foto_path',
         'estado_validacion',
+        'validador_id',
+        'motivo_rechazo_codigo',
+        'motivo_rechazo_texto',
+        'rechazado_at',
+        'validado_at',
+        'distancia_gps_metros',
+        'intensidad_validada',
+        'ajuste_comentario',
         'datos_clima_json',
         'polygon_coords',
         'polygon_geojson',
@@ -57,6 +66,9 @@ class Reporte extends Model
         'polygon_geojson'  => 'array',
         'polygon_calculado_at' => 'datetime',
         'polygon_es_fallback'  => 'boolean',
+        'rechazado_at'         => 'datetime',
+        'validado_at'          => 'datetime',
+        'distancia_gps_metros' => 'decimal:2',
     ];
 
     public function inundacion(): BelongsTo
@@ -67,6 +79,39 @@ class Reporte extends Model
     public function citizen(): BelongsTo
     {
         return $this->belongsTo(User::class, foreignKey: 'citizen_carnet', ownerKey: 'carnet');
+    }
+
+    public function validador(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'validador_id', 'carnet');
+    }
+
+    public function motivoRechazo(): BelongsTo
+    {
+        return $this->belongsTo(MotivoRechazo::class, 'motivo_rechazo_codigo', 'codigo');
+    }
+
+    public function historialValidacion(): HasMany
+    {
+        return $this->hasMany(ReporteValidacionHistorial::class)->orderByDesc('fecha_accion');
+    }
+
+    public function intensidadEfectiva(): string
+    {
+        return $this->intensidad_validada ?? $this->intensidad_propuesta ?? 'media';
+    }
+
+    public function fueAjustado(): bool
+    {
+        return $this->intensidad_validada !== null
+            && $this->intensidad_validada !== $this->intensidad_propuesta;
+    }
+
+    public function precipitacionAlReportar(): ?float
+    {
+        $value = data_get($this->datos_clima_json, 'current.precipitation');
+
+        return $value !== null ? (float) $value : null;
     }
 
     protected static function booted(): void

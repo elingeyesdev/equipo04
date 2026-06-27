@@ -37,6 +37,8 @@ class InundacionResource extends JsonResource
                 'id'                   => $rep->id,
                 'peso'                 => $rep->peso,
                 'intensidad_propuesta' => $rep->intensidad_propuesta,
+                'intensidad_validada'  => $rep->intensidad_validada,
+                'intensidad_efectiva'  => $rep->intensidadEfectiva(),
                 'lat_reporte'          => $rep->lat_reporte,
                 'long_reporte'         => $rep->long_reporte,
                 'foto_path'            => $rep->foto_path,
@@ -54,7 +56,7 @@ class InundacionResource extends JsonResource
         $desglosePuntos = $this->whenLoaded('reportesActivosTTL', function () {
             $desglose = ['baja' => 0, 'media' => 0, 'alta' => 0];
             foreach ($this->reportesActivosTTL as $rep) {
-                $cat = $rep->intensidad_propuesta;
+                $cat = $rep->intensidadEfectiva();
                 if (array_key_exists($cat, $desglose)) {
                     $desglose[$cat] += $rep->peso;
                 }

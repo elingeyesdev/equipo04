@@ -40,11 +40,12 @@ class ReporteController extends Controller
         }
 
         // Validación Haversine: máximo 500 m entre GPS y punto reportado
-        $distancia = $this->haversineKm(
+        $distanciaKm = $this->haversineKm(
             $data['lat_gps'], $data['long_gps'],
             $data['lat_reporte'], $data['long_reporte']
         );
-        if ($distancia > 0.5) {
+        $distanciaMetros = round($distanciaKm * 1000, 2);
+        if ($distanciaKm > 0.5) {
             return response()->json([
                 'message' => 'El reporte no puede estar a más de 500 metros de tu ubicación actual.',
             ], 422);
@@ -84,6 +85,7 @@ class ReporteController extends Controller
                 'address'              => $data['address'] ?? $reportePrevio->address,
                 'description'          => $data['description'] ?? $reportePrevio->description,
                 'datos_clima_json'     => $weatherData,
+                'distancia_gps_metros' => $distanciaMetros,
             ]);
 
             return response()->json([
@@ -105,6 +107,7 @@ class ReporteController extends Controller
             'address'              => $data['address'] ?? null,
             'description'          => $data['description'] ?? null,
             'datos_clima_json'     => $weatherData,
+            'distancia_gps_metros' => $distanciaMetros,
             'estado_validacion'    => Reporte::VALIDACION_PENDIENTE,
         ]);
 
@@ -141,51 +144,89 @@ class ReporteController extends Controller
      */
     public function validateReport(Request $request, int $id): JsonResponse
     {
+        if (! $request->user()?->isAuthority()) {
+            return response()->json(['message' => 'No autorizado.'], 403);
+        }
+
         $reporte = Reporte::findOrFail($id);
 
         $data = $request->validate([
-            'action'       => 'required|in:vincular,crear,rechazar',
-            'inundacion_id'=> 'required_if:action,vincular|exists:inundaciones,id',
+            'action'              => 'required|in:vincular,crear,rechazar',
+            'inundacion_id'       => 'required_if:action,vincular|exists:inundaciones,id',
+            'motivo_codigo'       => 'required_if:action,rechazar|exists:motivos_rechazo,codigo',
+            'motivo_texto'        => 'nullable|string|max:2000',
+            'intensidad_validada' => 'nullable|string|in:baja,media,alta',
+            'ajuste_comentario'   => 'nullable|string|max:2000',
         ]);
 
         $validacion = app(ReporteValidacionService::class);
+        $validadorCarnet = (string) $request->user()->carnet;
 
-        if ($data['action'] === 'rechazar') {
-            $validacion->rechazar($reporte);
+        try {
+            if ($data['action'] === 'rechazar') {
+                $validacion->rechazar(
+                    $reporte,
+                    $validadorCarnet,
+                    (string) $data['motivo_codigo'],
+                    $data['motivo_texto'] ?? null,
+                );
 
-            return response()->json(['message' => 'Reporte rechazado']);
-        }
+                return response()->json(['message' => 'Reporte rechazado']);
+            }
 
-        if ($data['action'] === 'crear') {
-            $inundacion = $validacion->crearInundacionDesdeReporte(
-                $reporte,
-                (string) $request->user()->carnet
-            );
+            if ($data['action'] === 'crear') {
+                $inundacion = $validacion->crearInundacionDesdeReporte(
+                    $reporte,
+                    $validadorCarnet,
+                    $data['intensidad_validada'] ?? null,
+                    $data['ajuste_comentario'] ?? null,
+                );
 
-            $inundacion->load('reportesActivosTTL');
+                $inundacion->load('reportesActivosTTL');
 
+                return response()->json([
+                    'message'    => 'Nueva inundación creada',
+                    'inundacion' => $this->inundacionConQuorum($inundacion),
+                ], 201);
+            }
+
+            if ($data['action'] === 'vincular') {
+                $inundacion = $validacion->aceptarYVincular(
+                    $reporte,
+                    (int) $data['inundacion_id'],
+                    $validadorCarnet,
+                    $data['intensidad_validada'] ?? null,
+                    $data['ajuste_comentario'] ?? null,
+                );
+
+                $inundacion->load('reportesActivosTTL');
+
+                return response()->json([
+                    'message'    => 'Reporte vinculado exitosamente',
+                    'inundacion' => $this->inundacionConQuorum($inundacion),
+                ]);
+            }
+        } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
-                'message'    => 'Nueva inundación creada',
-                'inundacion' => $this->inundacionConQuorum($inundacion),
-            ], 201);
+                'message' => 'Error de validación.',
+                'errors'  => $e->errors(),
+            ], 422);
         }
 
-        if ($data['action'] === 'vincular') {
-            $inundacion = $validacion->aceptarYVincular(
-                $reporte,
-                (int) $data['inundacion_id']
-            );
-
-            $inundacion->load('reportesActivosTTL');
-
-            return response()->json([
-                'message'    => 'Reporte vinculado exitosamente',
-                'inundacion' => $this->inundacionConQuorum($inundacion),
-            ]);
-        }
-
-        // Por exhaustividad (nunca debería llegar aquí por la validación)
         return response()->json(['message' => 'Acción no reconocida'], 422);
+    }
+
+    /**
+     * Catálogo de motivos de rechazo activos.
+     */
+    public function motivosRechazo(): JsonResponse
+    {
+        $motivos = \App\Models\MotivoRechazo::query()
+            ->activos()
+            ->orderBy('codigo')
+            ->get(['codigo', 'label_autoridad', 'label_ciudadano', 'requiere_nota']);
+
+        return response()->json($motivos);
     }
 
     // ─────────────────────────────────────────────────────────────────────

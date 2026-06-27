@@ -411,16 +411,20 @@ final class ReportController
         $reporte = Reporte::findOrFail((int) $id);
         $nuevoEstado = (string) $data['estado_validacion'];
         $validacion = app(ReporteValidacionService::class);
+        $validadorCarnet = (string) ($request->session()->get('api_user.carnet') ?? '');
 
-        if ($nuevoEstado === Reporte::VALIDACION_ACEPTADO && !empty($data['inundacion_id'])) {
-            $validacion->aceptarYVincular($reporte, (int) $data['inundacion_id']);
-        } elseif ($nuevoEstado === Reporte::VALIDACION_RECHAZADO) {
-            $validacion->rechazar($reporte);
-        } else {
-            $reporte->update([
-                'estado_validacion' => $nuevoEstado,
-                'inundacion_id'     => null,
-            ]);
+        try {
+            if ($nuevoEstado === Reporte::VALIDACION_ACEPTADO && !empty($data['inundacion_id'])) {
+                $validacion->aceptarYVincular($reporte, (int) $data['inundacion_id'], $validadorCarnet);
+            } elseif ($nuevoEstado === Reporte::VALIDACION_RECHAZADO) {
+                return redirect()->route('reports.index')
+                    ->with('error', 'Use el panel de reportes con motivo de rechazo.');
+            } else {
+                $validacion->revertirAPendiente($reporte, $validadorCarnet, $request->input('reversion_texto'));
+            }
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()->route('reports.index')
+                ->with('error', collect($e->errors())->flatten()->first() ?? 'Error de validación.');
         }
 
         return redirect()->route('reports.index')
@@ -490,7 +494,7 @@ final class ReportController
 
         $items   = [];
         $reportes = Reporte::query()
-            ->with('inundacion')
+            ->with(['inundacion', 'motivoRechazo'])
             ->where('citizen_carnet', $carnet)
             ->latest('updated_at')
             ->limit(20)
@@ -498,23 +502,32 @@ final class ReportController
 
         foreach ($reportes as $reporte) {
             if ($reporte->estado_validacion === Reporte::VALIDACION_RECHAZADO) {
+                $motivoLabel = $reporte->motivoRechazo?->label_ciudadano ?? 'Tu reporte no pudo ser validado.';
                 $items[] = [
                     'id'         => 'citizen-rejected-' . $reporte->id,
-                    'cursor'     => (int) optional($reporte->updated_at)->timestamp,
+                    'cursor'     => (int) optional($reporte->rechazado_at ?? $reporte->updated_at)->timestamp,
                     'title'      => 'Reporte rechazado',
-                    'message'    => 'Tu reporte #' . $reporte->id . ' fue rechazado por una autoridad.',
-                    'created_at' => optional($reporte->updated_at)?->toIso8601String(),
+                    'message'    => 'Tu reporte #' . $reporte->id . ' fue rechazado: ' . $motivoLabel,
+                    'created_at' => optional($reporte->rechazado_at ?? $reporte->updated_at)?->toIso8601String(),
                     'link'       => route('reports.index', [], false),
                 ];
             }
 
             if ($reporte->estado_validacion === Reporte::VALIDACION_ACEPTADO && $reporte->inundacion_id !== null) {
+                $mensajeAceptado = 'Tu reporte #' . $reporte->id . ' fue atendido y vinculado a una inundacion.';
+                if ($reporte->fueAjustado()) {
+                    $mensajeAceptado = 'Tu reporte #' . $reporte->id . ' fue atendido. Reportaste '
+                        . $reporte->intensidad_propuesta . ' y registramos ' . $reporte->intensidad_validada . '.';
+                    if ($reporte->ajuste_comentario) {
+                        $mensajeAceptado .= ' ' . $reporte->ajuste_comentario;
+                    }
+                }
                 $items[] = [
                     'id'         => 'citizen-accepted-' . $reporte->id,
-                    'cursor'     => (int) optional($reporte->updated_at)->timestamp,
+                    'cursor'     => (int) optional($reporte->validado_at ?? $reporte->updated_at)->timestamp,
                     'title'      => 'Reporte atendido',
-                    'message'    => 'Tu reporte #' . $reporte->id . ' fue atendido y vinculado a una inundacion.',
-                    'created_at' => optional($reporte->updated_at)?->toIso8601String(),
+                    'message'    => $mensajeAceptado,
+                    'created_at' => optional($reporte->validado_at ?? $reporte->updated_at)?->toIso8601String(),
                     'link'       => route('reports.index', [], false),
                 ];
             }

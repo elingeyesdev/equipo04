@@ -72,7 +72,7 @@ final class CalcularPoligonoInundacion implements ShouldQueue
             return;
         }
 
-        $intensidad = $reporte->intensidad_propuesta ?? 'media';
+        $intensidad = $reporte->intensidadEfectiva();
 
         Log::info("CalcularPoligonoInundacion: Region growing para Reporte #{$this->entityId} ({$intensidad}).");
 
