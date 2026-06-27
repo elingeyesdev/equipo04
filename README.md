@@ -61,8 +61,26 @@ El color representa la **intensidad de la inundación** (voto ponderado por peso
 ### 5. Capa de Intervención de Autoridades
 Una Autoridad puede dibujar la zona de desastre manualmente. Si la *Inundación* tiene `polygon_editado_autoridad`, este polígono tiene **absoluta prioridad** y no se sobrescribe en los recálculos automáticos.
 
-### 6. Validación con mapa (Review Drawer)
-Autoridades pueden vincular reportes pendientes usando **"Vincular (Ver Mapa)"**: drawer con mapa Leaflet, inundaciones cercanas seleccionables y confirmación SweetAlert2.
+### 6. Validación de reportes (panel de autoridades)
+
+En `/reports`, las autoridades gestionan reportes pendientes y rechazados desde **Livewire `ReportsIndex`** (`resources/views/livewire/reports-index.blade.php`).
+
+#### Panel «Pendientes de Validación»
+Tabla compacta de **5 columnas**:
+
+| Columna | Contenido |
+|---------|-----------|
+| **Foto** | Imagen del reporte (~96 px); clic abre modal a pantalla completa |
+| **Reporte** | N° + pill de intensidad (alta/media/baja), fecha, nombre del ciudadano |
+| **Detalles** | Descripción y dirección separadas por línea punteada; enlace *Ver detalle completo* abre modal con texto íntegro |
+| **Mapa** | Minimapa Leaflet: GPS del reportero (azul) vs punto reportado (rojo), línea de distancia; arrastre y zoom con rueda al pasar el cursor |
+| **Acciones** | Tres botones apilados: **Aprobar** (nueva inundación), **Vincular** (drawer de mapa; deshabilitado si no hay cercanas ≤300 m), **Rechazar** |
+
+#### Panel «Reportes Rechazados»
+Filas con foto, metadatos (ID, reportero, fechas, descripción), minimapa de ubicación y formulario Livewire para cambiar estado o revincular.
+
+#### Review Drawer (vinculación)
+Al pulsar **Vincular** se abre un panel lateral con mapa Leaflet ampliado, polígonos de inundaciones cercanas (desde `window.floodReports`) y confirmación SweetAlert2 antes de `POST /api/reportes/{id}/validar`.
 
 ---
 
@@ -141,7 +159,10 @@ Para maximizar el rendimiento de Docker en Windows, este proyecto se ha configur
 Toda la interfaz del sistema ha sido construida siguiendo estándares **Premium**.
 * Se hace uso intensivo del concepto de **Glassmorphism**: paneles translúcidos (`backdrop-blur`) que flotan sobre un fondo vibrante.
 * Tipografía **Inter / Poppins** (Google Fonts) para un aspecto limpio y moderno.
-* **SweetAlert2** para toasts y confirmaciones.
+* **SweetAlert2** para toasts y confirmaciones de validación (`validarRapido`).
+* **Modales** para foto ampliada y detalle completo del reporte (z-index por encima de mapas Leaflet embebidos).
+* **Minimapas inline** en filas de validación: preview estático con interacción local (pan + zoom con rueda al hover).
+* Jerarquía visual en acciones de validación: botones apilados con peso cromático (slate → violeta → stone), sin depender solo de verde/azul/rojo semáforo.
 * Animaciones orgánicas (`hover:-translate-y`, `transition-all`) para darle reactividad al ecosistema.
 
 ---

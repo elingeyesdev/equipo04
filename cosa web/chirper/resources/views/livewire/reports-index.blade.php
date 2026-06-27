@@ -40,7 +40,7 @@
         }
         .report-location-minimap {
             width: 11rem;
-            height: 5rem;
+            height: 6.75rem;
             border-radius: 0.75rem;
             overflow: hidden;
             border: 1px solid rgba(226, 232, 240, 0.8);
@@ -55,12 +55,20 @@
         @media (min-width: 768px) {
             .report-location-minimap {
                 width: 12.5rem;
+                height: 7.5rem;
+            }
+        }
+        .report-location-minimap--compact {
+            height: 5rem;
+        }
+        @media (min-width: 768px) {
+            .report-location-minimap--compact {
                 height: 5.5rem;
             }
         }
-        .approve-dropdown-menu {
-            min-width: 13rem;
-        }
+        .intensity-pill-alta { background: #fef2f2; color: #991b1b; }
+        .intensity-pill-media { background: #fffbeb; color: #92400e; }
+        .intensity-pill-baja { background: #f0fdfa; color: #115e59; }
     </style>
 
     <!-- Main Container with custom gradient background -->
@@ -372,12 +380,11 @@
                     <table class="w-full text-sm glass-table rounded-xl overflow-hidden">
                         <thead class="text-slate-600">
                             <tr>
-                                <th class="text-left font-semibold px-4 py-3 rounded-tl-xl w-32">Foto</th>
-                                <th class="text-left font-semibold px-4 py-3">Reporte N°</th>
-                                <th class="text-left font-semibold px-4 py-3">Intensidad</th>
-                                <th class="text-left font-semibold px-4 py-3">Detalles</th>
-                                <th class="text-left font-semibold px-4 py-3">Ubicación</th>
-                                <th class="text-left font-semibold px-4 py-3 rounded-tr-xl">Acciones</th>
+                                <th class="text-center font-semibold px-3 py-2 rounded-tl-xl w-24">Foto</th>
+                                <th class="text-left font-semibold px-3 py-2 w-36">Reporte</th>
+                                <th class="text-left font-semibold px-3 py-2">Detalles</th>
+                                <th class="text-center font-semibold px-3 py-2 w-36">Mapa</th>
+                                <th class="text-left font-semibold px-3 py-2 rounded-tr-xl w-36">Acciones</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-200/50">
@@ -386,86 +393,90 @@
                                     /** @var \App\Models\Reporte $rep */
                                     $reporterName = $rep->citizen?->name
                                         ?? ($rep->citizen_carnet ? 'Carnet ' . $rep->citizen_carnet : 'Ciudadano anónimo');
+                                    $descText = !empty($rep->description) ? $rep->description : 'Sin descripción.';
+                                    $addrText = !empty($rep->address) ? $rep->address : 'Ubicación GPS';
+                                    $intensityClass = match ($rep->intensidad_propuesta) {
+                                        'alta'  => 'intensity-pill-alta',
+                                        'media' => 'intensity-pill-media',
+                                        default => 'intensity-pill-baja',
+                                    };
+                                    $reportDrawerPayload = array_merge($rep->toArray(), [
+                                        'cercanas' => collect($rep->cercanas ?? [])->values()->all(),
+                                    ]);
                                 @endphp
                                 <tr class="transition-colors duration-200 hover:bg-white/30">
-                                    <td class="px-4 py-3">
-                                        <div class="w-24 md:w-32 flex-shrink-0 flex items-center justify-center bg-white/50 border border-white/60 rounded-2xl overflow-hidden h-32 shadow-sm">
+                                    <td class="px-3 py-2 align-middle text-center">
+                                        <div class="w-[4.5rem] md:w-24 flex-shrink-0 flex items-center justify-center bg-white/50 border border-white/60 rounded-xl overflow-hidden h-[4.5rem] md:h-24 shadow-sm mx-auto">
                                             @if(!empty($rep->foto_path))
                                                 <img src="{{ asset('storage/' . $rep->foto_path) }}" alt="Foto del reporte N°{{ $rep->id }}" onclick="openImageModal('{{ asset('storage/' . $rep->foto_path) }}')" class="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity">
                                             @else
-                                                <div class="flex flex-col items-center justify-center">
-                                                    <svg class="w-8 h-8 opacity-20 mb-1 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                                                    <span class="text-[9px] font-bold text-slate-400 uppercase text-center leading-tight px-2">Sin foto<br>adjunta</span>
+                                                <div class="flex flex-col items-center justify-center p-1">
+                                                    <svg class="w-6 h-6 opacity-20 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                                    <span class="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight">Sin foto</span>
                                                 </div>
                                             @endif
                                         </div>
                                     </td>
-                                    <td class="px-4 py-3">
-                                        <span class="font-bold text-slate-700 block">N°{{ $rep->id }}</span>
-                                        <span class="text-[10px] text-slate-500 block">{{ $rep->created_at->format('d/m/Y H:i') }}</span>
-                                        <span class="text-[10px] text-slate-600 block mt-1" title="{{ $reporterName }}">
-                                            <span class="font-semibold text-slate-500">Por:</span> {{ $reporterName }}
-                                        </span>
+                                    <td class="px-3 py-2 align-middle">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <p class="text-sm font-bold text-slate-800 leading-snug">N°{{ $rep->id }}</p>
+                                            <span class="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide {{ $intensityClass }}">
+                                                {{ $rep->intensidad_propuesta }}
+                                            </span>
+                                        </div>
+                                        <p class="text-sm text-slate-500 leading-snug mt-1">{{ $rep->created_at->format('d/m/Y H:i') }}</p>
+                                        <p class="text-sm text-slate-600 leading-snug mt-1 truncate max-w-[10rem]" title="{{ $reporterName }}">{{ $reporterName }}</p>
                                     </td>
-                                    <td class="px-4 py-3">
-                                        <span class="inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold uppercase bg-amber-100 text-amber-800 shadow-sm">
-                                            {{ $rep->intensidad_propuesta }}
-                                        </span>
+                                    <td class="px-3 py-2 align-top min-w-[11rem] max-w-[16rem]">
+                                        <p class="text-base text-slate-700 whitespace-normal break-words leading-relaxed line-clamp-4">{{ $descText }}</p>
+                                        <div class="border-t border-dashed border-slate-300 my-2"></div>
+                                        <p class="text-base text-slate-500 whitespace-normal break-words leading-relaxed line-clamp-2">{{ $addrText }}</p>
+                                        <button
+                                            type="button"
+                                            onclick="openReportDetailModal(this)"
+                                            class="mt-2 text-sm font-semibold text-indigo-700 hover:text-indigo-900 underline-offset-2 hover:underline transition-colors"
+                                            data-id="{{ $rep->id }}"
+                                            data-description="{{ e($descText) }}"
+                                            data-address="{{ e($addrText) }}"
+                                            data-reporter="{{ e($reporterName) }}"
+                                            data-date="{{ $rep->created_at->format('d/m/Y H:i') }}"
+                                            data-intensity="{{ $rep->intensidad_propuesta }}"
+                                        >Ver detalle completo</button>
                                     </td>
-                                    <td class="px-4 py-3 align-top">
-                                        <p class="text-xs text-slate-500 max-w-[14rem] whitespace-normal break-words leading-relaxed">
-                                            {{ !empty($rep->description) ? $rep->description : 'Sin descripción.' }}
-                                        </p>
+                                    <td class="px-3 py-2 align-top text-center">
+                                        <div class="inline-flex flex-col items-center">
+                                            <div
+                                                id="report-minimap-pending-{{ $rep->id }}"
+                                                class="report-location-minimap"
+                                                wire:ignore
+                                                aria-label="Mapa de ubicación del reporte N°{{ $rep->id }}"
+                                                data-lat-gps="{{ $rep->lat_gps }}"
+                                                data-lng-gps="{{ $rep->long_gps }}"
+                                                data-lat-rep="{{ $rep->lat_reporte }}"
+                                                data-lng-rep="{{ $rep->long_reporte }}"
+                                            ></div>
+                                            <p class="text-[9px] text-slate-400 mt-1"><span class="text-blue-500">●</span> Usuario <span class="text-rose-500 ml-1">●</span> Evento</p>
+                                        </div>
                                     </td>
-                                    <td class="px-4 py-3">
-                                        <p class="text-xs text-slate-600 max-w-[10rem] truncate mb-1.5" title="{{ !empty($rep->address) ? $rep->address : 'Ubicación GPS' }}">
-                                            {{ !empty($rep->address) ? $rep->address : 'Ubicación GPS' }}
-                                        </p>
-                                        <div
-                                            id="report-minimap-pending-{{ $rep->id }}"
-                                            class="report-location-minimap"
-                                            wire:ignore
-                                            aria-label="Mapa de ubicación del reporte N°{{ $rep->id }}"
-                                            data-lat-gps="{{ $rep->lat_gps }}"
-                                            data-lng-gps="{{ $rep->long_gps }}"
-                                            data-lat-rep="{{ $rep->lat_reporte }}"
-                                            data-lng-rep="{{ $rep->long_reporte }}"
-                                        ></div>
-                                        <p class="text-[9px] text-slate-400 mt-1"><span class="text-blue-500">●</span> Usuario <span class="text-rose-500 ml-1">●</span> Evento</p>
-                                    </td>
-                                    <td class="px-4 py-3 align-top">
-                                        <div class="flex items-start gap-2 flex-nowrap">
-                                            <div class="relative approve-dropdown">
-                                                <button type="button" onclick="toggleApproveMenu({{ $rep->id }}, event)" class="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white pl-3 pr-2.5 py-2 text-xs rounded-lg font-bold shadow-sm transition-colors">
-                                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
-                                                    <span>Aprobar</span>
-                                                    <svg class="w-3.5 h-3.5 shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
+                                    <td class="px-3 py-2 align-top">
+                                        <div class="flex flex-col gap-1.5 w-full max-w-[9.5rem]">
+                                            <button type="button" onclick="validarRapido({{ $rep->id }}, 'crear')" class="w-full inline-flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white px-3 py-2 text-xs rounded-lg font-bold shadow-sm transition-colors">
+                                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+                                                Aprobar
+                                            </button>
+                                            @if(count($rep->cercanas ?? []) > 0)
+                                                <button type="button" data-report="{{ json_encode($reportDrawerPayload) }}" onclick="openReviewDrawer(this)" class="w-full inline-flex items-center justify-center gap-1.5 bg-violet-100 hover:bg-violet-200 text-violet-900 border border-violet-300/80 px-3 py-2 text-xs rounded-lg font-bold shadow-sm transition-colors">
+                                                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                                                    Vincular
                                                 </button>
-                                                <div id="approve-menu-{{ $rep->id }}" class="approve-dropdown-menu hidden absolute left-0 top-full mt-1 z-20 bg-white rounded-xl shadow-lg border border-slate-200 py-1 overflow-hidden">
-                                                    <button type="button" onclick="closeApproveMenus(); validarRapido({{ $rep->id }}, 'crear')" class="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-semibold text-slate-700 hover:bg-emerald-50 transition-colors text-left">
-                                                        <svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
-                                                        Como Nueva Inundación
-                                                    </button>
-                                                    @if(count($rep->cercanas ?? []) > 0)
-                                                        @php
-                                                            $reportDrawerPayload = array_merge($rep->toArray(), [
-                                                                'cercanas' => collect($rep->cercanas ?? [])->values()->all(),
-                                                            ]);
-                                                        @endphp
-                                                        <button type="button" id="review-trigger-{{ $rep->id }}" data-report="{{ json_encode($reportDrawerPayload) }}" onclick="closeApproveMenus(); openReviewDrawer(this)" class="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-semibold text-slate-700 hover:bg-blue-50 transition-colors text-left border-t border-slate-100">
-                                                            <svg class="w-4 h-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                                                            Como Vinculada (Ver Mapa)
-                                                        </button>
-                                                    @else
-                                                        <span class="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-medium text-slate-400 border-t border-slate-100 cursor-not-allowed" title="Sin inundaciones activas cercanas">
-                                                            <svg class="w-4 h-4 text-slate-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                                                            Como Vinculada (Ver Mapa)
-                                                        </span>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                            <button type="button" onclick="validarRapido({{ $rep->id }}, 'rechazar')" class="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-600 border border-slate-300 px-3 py-2 text-xs rounded-lg font-bold shadow-sm transition-colors">
-                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                            @else
+                                                <button type="button" disabled title="Sin inundaciones activas cercanas" class="w-full inline-flex items-center justify-center gap-1.5 bg-slate-50 text-slate-400 border border-slate-200 px-3 py-2 text-xs rounded-lg font-bold cursor-not-allowed">
+                                                    <svg class="w-3.5 h-3.5 shrink-0 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                                                    Vincular
+                                                </button>
+                                            @endif
+                                            <button type="button" onclick="validarRapido({{ $rep->id }}, 'rechazar')" class="w-full inline-flex items-center justify-center gap-1.5 bg-stone-100 hover:bg-stone-200 text-stone-600 border border-stone-300 px-3 py-2 text-xs rounded-lg font-bold shadow-sm transition-colors">
+                                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
                                                 Rechazar
                                             </button>
                                         </div>
@@ -473,7 +484,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="px-4 py-8 text-center text-slate-500 font-medium">
+                                    <td colspan="5" class="px-4 py-8 text-center text-slate-500 font-medium">
                                         No hay reportes pendientes de revisión.
                                     </td>
                                 </tr>
@@ -565,7 +576,7 @@
                                 </p>
                                 <div
                                     id="report-minimap-rejected-{{ $rep->id }}"
-                                    class="report-location-minimap"
+                                    class="report-location-minimap report-location-minimap--compact"
                                     wire:ignore
                                     aria-label="Mapa de ubicación del reporte rechazado N°{{ $rep->id }}"
                                     data-lat-gps="{{ $rep->lat_gps }}"
@@ -838,6 +849,19 @@ window.validateReport = function(id, action) {
                 map.fitBounds(bounds, { padding: [8, 8] });
             }
 
+            map.scrollWheelZoom.disable();
+            if (!containerEl.dataset.wheelBound) {
+                containerEl.dataset.wheelBound = '1';
+                containerEl.addEventListener('mouseenter', () => {
+                    const m = reportMinimaps.get(containerEl.id);
+                    if (m) m.scrollWheelZoom.enable();
+                });
+                containerEl.addEventListener('mouseleave', () => {
+                    const m = reportMinimaps.get(containerEl.id);
+                    if (m) m.scrollWheelZoom.disable();
+                });
+            }
+
             reportMinimaps.set(id, map);
             setTimeout(() => map.invalidateSize(), 100);
         }
@@ -869,26 +893,6 @@ window.validateReport = function(id, action) {
             Livewire.hook('morph.updated', () => {
                 setTimeout(() => initAllReportMinimaps(false), 50);
             });
-        });
-
-        function toggleApproveMenu(id, event) {
-            event.stopPropagation();
-            const menu = document.getElementById('approve-menu-' + id);
-            const isOpen = menu && !menu.classList.contains('hidden');
-            closeApproveMenus();
-            if (menu && !isOpen) {
-                menu.classList.remove('hidden');
-            }
-        }
-
-        function closeApproveMenus() {
-            document.querySelectorAll('[id^="approve-menu-"]').forEach((el) => el.classList.add('hidden'));
-        }
-
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('.approve-dropdown')) {
-                closeApproveMenus();
-            }
         });
 
         function toggleDetails(id) {
@@ -945,12 +949,30 @@ window.validateReport = function(id, action) {
 
 
         function openImageModal(src) {
-            closeApproveMenus();
             const modal = document.getElementById('imageModal');
             const img = document.getElementById('modalImage');
             img.src = src;
             modal.classList.remove('hidden');
             setTimeout(() => modal.classList.remove('opacity-0'), 10);
+        }
+
+        function openReportDetailModal(btn) {
+            document.getElementById('reportDetailId').textContent = 'N°' + btn.dataset.id;
+            document.getElementById('reportDetailReporter').textContent = btn.dataset.reporter;
+            document.getElementById('reportDetailDate').textContent = btn.dataset.date;
+            document.getElementById('reportDetailIntensity').textContent = btn.dataset.intensity;
+            document.getElementById('reportDetailDescription').textContent = btn.dataset.description;
+            document.getElementById('reportDetailAddress').textContent = btn.dataset.address;
+
+            const modal = document.getElementById('reportDetailModal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+        }
+
+        function closeReportDetailModal() {
+            const modal = document.getElementById('reportDetailModal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
         }
 
         function closeImageModal() {
@@ -970,6 +992,35 @@ window.validateReport = function(id, action) {
                 <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
             <img id="modalImage" src="" alt="Report Image" class="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl border border-white/20">
+        </div>
+    </div>
+
+    <!-- Report Detail Modal -->
+    <div id="reportDetailModal" class="fixed inset-0 z-[10000] hidden bg-slate-900/90 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity duration-300 opacity-0" onclick="closeReportDetailModal()">
+        <div class="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden" onclick="event.stopPropagation()">
+            <div class="px-5 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-slate-800">Detalle del Reporte <span id="reportDetailId"></span></h3>
+                    <p class="text-xs text-slate-500 mt-0.5"><span id="reportDetailReporter"></span> · <span id="reportDetailDate"></span></p>
+                </div>
+                <button type="button" onclick="closeReportDetailModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+                <div>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Intensidad</span>
+                    <p id="reportDetailIntensity" class="text-sm font-semibold text-slate-800 capitalize mt-0.5"></p>
+                </div>
+                <div>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Descripción</span>
+                    <p id="reportDetailDescription" class="text-sm text-slate-700 whitespace-pre-wrap break-words leading-relaxed mt-1"></p>
+                </div>
+                <div class="border-t border-dashed border-slate-300 pt-4">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Dirección</span>
+                    <p id="reportDetailAddress" class="text-sm text-slate-600 whitespace-pre-wrap break-words leading-relaxed mt-1"></p>
+                </div>
+            </div>
         </div>
     </div>
 
