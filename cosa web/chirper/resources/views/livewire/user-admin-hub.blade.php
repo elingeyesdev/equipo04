@@ -26,7 +26,7 @@
                     <p class="text-sm font-medium text-green-800">{{ session('message') }}</p>
                 </div>
             </div>
-        </div>
+
     @endif
 
     <!-- Estadísticas -->
@@ -131,16 +131,21 @@
                                     </button>
 
                                     <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="transform opacity-0 scale-95" x-transition:enter-end="transform opacity-100 scale-100" x-transition:leave="transition ease-in duration-75" x-transition:leave-start="transform opacity-100 scale-100" x-transition:leave-end="transform opacity-0 scale-95" class="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none" role="menu" aria-orientation="vertical" aria-labelledby="menu-button" tabindex="-1" style="display: none;">
-                                        <div class="py-1" role="none">
                                             @if($user->role === \App\Models\User::ROLE_CITIZEN)
-                                                <button onclick="if(confirm('¿Estás seguro de promover este usuario a Autoridad?')) { @this.promoteToAuthority('{{ $user->carnet }}'); }" class="text-gray-700 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100" role="menuitem" tabindex="-1">
+                                                <button type="button" @click="open = false; Swal.fire({ title: '¿Promover a Autoridad?', text: '¿Estás seguro de otorgar rol de Autoridad?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, promover', confirmButtonColor: '#3085d6' }).then((r) => { if(r.isConfirmed) $wire.promoteToAuthority('{{ $user->carnet }}'); })" class="text-gray-700 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100" role="menuitem" tabindex="-1">
                                                     Promover a Autoridad
                                                 </button>
                                             @endif
                                             
                                             @if(in_array($user->role, [\App\Models\User::ROLE_CITIZEN, \App\Models\User::ROLE_AUTHORITY]))
-                                                <button onclick="if(confirm('¿Estás seguro de promover este usuario a Super Admin? Esta acción otorga acceso total.')) { @this.promoteToSuperAdmin('{{ $user->carnet }}'); }" class="text-gray-700 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100" role="menuitem" tabindex="-1">
+                                                <button type="button" @click="open = false; Swal.fire({ title: '¿Promover a Super Admin?', text: 'Esta acción otorga acceso total al sistema.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, promover', confirmButtonColor: '#3085d6' }).then((r) => { if(r.isConfirmed) $wire.promoteToSuperAdmin('{{ $user->carnet }}'); })" class="text-gray-700 block w-full px-4 py-2 text-left text-sm hover:bg-gray-100" role="menuitem" tabindex="-1">
                                                     Promover a Super Admin
+                                                </button>
+                                            @endif
+                                            
+                                            @if(in_array($user->role, [\App\Models\User::ROLE_AUTHORITY, \App\Models\User::ROLE_SUPER_ADMIN]))
+                                                <button type="button" @click="open = false; Swal.fire({ title: '¿Remover Cargos?', text: '¿Estás seguro de remover los cargos y volver a este usuario un Ciudadano?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, remover', confirmButtonColor: '#d33' }).then((r) => { if(r.isConfirmed) $wire.demoteUser('{{ $user->carnet }}'); })" class="text-red-600 font-medium block w-full px-4 py-2 text-left text-sm hover:bg-red-50" role="menuitem" tabindex="-1">
+                                                    Remover Cargos
                                                 </button>
                                             @endif
                                         </div>
@@ -232,4 +237,19 @@
             </div>
         </div>
     </div>
+    
+    <script>
+        document.addEventListener('livewire:initialized', () => {
+            @this.on('swal', (event) => {
+                const data = event[0];
+                Swal.fire({
+                    title: data.title,
+                    text: data.text,
+                    icon: data.icon,
+                    confirmButtonColor: '#3085d6',
+                    confirmButtonText: 'Entendido'
+                });
+            });
+        });
+    </script>
 </div>

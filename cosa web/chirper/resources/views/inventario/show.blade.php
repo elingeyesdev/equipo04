@@ -297,7 +297,7 @@
 
         <ul class="divide-y divide-gray-200">
             @forelse($inventario as $item)
-            <li class="p-6 hover:bg-gray-50 transition-colors" :class="{'opacity-50': isDisabled({{ $item->id }})}">
+            <li class="p-6 hover:bg-gray-50 transition-colors cursor-pointer" :class="{'opacity-50': isDisabled({{ $item->id }})}" @click="if(showBulk && !isDisabled({{ $item->id }}) && !$event.target.closest('a') && !$event.target.closest('button') && $event.target.tagName !== 'INPUT') { const cb = $el.querySelector('input[type=checkbox]'); if (cb) { cb.click(); } }">
                 <div class="flex items-start">
                     
                     @if(in_array($apiRole, ['authority', 'super-admin']))
@@ -380,7 +380,7 @@
                  style="display: none;">
                  
                  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                     <form id="bulkUpdateForm" action="{{ route('inventario.bulkUpdateStatus', $centro->id_centro) }}" method="POST" enctype="multipart/form-data">
+                     <form id="bulkUpdateForm" action="{{ route('inventario.bulkUpdateStatus', $centro->id_centro) }}" method="POST" enctype="multipart/form-data" onsubmit="return confirm('¿Confirmas el cambio de estado de estas donaciones?');">
                          @csrf
                          
                          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3">

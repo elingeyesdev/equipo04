@@ -61,6 +61,29 @@ services:
     networks:
       - app-network
 
+  reverb:
+    build:
+      context: ./
+      dockerfile: ./.docker/Dockerfile.php
+    volumes:
+      - "./cosa web/chirper:/var/www/html"
+    ports:
+      - "8081:8081"
+    environment:
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres_db
+      - DB_PORT=5432
+      - DB_DATABASE=chirper
+      - DB_USERNAME=sail
+      - DB_PASSWORD=password
+      - REVERB_SERVER_HOST=0.0.0.0
+      - REVERB_SERVER_PORT=8081
+    depends_on:
+      - postgres_db
+    command: php artisan reverb:start --host=0.0.0.0 --port=8081
+    networks:
+      - app-network
+
 volumes:
   pgdata:
 

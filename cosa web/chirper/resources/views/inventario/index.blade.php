@@ -69,7 +69,11 @@
                 
                 <div class="mt-6">
                     <a href="{{ route('inventario.show', $centro->id_centro) }}" class="inline-flex w-full justify-center items-center px-4 py-2 bg-primary-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition ease-in-out duration-150">
-                        Gestionar Inventario
+                        @if(session('api_user') && (session('api_user')['role'] ?? '') === 'citizen')
+                            Ver Donaciones
+                        @else
+                            Gestionar Inventario
+                        @endif
                     </a>
                 </div>
             </div>

@@ -74,7 +74,7 @@ class InventarioController extends Controller
             'categoria' => 'required|string|max:255',
             'descripcion' => 'nullable|string',
             'donor_type' => 'required|in:anonimo,autoridad,ciudadano',
-            'donor_carnet_input' => 'nullable|string|max:20|required_if:donor_type,ciudadano',
+            'donor_carnet_input' => 'nullable|digits_between:6,9|required_if:donor_type,ciudadano',
             'cantidad' => 'nullable|numeric|min:0',
             'unidad_medida' => 'nullable|string|max:50',
         ]);

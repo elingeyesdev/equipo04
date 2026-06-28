@@ -32,7 +32,7 @@ final class ChatController extends Controller
         $apiUser  = (array) $request->session()->get('api_user', []);
         $myCarnet = (string) ($apiUser['carnet'] ?? '');
 
-        $authorities = User::where('role', User::ROLE_AUTHORITY)
+        $authorities = User::whereIn('role', [User::ROLE_AUTHORITY, User::ROLE_SUPER_ADMIN])
             ->where('carnet', '!=', $myCarnet)
             ->where('is_banned', false)
             ->orderBy('name')
@@ -122,7 +122,7 @@ final class ChatController extends Controller
         $myRole   = (string) ($apiUser['role']   ?? '');
 
         // Solo autoridades autenticadas
-        if ($myCarnet === '' || $myRole !== 'authority') {
+        if ($myCarnet === '' || !in_array($myRole, ['authority', 'super-admin'])) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 

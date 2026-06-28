@@ -50,6 +50,27 @@ class UserAdminHub extends Component
         }
     }
 
+    public function demoteUser(string $carnet): void
+    {
+        $user = User::where('carnet', $carnet)->first();
+        if ($user && in_array($user->role, [User::ROLE_AUTHORITY, User::ROLE_SUPER_ADMIN])) {
+            if ($user->role === User::ROLE_SUPER_ADMIN) {
+                $superAdminCount = User::where('role', User::ROLE_SUPER_ADMIN)->count();
+                if ($superAdminCount <= 3) {
+                    $this->dispatch('swal', [
+                        'title' => 'Acción Denegada',
+                        'text' => 'No puedes quitar el rol de Super Admin. El sistema requiere al menos 3 superadmins activos en todo momento.',
+                        'icon' => 'error'
+                    ]);
+                    return;
+                }
+            }
+            
+            $user->update(['role' => User::ROLE_CITIZEN]);
+            session()->flash('message', 'Usuario removido de sus cargos administrativos con éxito.');
+        }
+    }
+
     public function openCreateModal(): void
     {
         $this->reset(['newName', 'newCarnet', 'newPhone', 'newPassword']);

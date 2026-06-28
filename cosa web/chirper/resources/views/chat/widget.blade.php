@@ -5,7 +5,7 @@
     $myName = (string) ($apiUser['name'] ?? '');
 @endphp
 
-@if ($apiRole === 'authority' && $myCarnet !== '')
+@if (in_array($apiRole, ['authority', 'super-admin']) && $myCarnet !== '')
 <!-- ══════════════════════════════════════════════════════════════════
      CHAT WIDGET FLOTANTE — solo autoridades
      ══════════════════════════════════════════════════════════════════ -->
@@ -38,14 +38,12 @@
     </button>
 
     <!-- Panel principal -->
-    <div id="chat-panel" style="
+    <div id="chat-panel" class="shadow-xl" style="
         display: none;
         width: 360px; height: 520px;
-        background: rgba(15, 23, 42, 0.97);
-        backdrop-filter: blur(16px);
-        border: 1px solid rgba(99,102,241,0.3);
-        border-radius: 16px;
-        box-shadow: 0 25px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(99,102,241,0.1);
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
         overflow: hidden;
         flex-direction: column;
         position: absolute; bottom: 68px; right: 0;
@@ -53,13 +51,13 @@
     ">
         <!-- Header -->
         <div style="
-            background: linear-gradient(135deg, #1e3a8a, #1e40af);
+            background: #1e3a8a; /* bg-primary-900 */
             padding: 14px 16px; display: flex; align-items: center; gap: 10px;
-            border-bottom: 1px solid rgba(99,102,241,0.3); flex-shrink: 0;
+            flex-shrink: 0;
         ">
             <div style="
                 width: 36px; height: 36px; border-radius: 50%;
-                background: rgba(255,255,255,0.15);
+                background: rgba(255,255,255,0.2);
                 display: flex; align-items: center; justify-content: center;
             ">
                 <svg width="18" height="18" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24">
@@ -69,28 +67,28 @@
             </div>
             <div style="flex:1">
                 <div style="color:white; font-weight:700; font-size:14px;">Chat Autoridades</div>
-                <div id="chat-header-subtitle" style="color:rgba(255,255,255,0.6); font-size:11px;">Seleccioná una autoridad</div>
+                <div id="chat-header-subtitle" style="color:rgba(255,255,255,0.75); font-size:11px;">Seleccione una autoridad</div>
             </div>
             <button id="chat-close" style="
-                background:none; border:none; cursor:pointer; color:rgba(255,255,255,0.6);
+                background:none; border:none; cursor:pointer; color:rgba(255,255,255,0.75);
                 padding:4px; border-radius:6px; line-height:1;
-                transition: color 0.15s;
+                transition: color 0.15s; font-size: 20px;
             " title="Cerrar">&times;</button>
         </div>
 
         <!-- Layout: lista + conversación -->
-        <div style="display:flex; flex:1; overflow:hidden;">
+        <div style="display:flex; flex:1; overflow:hidden; background:#ffffff;">
 
             <!-- Lista de autoridades (columna izquierda) -->
             <div id="chat-contacts" style="
                 width: 120px; flex-shrink:0;
-                border-right: 1px solid rgba(255,255,255,0.08);
+                border-right: 1px solid #e5e7eb;
                 overflow-y: auto; padding: 8px 4px;
-                background: rgba(0,0,0,0.2);
+                background: #f9fafb;
             ">
-                <div style="color:rgba(255,255,255,0.4); font-size:10px; text-transform:uppercase; letter-spacing:0.08em; padding:4px 8px 8px;">Contactos</div>
+                <div style="color:#6b7280; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; padding:4px 8px 8px;">Contactos</div>
                 <div id="chat-contacts-list" style="display:flex; flex-direction:column; gap:4px;">
-                    <div style="color:rgba(255,255,255,0.3); font-size:11px; text-align:center; padding:16px 4px;">Cargando...</div>
+                    <div style="color:#9ca3af; font-size:11px; text-align:center; padding:16px 4px;">Cargando...</div>
                 </div>
             </div>
 
@@ -101,38 +99,38 @@
                 <div id="chat-empty-state" style="
                     flex:1; display:flex; flex-direction:column;
                     align-items:center; justify-content:center; gap:12px;
-                    color:rgba(255,255,255,0.3); text-align:center; padding:20px;
+                    color:#9ca3af; text-align:center; padding:20px;
                 ">
-                    <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="opacity:0.4">
+                    <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="opacity:0.6">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
                     </svg>
-                    <span style="font-size:12px;">Seleccioná una autoridad para chatear</span>
+                    <span style="font-size:12px; font-weight:500;">Seleccione una autoridad para chatear</span>
                 </div>
 
                 <!-- Mensajes -->
                 <div id="chat-messages" style="
                     flex:1; overflow-y:auto; padding:12px; display:none;
-                    flex-direction:column; gap:8px; scroll-behavior:smooth;
+                    flex-direction:column; gap:8px; scroll-behavior:smooth; background:#ffffff;
                 "></div>
 
                 <!-- Input -->
                 <div id="chat-input-area" style="
-                    display:none; padding:10px; border-top:1px solid rgba(255,255,255,0.08);
-                    background:rgba(0,0,0,0.2); flex-shrink:0;
+                    display:none; padding:10px; border-top:1px solid #e5e7eb;
+                    background:#ffffff; flex-shrink:0;
                 ">
                     <div style="display:flex; gap:8px; align-items:flex-end;">
-                        <textarea id="chat-input" rows="1" placeholder="Escribí un mensaje..." style="
-                            flex:1; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15);
-                            border-radius:10px; color:white; font-size:13px; padding:8px 12px;
+                        <textarea id="chat-input" rows="1" placeholder="Escriba un mensaje..." style="
+                            flex:1; background:#f3f4f6; border:1px solid #d1d5db;
+                            border-radius:8px; color:#111827; font-size:13px; padding:8px 12px;
                             resize:none; outline:none; font-family:inherit; line-height:1.4;
-                            transition: border-color 0.15s;
+                            transition: border-color 0.15s, background 0.15s;
                         "></textarea>
                         <button id="chat-send" style="
-                            width:36px; height:36px; border-radius:10px; flex-shrink:0;
-                            background:linear-gradient(135deg,#1e40af,#3b82f6); border:none;
+                            width:36px; height:36px; border-radius:8px; flex-shrink:0;
+                            background:#2563eb; border:none;
                             cursor:pointer; display:flex; align-items:center; justify-content:center;
-                            transition: opacity 0.15s, transform 0.15s;
+                            transition: background 0.15s, transform 0.15s;
                         ">
                             <svg width="16" height="16" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
@@ -150,20 +148,21 @@
     from { opacity:0; transform: translateY(12px) scale(0.97); }
     to   { opacity:1; transform: translateY(0)   scale(1);    }
 }
-#chat-fab:hover { transform: scale(1.08); box-shadow: 0 6px 28px rgba(59,130,246,0.7); }
+#chat-fab:hover { transform: scale(1.08); box-shadow: 0 6px 20px rgba(37,99,235,0.4); }
 #chat-contacts-list .contact-btn {
     width:100%; background:none; border:none; cursor:pointer;
     border-radius:8px; padding:6px; display:flex; flex-direction:column;
-    align-items:center; gap:4px; transition:background 0.15s; color:white;
+    align-items:center; gap:4px; transition:background 0.15s; color:#374151; font-weight:500;
 }
-#chat-contacts-list .contact-btn:hover { background:rgba(255,255,255,0.08); }
-#chat-contacts-list .contact-btn.active { background:rgba(59,130,246,0.25); }
+#chat-contacts-list .contact-btn:hover { background:#e5e7eb; }
+#chat-contacts-list .contact-btn.active { background:#eff6ff; color:#1d4ed8; }
 #chat-messages::-webkit-scrollbar { width:4px; }
 #chat-messages::-webkit-scrollbar-track { background:transparent; }
-#chat-messages::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.15); border-radius:4px; }
+#chat-messages::-webkit-scrollbar-thumb { background:#d1d5db; border-radius:4px; }
 #chat-contacts::-webkit-scrollbar { width:3px; }
-#chat-contacts::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.1); border-radius:3px; }
-#chat-input:focus { border-color:rgba(59,130,246,0.6); background:rgba(255,255,255,0.12); }
+#chat-contacts::-webkit-scrollbar-thumb { background:#e5e7eb; border-radius:3px; }
+#chat-input:focus { border-color:#3b82f6; background:#ffffff; box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
+#chat-send:hover { background:#1d4ed8 !important; }
 </style>
 
 <script>
@@ -312,13 +311,13 @@
     function createSeparatorNode() {
         const separator = document.createElement('div');
         separator.style.cssText = `
-            display:flex; align-items:center; gap:8px; margin:6px 0; color:rgba(255,255,255,0.45);
+            display:flex; align-items:center; gap:8px; margin:6px 0; color:#6b7280;
             font-size:10px; text-transform:uppercase; letter-spacing:0.08em;
         `;
         separator.innerHTML = `
-            <div style="height:1px; flex:1; background:rgba(255,255,255,0.14);"></div>
+            <div style="height:1px; flex:1; background:#e5e7eb;"></div>
             <span style="white-space:nowrap;">Mensajes no vistos</span>
-            <div style="height:1px; flex:1; background:rgba(255,255,255,0.14);"></div>
+            <div style="height:1px; flex:1; background:#e5e7eb;"></div>
         `;
         return separator;
     }
@@ -357,14 +356,14 @@
             gap:2px; animation: chatMsgIn 0.18s ease;
         `;
         div.innerHTML = `
-            ${!isMine ? `<span style="color:rgba(255,255,255,0.45);font-size:10px;margin-left:4px;">${escHtml(msg.sender_name)}</span>` : ''}
+            ${!isMine ? `<span style="color:#6b7280;font-size:10px;margin-left:4px;">${escHtml(msg.sender_name)}</span>` : ''}
             <div style="
                 max-width:85%; padding:8px 12px; border-radius:${isMine ? '14px 14px 4px 14px' : '14px 14px 14px 4px'};
-                background:${isMine ? 'linear-gradient(135deg,#1e40af,#3b82f6)' : 'rgba(255,255,255,0.1)'};
-                color:white; font-size:13px; line-height:1.45; word-break:break-word;
-                border:1px solid ${isMine ? 'transparent' : 'rgba(255,255,255,0.08)'};
+                background:${isMine ? '#2563eb' : '#f3f4f6'};
+                color:${isMine ? 'white' : '#111827'}; font-size:13px; line-height:1.45; word-break:break-word;
+                border:1px solid ${isMine ? 'transparent' : '#e5e7eb'};
             ">${escHtml(msg.message)}</div>
-            <span style="color:rgba(255,255,255,0.3);font-size:10px;margin:0 4px;">${fmtTime(msg.created_at)}</span>
+            <span style="color:#9ca3af;font-size:10px;margin:0 4px;">${fmtTime(msg.created_at)}</span>
         `;
         return div;
     }
@@ -374,7 +373,7 @@
         messagesEl.innerHTML = '';
 
         if (!state.messages.length) {
-            messagesEl.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.3);font-size:12px;padding:20px;">Sin mensajes aún. ¡Empezá la conversación!</div>';
+            messagesEl.innerHTML = '<div style="text-align:center;color:#9ca3af;font-size:12px;padding:20px;">Sin mensajes aún. ¡Empezá la conversación!</div>';
             return;
         }
 
@@ -434,7 +433,7 @@
 
     // ── Cargar historial ──────────────────────────────────────────────────────
     async function loadHistory(carnet) {
-        messagesEl.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.3);font-size:12px;padding:20px;">Cargando...</div>';
+        messagesEl.innerHTML = '<div style="text-align:center;color:#9ca3af;font-size:12px;padding:20px;">Cargando...</div>';
         messagesEl.style.display = 'flex';
         emptyState.style.display = 'none';
         inputArea.style.display  = 'block';
@@ -569,7 +568,7 @@
             contactsList.innerHTML = '';
 
             if (authorities.length === 0) {
-                contactsList.innerHTML = '<div style="color:rgba(255,255,255,0.3);font-size:11px;text-align:center;padding:12px 4px;">Sin otras autoridades</div>';
+                contactsList.innerHTML = '<div style="color:#9ca3af;font-size:11px;text-align:center;padding:12px 4px;">Sin otras autoridades</div>';
                 return;
             }
 
@@ -593,10 +592,10 @@
                             min-width:18px; height:18px; padding:0 4px;
                             background:#ef4444; color:white; border-radius:999px;
                             font-size:10px; font-weight:700; align-items:center; justify-content:center;
-                            border:2px solid #0f172a;
+                            border:2px solid #f9fafb;
                         ">0</span>
                     </div>
-                    <span style="font-size:9px;color:rgba(255,255,255,0.7);text-align:center;word-break:break-word;line-height:1.2;">${escHtml(auth.name)}</span>
+                    <span style="font-size:9px;color:#4b5563;text-align:center;word-break:break-word;line-height:1.2;margin-top:4px;">${escHtml(auth.name)}</span>
                 `;
                 btn.addEventListener('click', () => selectContact(auth, btn));
                 contactsList.appendChild(btn);
