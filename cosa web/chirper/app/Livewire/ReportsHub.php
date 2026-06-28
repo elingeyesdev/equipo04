@@ -48,6 +48,7 @@ class ReportsHub extends Component
         try {
             $api->updateReport($token, $id, ['estado' => 'terminada']);
             session()->flash('success', "Inundación #{$id} marcada como terminada correctamente.");
+            $this->dispatch('refreshReports');
         } catch (\Exception $e) {
             session()->flash('error', 'No se pudo desactivar la inundación: ' . $e->getMessage());
         }
@@ -67,7 +68,7 @@ class ReportsHub extends Component
 
         session()->flash('success', "Reporte #{$id} renovado exitosamente. Su TTL se ha extendido 3 horas.");
         $this->dispatch('reporte-ttl-renovado', reporteId: $id);
-        $this->skipRender();
+        $this->dispatch('refreshReports');
     }
 
     public function render()
