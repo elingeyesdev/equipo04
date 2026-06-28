@@ -104,8 +104,8 @@
                     <a href="{{ route('logistica.index', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('logistica.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Logística</a>
                     <a href="{{ route('inventario.index', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('inventario.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Inventario</a>
                     <a href="{{ route('victimas.index', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('victimas.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Víctimas</a>
-                    @if ($apiRole === 'authority')
-                        <a href="{{ route('authorities.create', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('authorities.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Promover Autoridad</a>
+                    @if ($apiRole === 'super-admin')
+                        <a href="{{ route('admin.users', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('admin.users') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Admin Usuarios</a>
                     @endif
                 </nav>
                 @endif
@@ -167,7 +167,7 @@
     <nav class="md:hidden bg-white border-b border-gray-200 overflow-x-auto no-scrollbar flex items-center px-4 py-2 gap-2 shadow-inner">
         <a href="{{ route('reports.index', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('reports.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Reportes</a>
         <a href="{{ route('reports.mis', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('reports.mis') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Mis reportes</a>
-        @if ($apiRole === 'authority')
+        @if (in_array($apiRole, ['authority', 'super-admin']))
             <a href="{{ route('reports.pendientes', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('reports.pendientes') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Pendientes</a>
             <a href="{{ route('reports.rechazados', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('reports.rechazados') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Rechazados</a>
         @endif
@@ -177,8 +177,8 @@
         <a href="{{ route('logistica.index', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('logistica.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Logística</a>
         <a href="{{ route('inventario.index', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('inventario.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Inventario</a>
         <a href="{{ route('victimas.index', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('victimas.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Víctimas</a>
-        @if ($apiRole === 'authority')
-            <a href="{{ route('authorities.create', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('authorities.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Promover Autoridad</a>
+        @if ($apiRole === 'super-admin')
+            <a href="{{ route('admin.users', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('admin.users') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Admin Usuarios</a>
         @endif
     </nav>
     @endif

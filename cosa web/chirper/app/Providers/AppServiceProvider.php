@@ -25,6 +25,8 @@ class AppServiceProvider extends ServiceProvider
             URL::forceScheme('http');
             URL::forceRootUrl(config('app.url'));
         }
+        
+        \Carbon\Carbon::setLocale(config('app.locale'));
 
         View::composer('layouts.app', function ($view) {
             $count = 0;
