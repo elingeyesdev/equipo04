@@ -145,7 +145,7 @@
                     </button>
                 </div>
                 @endif
-                <div id="map-wrapper" class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden relative"
+                <div id="map-wrapper" class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-visible relative"
                     style="height: 700px;">
                     <div id="logistics_map" class="absolute inset-0 z-0"></div>
                     
@@ -389,7 +389,7 @@
             };
 
             const overlayMaps = {};
-            const layerControl = L.control.layers(baseMaps, overlayMaps).addTo(map);
+            const layerControl = L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
 
             markersLayer = L.layerGroup().addTo(map); // Activo por defecto
             layerControl.addOverlay(markersLayer, "Centros de Acopio");

@@ -272,13 +272,21 @@ it('renderiza la página de reporte rápido', function () {
 
     $response->assertOk()
 
-        ->assertSee('Reporte Rápido', false)
+        ->assertSee('ISCZ', false)
+
+        ->assertSee('Portal', false)
 
         ->assertSee('rapidoMap', false)
 
         ->assertSee('flood-heat-sources.js', false)
 
         ->assertSee('reporte-rapido.js', false)
+
+        ->assertDontSee('rapidoCarousel', false)
+
+        ->assertDontSee('Inundaciones cercanas', false)
+
+        ->assertDontSee('rapidoModeChip', false)
 
         ->assertDontSee('rapidoShowReportDots', false);
 

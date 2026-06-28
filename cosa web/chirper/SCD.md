@@ -170,30 +170,29 @@ flowchart LR
 | `GET /reports/rechazados` | `ReportsRechazados` | Autoridad | Auditoría con filtros (paginado 15) |
 | `GET /reports/create`, `POST /reports` | `ReportController` | Sesión | Alta de reportes |
 | `GET /reports/{id}` | `ReportController` | Sesión | Ficha de reporte |
-| `GET /reporte-rapido` | `ReporteRapidoController` | **Público** | Reporte rápido anónimo: mapa con heatmap, carrusel de cercanía, intensidad por segmented control |
+| `GET /reporte-rapido` | `ReporteRapidoController` | **Público** | Reporte rápido anónimo: mapa con heatmap, intensidad por segmented control |
 
 > Las rutas específicas (`/reports/pendientes`, `/reports/rechazados`, etc.) se registran **antes** de `/reports/{id}` para evitar colisiones.
 
 #### Reporte Rápido (`/reporte-rapido`)
 
-Flujo móvil-first para ciudadanos **sin sesión**:
+Flujo móvil-first para ciudadanos **sin sesión** (emergencia, mínima fricción):
 
-- **Layout:** `layouts/emergency.blade.php` (header mínimo, sin nav completa).
-- **Frontend:** `public/js/reporte-rapido.js` + `public/js/flood-heat-sources.js` (helper compartido con `/reports`) + `components/reports/rapido-styles.blade.php`.
-- **Mapa:** Leaflet + `smart-heatmap.js` / `flood-outline.js` / `flood-heat-sources.js` — mismo pipeline de heatSources que `/reports` (TTL por reportes vivos vía `ultima_actividad_at`, geometría unificada). Capa de calor persistente (`heatLayer`), pane `floodFillPane` (z=450, encima del círculo GPS), redraw en zoom/move y doble pasada tras pintar (como `/reports`). Pin GPS draggable, círculo 500 m, leyenda baja/media/alta, **puntos de reportes activos siempre visibles** (sin toggle). No hay control de capas Leaflet (a diferencia de `/reports`, donde el heatmap vive en la overlay “Zona de Inundación”).
-- **Carrusel:** inundaciones cercanas (≤2 km o dentro de contorno) con flechas, drag-to-scroll y dots; tarjetas muestran distancia, intensidad, **N reportes activos**, estado confirmada/validación y última actividad; modo **Apoyar** pre-rellena intensidad y mantiene el pin en el GPS del usuario. **Cancelar apoyo:** botón × del chip, o segundo clic en la misma tarjeta (toggle); al salir se resetea intensidad a baja y se quita la selección visual.
-- **Envío:** `POST /api/reportes` estándar (`user_uuid`, coords, intensidad). Sin auto-vincular; el quórum sube tras validación de autoridad.
-- **Vinculación:** el backend existente (`InundacionMapaService::inundacionesVinculablesParaReporte` → `enrichPendientesConCercanas`) detecta candidatas por coordenadas del reporte; no se envía `inundacion_id` desde el cliente.
-- **Contexto dinámico:** `GET /api/inundaciones/contexto?lat=&lng=` (público, throttle); refresco cada 60 s tras obtener GPS.
-- **Post-envío:** confirmación in-page (pendiente de validación, referencia de reporte, ETA si aplica); sin redirect forzado a login.
+- **Layout:** `layouts/emergency.blade.php` — header con marca **ISCZ Portal** (mismo estilo que `/login` / app), sin iconos decorativos; enlace a iniciar sesión.
+- **Frontend:** `public/js/reporte-rapido.js` + `public/js/flood-heat-sources.js` + `components/reports/rapido-styles.blade.php`.
+- **Flujo UI:** botón Actualizar GPS → mapa → intensidad (segmented sólido) → enviar. **Sin carrusel** ni modo Apoyar.
+- **Mapa:** Leaflet + `smart-heatmap.js` / `flood-outline.js` / `flood-heat-sources.js` — mismo pipeline de heatSources que `/reports`. Capa `heatLayer` persistente, pane `floodFillPane` (z=450), `ensureHeatOverlayOnPane` en smart-heatmap, `whenReady`, `ResizeObserver`, `fitBounds` inicial, redraw doble + `tickFloodHeatTtlPulse` inmediato. Pin usuario naranja sólido, círculo 500 m, leyenda por tier, puntos de reportes siempre visibles.
+- **Envío:** `POST /api/reportes` (`user_uuid`, coords, intensidad). Sin `inundacion_id` en cliente.
+- **Vinculación:** automática en backend (`InundacionMapaService::inundacionesVinculablesParaReporte`).
+- **Contexto:** `GET /api/inundaciones/contexto?lat=&lng=` (≤2 km o dentro de contorno); refresco 60 s.
+- **Post-envío:** confirmación in-page; sin redirect forzado a login.
 
-**Correcciones UX/mapa (2026-06-28):**
+**Cambios UX (2026-06-28):**
 
-- **Heatmap:** `heatLayer` persistente (no se recrea en cada refresh); pane `floodFillPane` z-index 450; `scheduleHeatRedraw()` con doble pasada (0 ms + 120 ms) y en `zoomend`/`moveend`; timer `tickFloodHeatTtlPulse` como en `/reports`.
-- **TTL/geometría:** `InundacionPublicResource` serializa `reportes_activos[].updated_at` en ISO8601; `flood-heat-sources.js` usa `ultima_actividad_at` como fallback TTL y permite polígono unificado sin exigir polígono en todos los reportes.
-- **Modo Apoyar:** chip ocultable con `.hidden` en `rapido-styles` (independiente de Tailwind/Vite); cancelar con × o segundo clic en la misma tarjeta; intensidad vuelve a baja al salir.
-- **Puntos de reporte:** siempre visibles; eliminado checkbox `#rapidoShowReportDots`.
-- **Assets:** `reporte-rapido.js?v=3`, `flood-heat-sources.js?v=2`.
+- Eliminados carrusel, modo Apoyar, checkbox de puntos, texto/coords GPS, gradientes y animaciones decorativas.
+- UI sólida: intensidades siempre en color pleno; selección con anillo negro; botón enviar cambia de color según intensidad.
+- Heatmap: alineado con `/reports` (pane fix, tick inicial, resize observer).
+- Assets: `reporte-rapido.js?v=4`, `smart-heatmap.js?v=20260629h`, `flood-heat-sources.js?v=2`.
 
 ### 4.7 Livewire — Panel de reportes (modular)
 

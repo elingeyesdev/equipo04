@@ -110,22 +110,14 @@ final class ReporteValidacionService
                 ]);
             }
 
-            $distancia = $mapaService->distanciaMetros(
-                (float) $reporte->lat_reporte,
-                (float) $reporte->long_reporte,
-                (float) $inundacion->latitud,
-                (float) $inundacion->longitud,
-            );
+            $latRep = (float) $reporte->lat_reporte;
+            $lngRep = (float) $reporte->long_reporte;
 
-            $dentroContorno = $mapaService->puntoDentroContornoActivo(
-                (float) $reporte->lat_reporte,
-                (float) $reporte->long_reporte,
-                $inundacion,
-            );
-
-            if (! $dentroContorno && $distancia > InundacionMapaService::RADIO_VINCULACION_METROS) {
+            if (! $mapaService->esVinculableGeograficamente($latRep, $lngRep, $inundacion)) {
                 throw ValidationException::withMessages([
-                    'inundacion_id' => 'La inundación está a más de '.InundacionMapaService::RADIO_VINCULACION_METROS.' m del evento reportado y fuera de su contorno activo.',
+                    'inundacion_id' => 'El reporte está fuera del contorno activo y a más de '
+                        .InundacionMapaService::BUFFER_CONTORNO_METROS
+                        .' m de su borde (o fuera del radio de la mancha de los reportes activos).',
                 ]);
             }
 

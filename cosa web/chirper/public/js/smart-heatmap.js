@@ -375,6 +375,21 @@ function createHeatOverlay(map, raster, options) {
     });
 }
 
+function ensureHeatOverlayOnPane(map, overlay, paneName) {
+    if (!map || !overlay || !paneName) return;
+
+    const paneEl = map.getPane(paneName);
+    const imgEl = typeof overlay.getElement === 'function' ? overlay.getElement() : null;
+
+    if (paneEl && imgEl && imgEl.parentNode !== paneEl) {
+        paneEl.appendChild(imgEl);
+    }
+
+    if (typeof overlay._reset === 'function') {
+        overlay._reset();
+    }
+}
+
 window.redrawFloodHeatOverlays = function (map, instance) {
     if (!map || !instance || !Array.isArray(instance.overlays)) return;
 
@@ -527,6 +542,12 @@ window.createSmartHeatmap = function (map, reports, options = {}) {
 
         tierGroups.push(group);
     });
+
+    if (options.pane) {
+        allOverlays.forEach(function (overlay) {
+            ensureHeatOverlayOnPane(map, overlay, options.pane);
+        });
+    }
 
     return {
         layers: tierGroups,

@@ -113,7 +113,6 @@
                                             data-lat-rep="{{ $rep->lat_reporte }}"
                                             data-lng-rep="{{ $rep->long_reporte }}"
                                         ></div>
-                                        <p class="text-[9px] text-slate-400 mt-1"><span class="text-blue-500">●</span> Usuario <span class="text-rose-500 ml-1">●</span> Evento</p>
                                     </td>
                                     <td>
                                         <div class="flex flex-col gap-1.5 w-full max-w-[9.5rem]">

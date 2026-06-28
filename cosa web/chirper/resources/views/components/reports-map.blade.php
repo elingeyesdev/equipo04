@@ -147,7 +147,7 @@
 </style>
 
 <div class="relative mb-10">
-    <div id="map-container" class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden relative z-0" style="height: {{ $mapHeight }};" wire:ignore>
+    <div id="map-container" class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-visible relative z-0" style="height: {{ $mapHeight }};" wire:ignore>
         <div id="map" class="absolute inset-0 z-0"></div>
 
         @if($showRouting)
@@ -349,7 +349,7 @@ function initMap() {
 
     // ── 3. Overlays ───────────────────────────────────────────────────────
     const overlayMaps = {};
-    const layerControl = L.control.layers(baseMaps, overlayMaps, { collapsed: true }).addTo(map);
+    const layerControl = L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
 
     // ── 3a. Capas de Reportes ─────────────────────────────────────────────
     const markersLayer           = L.layerGroup().addTo(map);
@@ -562,6 +562,16 @@ function initMap() {
         }
     }
 
+    function focusMapOnPoint(lat, lng, minZoom) {
+        minZoom = minZoom || 15;
+        if (isNaN(lat) || isNaN(lng)) return;
+        if (map.getZoom() >= minZoom) {
+            map.panTo([lat, lng], { animate: true, duration: 0.5 });
+        } else {
+            map.flyTo([lat, lng], minZoom, { animate: true, duration: 0.8 });
+        }
+    }
+
     function selectInundacion(inundacion, options) {
         options = options || { fly: true };
         const lat = parseFloat(inundacion.latitud);
@@ -596,13 +606,8 @@ function initMap() {
 
         updateSelectionMarkerStyles();
 
-        if (options.fly) {
-            if (outlineLayers.length > 0) {
-                const group = L.featureGroup(outlineLayers);
-                map.fitBounds(group.getBounds().pad(0.12), { maxZoom: 16, animate: true, duration: 0.8 });
-            } else if (!isNaN(lat) && !isNaN(lng)) {
-                map.flyTo([lat, lng], 15, { animate: true, duration: 0.8 });
-            }
+        if (options.fly && !isNaN(lat) && !isNaN(lng)) {
+            focusMapOnPoint(lat, lng, 15);
         }
     }
 
@@ -725,6 +730,7 @@ function initMap() {
                     repMarker.on('click', function (e) {
                         L.DomEvent.stopPropagation(e);
                         selectInundacion(report, { fly: false });
+                        focusMapOnPoint(repLat, repLng, 15);
                     });
 
                     individualReportsLayer.addLayer(repMarker);
@@ -825,6 +831,11 @@ function initMap() {
 
             const marker = L.marker([lat, lng], { icon: customIcon })
                 .bindPopup(popupHtml, { minWidth: 200 });
+
+            marker.on('click', function (e) {
+                L.DomEvent.stopPropagation(e);
+                focusMapOnPoint(lat, lng, 15);
+            });
 
             pendingReportsLayer.addLayer(marker);
         });

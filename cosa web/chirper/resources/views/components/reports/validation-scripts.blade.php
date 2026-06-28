@@ -347,7 +347,11 @@ window.buildPendingValidationPopupHtml = function (report) {
         }
 
         function closeReportDetailModal() {
-            destroyReportMinimap('report-detail-minimap');
+            try {
+                destroyReportMinimap('report-detail-minimap');
+            } catch (err) {
+                console.warn('No se pudo destruir minimapa del modal:', err);
+            }
             reportDetailCurrentData = null;
 
             const modal = document.getElementById('reportDetailModal');
