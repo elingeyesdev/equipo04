@@ -7,7 +7,7 @@
 
 ## 📖 Visión General del Proyecto
 
-El **Sistema de Gestión de Inundaciones (SGI)** es una plataforma web desarrollada para monitorear, validar y visualizar eventos hidrológicos extremos en **Santa Cruz de la Sierra, Bolivia**. 
+El **Sistema de Gestión de Inundaciones (SGI)** es una plataforma web desarrollada para monitorear, validar y visualizar eventos hidrológicos extremos en **Santa Cruz de la Sierra, Bolivia**.
 
 Este sistema aborda el problema combinando la **participación ciudadana (Crowdsourcing)** para predecir y dibujar cómo el agua se acumula en tiempo real.
 
@@ -15,112 +15,181 @@ Este sistema aborda el problema combinando la **participación ciudadana (Crowds
 
 ## 🏗️ Arquitectura y Tecnologías
 
-El proyecto sigue una arquitectura monolítica moderna impulsada por eventos, utilizando el ecosistema de Laravel.
+Monolito Laravel impulsado por eventos. La capa web usa `FloodApiClient` para invocar una **API REST interna** (Sanctum), fuente de verdad del negocio.
 
-* **Backend:** Laravel 11 (PHP 8.2+).
-* **Frontend:** Blade Templates + Tailwind CSS (Glassmorphism & Diseño Premium) + JS Vainilla.
-* **Base de Datos:** PostgreSQL.
-* **Mapas y GIS:** Leaflet.js + Leaflet.heat (Capa de Calor).
-* **Infraestructura Local:** Laravel Sail (Docker).
-
----
-
-## 🧠 Lógica Core: El Mapa de Calor y la Topografía Inteligente
-
-A diferencia de los mapas estáticos tradicionales, el SGI no muestra simples "marcadores" donde alguien reportó agua. Simula el comportamiento del agua basándose en el tiempo y el terreno. 
-
-### 1. Sistema de Quórum Dinámico y TTL (Time-To-Live)
-Las inundaciones son eventos dinámicos que aparecen y desaparecen. 
-* **Reportes Ciudadanos:** Cuando un usuario envía un reporte, este se asocia a una inundación.
-* **Tiempo de Vida (TTL):** Cada reporte tiene un tiempo de vida activo de **3 horas**, basado estrictamente en el campo **`updated_at`** de la base de datos.
-* **Renovación (Autoridades):** Si el evento de lluvia continúa, una autoridad puede pulsar el botón **"Renovar"**. Esto hace un `touch()` al reporte (actualiza su `updated_at` al momento actual), otorgándole 3 horas adicionales de vida, manteniendo el área visualmente inundada en el mapa sin requerir reportes basura.
-* Si el tiempo (`updated_at` + 3h) se agota, el reporte pasa a estar "Caducado" o inactivo, y sus puntos de calor se retiran automáticamente del mapa principal, reduciendo la intensidad de la inundación de forma realista a medida que el agua drena.
-
-### 2. Motor Topográfico (`CalcularPoligonoInundacion` Job)
-Cuando se aprueba un reporte, el sistema no asume que el agua se queda en un punto exacto (1 metro cuadrado). El agua fluye:
-1. El backend lanza un **Job asíncrono/síncrono** que se conecta a un servicio de elevación externa.
-2. Lee la latitud y longitud del reporte, y muestrea 8 puntos a su alrededor (como los radios de una bicicleta) a diferentes distancias (ej. 15, 35 o 60 metros dependiendo de la "Intensidad" reportada).
-3. Evalúa el terreno: **El agua solo fluye hacia áreas que tengan una elevación igual o menor** al epicentro (con un margen de error de `0.5 metros` por bordes de calle/acera).
-4. Genera un **Casco Convexo (Convex Hull)** con los puntos inundables y guarda este polígono en la base de datos (`polygon_coords`).
-5. **Resultado:** En lugar de un círculo perfecto, el frontend dibuja la forma irregular real de cómo se empozó el agua en la calle.
-
-### 3. Puentes Térmicos (Fusión de Mapas de Calor)
-Si llueve fuerte en el 4to Anillo, es probable que haya múltiples reportes en la misma avenida.
-* El mapa extrae todos los reportes activos vinculados a la misma inundación.
-* Si la distancia entre dos reportes es entre **10 y 250 metros**, el algoritmo de JavaScript inyecta automáticamente puntos de interpolación térmica en el medio (uno cada 15 metros).
-* El motor `leaflet.heat` renderiza estos puntos con una opacidad calculada, lo que resulta en la ilusión visual de un **río continuo** que conecta los reportes ciudadanos, reflejando el colapso de un canal o avenida entera.
-
-### 4. Capa de Intervención de Autoridades
-El sistema reconoce que el cálculo algorítmico puede no ser suficiente en desastres mayores. Una Autoridad puede usar herramientas de dibujo (`L.Draw`) para "manchar el mapa" manualmente. Si el backend detecta que la *Inundación* (no el reporte individual) tiene un polígono trazado por una autoridad, este tiene **absoluta prioridad**. Se oculta la simulación ciudadana y se dibuja un polígono de borde azul punteado indicando una "Zona de Desastre Oficial".
+| Capa | Stack |
+|------|--------|
+| Backend | Laravel 13 (PHP 8.3+; entorno actual 8.4) |
+| Frontend | Blade + Livewire + Tailwind CSS 4 + JS vanilla |
+| Tiempo real | Laravel Reverb + Laravel Echo (chat de autoridades) |
+| Base de datos | PostgreSQL (`jsonb` para polígonos y clima) |
+| Mapas | Leaflet.js + Leaflet.heat |
+| Colas | driver `database` (`queue:work` para topografía) |
+| Infra | Docker Compose (`postgres_db`, `web_app`, `queue_worker`) |
 
 ---
 
-## 🚀 Guía de Instalación Rápida para Desarrolladores (Optimizado para WSL/Ubuntu)
+## 🧩 Módulos del Sistema
 
-Para maximizar el rendimiento de Docker en Windows, este proyecto se ha configurado para ejecutarse nativamente dentro de **WSL (Ubuntu)**. Sigue estos pasos para levantar el entorno:
+Además del núcleo de inundaciones y reportes, el SGI incluye módulos operativos para la respuesta ante desastres:
 
-1. **Instalar WSL (Linux) en Windows:**
-   Abre una terminal de PowerShell como administrador y ejecuta:
-   ```powershell
-   wsl --install
-   ```
-   *(Si ya lo tienes, asegúrate de que esté actualizado con `wsl --update` y reinicia si es necesario).*
+| Módulo | Ruta principal | Descripción |
+|--------|----------------|-------------|
+| **Reportes e inundaciones** | `/reports` | Mapa de calor, validación ciudadana, quórum y TTL |
+| **Centro de comando** | `/command-center` | Timeline, análisis de impacto, fusión de inundaciones, daños materiales |
+| **Logística** | `/logistica` | Centros de asistencia |
+| **Víctimas** | `/victimas` | Registro y seguimiento de afectados |
+| **Inventario** | `/inventario` | Stock por centro de asistencia |
+| **Vehículos** | `/vehiculos/mapa` | Flota en mapa y gestión (autoridad) |
+| **Chat** | `/chat` | Mensajería entre autoridades (Reverb) |
+| **Perfil** | `/perfil` | Datos del usuario autenticado |
+| **Sugerencias / FAQ** | `/sugerencias`, `/faq` | Retroalimentación y ayuda pública |
 
-2. **Mover o copiar el proyecto a Ubuntu:**
-   Para que Docker funcione a la máxima velocidad, el proyecto **no** debe estar en tu disco de Windows (como `C:\Users\...`). 
-   - Abre tu terminal de Ubuntu y clona o copia tu proyecto dentro del sistema de archivos de Linux (por ejemplo, en `/home/tu_usuario/ProyectoInundaciones2` o `/root/...`).
+Los roles son **ciudadano** (reporta y consulta) y **autoridad** (valida, opera logística, gestiona flota y datos sensibles).
 
-3. **Instalar dependencias clave en Ubuntu:**
-   Abre tu terminal de Ubuntu y asegúrate de instalar PHP, Composer y Node.js para poder gestionar los paquetes correctamente de forma local antes de levantar Sail:
+---
+
+## 🧠 Lógica Core: Mapa de Calor y Topografía
+
+El SGI no muestra solo marcadores estáticos: simula acumulación de agua según tiempo y terreno.
+
+### 1. Quórum dinámico y TTL (3 h)
+
+- Reportes ciudadanos se asocian a inundaciones.
+- **TTL:** vida activa de **3 horas** según `updated_at`.
+- **Renovar** (autoridades): `touch()` al reporte (+3 h en mapa).
+- Al caducar, el calor baja de forma realista.
+
+### 2. Motor topográfico (`CalcularPoligonoInundacion`)
+
+1. Job consulta elevación vía **Open Topo Data** (SRTM 30 m, sin API key), caché 24 h.
+2. **Region growing** (celda ≈ 25 m; radio 100/200/300 m por intensidad).
+3. Agua solo hacia celdas ≤ epicentro (margen 0.5 m).
+4. Polígono en `polygon_coords`; fallback geométrico si falla la API.
+5. **PolygonSimplifier:** Douglas-Peucker, máx. 150 vértices/anillo.
+
+### 3. Unificación de zona
+
+- Job de inundación fusiona polígonos de reportes (cierre morfológico).
+- Cliente: `flood-outline.js` unifica contornos si el backend aún no calculó.
+
+### 4. Mapa de calor por intensidad
+
+- Capas fijas: baja `#7dd3fc`, media `#0ea5e9`, alta `#1e3a8a`.
+- Radio en metros reales; leyenda y etiqueta por inundación.
+
+### 5. Intervención de autoridades
+
+`polygon_editado_autoridad` tiene prioridad absoluta sobre recálculos.
+
+### 6. Validación de reportes
+
+El panel de reportes está implementado con **varios componentes Livewire** y partials compartidos. La navegación entre secciones está en el menú desplegable **Reportes** de la barra superior.
+
+| Ruta | Componente | Acceso |
+|------|------------|--------|
+| `/reports` | `ReportsHub` | Sesión — vista general con mapa e inundaciones activas |
+| `/reports/mis-reportes` | `ReportsMisReportes` | Sesión — reportes del usuario |
+| `/reports/historial` | `ReportsHistorial` | Sesión — inundaciones terminadas |
+| `/reports/pendientes` | `ReportsPendientes` | Autoridad — cola de validación (paginado) |
+| `/reports/rechazados` | `ReportsRechazados` | Autoridad — auditoría con filtros (paginado) |
+
+En **`/reports`** (hub), las autoridades ven una **previsualización** de hasta 5 pendientes y 5 rechazados, con enlaces a las subpáginas completas. El mapa principal incluye rutas seguras (OpenRouteService) y capa de reportes pendientes.
+
+Ambos paneles de validación usan la misma **tabla de 5 columnas** (clase `report-validation-table`), labels `.report-field-label` / valores `.report-field-value`, y minimapas Leaflet (`public/js/report-minimaps.js`: GPS azul vs evento rojo, zoom adaptativo, carga diferida).
+
+#### Panel «Pendientes de Validación»
+
+| Columna | Contenido |
+|---------|-----------|
+| **Foto** | Thumbnail; clic → modal pantalla completa |
+| **Reporte** | N°, Fecha, Reportado por |
+| **Detalles** | Descripción; Dirección e **Intensidad propuesta** (50/50); enlace *Ver detalle completo* |
+| **Mapa** | Minimapa GPS vs evento; pan + zoom con rueda al hover |
+| **Acciones** | **Aprobar** · **Vincular** · **Rechazar** |
+
+#### Panel «Reportes Rechazados»
+
+Misma estructura de 5 columnas. Columna **Reporte** incluye fecha de rechazo, validador y motivo. Columna **Acciones**: botón **Modificar** (modal Livewire) y **Ver historial** (modal Livewire). En `/reports/rechazados` hay filtros por motivo, validador y rango de fechas.
+
+#### Modal «Ver detalle completo» (pendientes)
+
+Texto íntegro, **Reportado por**, **Intensidad propuesta**, minimapa embebido y los tres botones de acción (misma semántica que la fila).
+
+#### Review Drawer (vinculación)
+
+Botón **Vincular** → panel lateral con mapa ampliado, inundaciones cercanas (≤300 m) desde `window.floodReports`, confirmación SweetAlert2 → `POST /api/reportes/{id}/validar`.
+
+---
+
+## ⚙️ Operación y Configuración
+
+- **Zona horaria:** `America/La_Paz` (`APP_TIMEZONE`).
+- **Colas:** `QUEUE_CONNECTION=database`; el servicio `queue_worker` debe estar activo.
+- **Recálculo topográfico:** `php artisan topografia:recalcular-inundaciones`
+- **Optimizar polígonos:** `php artisan topografia:simplificar-poligonos --solo-activas`
+- **Tras cambios en Blade:** `php artisan view:clear`
+- **Tras `.env`/config:** `php artisan config:clear` y reiniciar `queue_worker`
+
+Desde la carpeta **`equipo04/`** (donde está `docker-compose.yml`):
+
+```bash
+docker compose exec web_app php artisan topografia:recalcular-inundaciones
+docker compose exec web_app php artisan topografia:simplificar-poligonos --solo-activas
+docker compose exec web_app php artisan view:clear
+```
+
+> **Datos:** la BD persiste en el volumen Docker `equipo04_pgdata`. No uses `docker compose down -v`. No ejecutes `php artisan test` dentro del contenedor salvo que confirmes SQLite de test (ver [SCD §8.1](cosa%20web/chirper/SCD.md)). Si la BD quedó vacía: `docker compose exec web_app php artisan db:seed`.
+
+---
+
+## 🚀 Instalación (WSL / Ubuntu recomendado)
+
+Para Docker en Windows, ejecutar el proyecto **dentro de WSL** (no en `C:\Users\...`).
+
+1. **WSL:** `wsl --install` (PowerShell admin) y `wsl --update` si hace falta.
+2. **Clonar o copiar el repo** al filesystem Linux (ej. `/home/tu_usuario/ProyectoInundaciones2`).
+3. **Desde la carpeta `equipo04/`:**
    ```bash
-   # 1. Actualizar sistema
-   sudo apt update
-
-   # 2. Instalar PHP y extensiones básicas
-   sudo apt install -y php-cli php-curl php-xml php-mbstring unzip
-
-   # 3. Instalar Composer
-   curl -sS https://getcomposer.org/installer -o composer-setup.php
-   sudo php composer-setup.php --install-dir=/usr/local/bin --filename=composer
-   rm composer-setup.php
-
-   # 4. Instalar Node.js y NPM
-   sudo apt install -y nodejs npm
+   docker compose up -d --build
+   docker compose exec web_app cp .env.example .env    # si aún no existe
+   docker compose exec web_app php artisan key:generate
+   docker compose exec web_app php artisan migrate --seed
    ```
+4. Abrir **`http://localhost:8001`**.
 
-4. **Configurar Docker y levantar el sistema (Laravel Sail):**
-   Dentro de Ubuntu, navega a la carpeta principal de tu proyecto web (ej. `cd "cosa web/chirper"`) y ejecuta:
-   ```bash
-   # Instalar dependencias de backend
-   composer install
+El compose levanta **PostgreSQL** (puerto host `5440`), la app web (`web_app`) y el worker de colas (`queue_worker`). Variables de entorno sensibles (`OPEN_ROUTE_SERVICE_KEY`, claves de clima, etc.) se configuran en `cosa web/chirper/.env`.
 
-   # Copiar archivo de entorno
-   cp .env.example .env
-
-   # Levantar los contenedores de Docker (Base de Datos, Redis, etc.) en segundo plano
-   ./vendor/bin/sail up -d
-
-   # Generar clave de aplicación y correr las migraciones (PostGIS)
-   ./vendor/bin/sail artisan key:generate
-   ./vendor/bin/sail artisan migrate --seed
-   ```
-
-5. **Correr el programa (Frontend):**
-   Finalmente, instala los paquetes de Node y arranca el servidor de desarrollo:
-   ```bash
-   npm install
-   npm run dev
-   ```
-
-6. Ingresa a `http://localhost:8001` (o el puerto configurado en tu `.env`) en tu navegador para ver la plataforma funcionando a máxima velocidad.
+Para desarrollo frontend con Vite, desde `cosa web/chirper/`: `npm install && npm run dev`.
 
 ---
 
-## 🎨 Arquitectura del Diseño (UI/UX)
-Toda la interfaz del sistema ha sido construida siguiendo estándares **Premium**.
-* Se hace uso intensivo del concepto de **Glassmorphism**: paneles translúcidos (`backdrop-blur`) que flotan sobre un fondo vibrante.
-* Tipografía **Outfit** (Google Fonts) para un aspecto limpio y moderno.
-* Animaciones orgánicas (`hover:-translate-y`, `transition-all`) para darle reactividad al ecosistema.
+## 🎨 Diseño UI/UX (`/reports` y paneles de validación)
+
+Interfaz con glassmorphism (`backdrop-blur`), tipografía **Outfit** (Google Fonts) y **SweetAlert2** para confirmaciones.
+
+### Jerarquía de campos
+
+| Elemento | Color / estilo |
+|----------|----------------|
+| Cabeceras de tabla (Foto, Reporte, …) | Texto `#1F2937` |
+| Labels (DESCRIPCIÓN, DIRECCIÓN, **INTENSIDAD PROPUESTA**, …) | `#71717A` (`.report-field-label`) |
+| Valores de datos | `#1F2937` (`.report-field-value`) |
+| Enlace *Ver detalle completo* | `#4F46E5` (índigo) |
+
+### Botones de acción
+
+| Acción | Fondo | Texto / icono |
+|--------|-------|----------------|
+| **Aprobar** / Guardar cambios | `#059669` | `#FFFFFF` |
+| **Vincular** | `#2563EB` | `#FFFFFF` |
+| **Rechazar** | `#F3F4F6` | `#DC2626` |
+| **Modificar** (rechazados) | `#EEF2FF` | `#4338CA` |
+
+Pills de **intensidad propuesta** (baja/media/alta): clases `intensity-pill-*` en columna Detalles.
+
+Otros elementos: modales de foto, detalle e historial (z-index sobre Leaflet), minimapas con `wire:ignore`, animaciones suaves en hover.
 
 ---
-*Desarrollado para la protección y gestión del riesgo hídrico en la ciudad.*
+
+*Desarrollado para la protección y gestión del riesgo hídrico en Santa Cruz de la Sierra, Bolivia.*

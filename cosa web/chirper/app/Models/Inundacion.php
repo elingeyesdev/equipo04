@@ -179,7 +179,7 @@ class Inundacion extends Model
             ];
 
             foreach ($reportes as $reporte) {
-                $intensidad = $reporte->intensidad_propuesta;
+                $intensidad = $reporte->intensidadEfectiva();
                 if (array_key_exists($intensidad, $puntos)) {
                     $puntos[$intensidad] += $reporte->peso;
                 }
@@ -292,7 +292,7 @@ class Inundacion extends Model
         $desglose = ['alta' => 0, 'media' => 0, 'baja' => 0];
 
         foreach ($reportes as $rep) {
-            $cat = $rep->intensidad_propuesta;
+            $cat = $rep->intensidadEfectiva();
             if (array_key_exists($cat, $desglose)) {
                 $desglose[$cat] += (int) $rep->peso;
             }

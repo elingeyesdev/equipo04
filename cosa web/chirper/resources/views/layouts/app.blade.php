@@ -22,6 +22,8 @@
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
 
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     @endif
@@ -96,9 +98,9 @@
                 <!-- Main Nav Links -->
                 @if (session()->has('api_token'))
                 <nav class="hidden md:flex items-center gap-1 text-sm font-medium">
-                    <a href="{{ route('reports.index', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('reports.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Reportes</a>
-                    <a href="{{ route('command-center.index', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('command-center.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Análisis de Impacto</a>
-                    <a href="{{ route('vehiculos.mapa', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('vehiculos.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Vehículos</a>
+                    <x-reports.nav-dropdown :api-role="$apiRole" />
+                    <a href="{{ route('command-center.index', [], false) }}" class="hidden px-4 py-2 rounded-md transition-colors {{ request()->routeIs('command-center.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Análisis de Impacto</a>
+                    <a href="{{ route('vehiculos.mapa', [], false) }}" class="hidden px-4 py-2 rounded-md transition-colors {{ request()->routeIs('vehiculos.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Vehículos</a>
                     <a href="{{ route('logistica.index', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('logistica.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Logística</a>
                     <a href="{{ route('inventario.index', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('inventario.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Inventario</a>
                     <a href="{{ route('victimas.index', [], false) }}" class="px-4 py-2 rounded-md transition-colors {{ request()->routeIs('victimas.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">Víctimas</a>
@@ -164,8 +166,14 @@
     @if (session()->has('api_token'))
     <nav class="md:hidden bg-white border-b border-gray-200 overflow-x-auto no-scrollbar flex items-center px-4 py-2 gap-2 shadow-inner">
         <a href="{{ route('reports.index', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('reports.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Reportes</a>
-        <a href="{{ route('command-center.index', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('command-center.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Análisis</a>
-        <a href="{{ route('vehiculos.mapa', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('vehiculos.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Vehículos</a>
+        <a href="{{ route('reports.mis', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('reports.mis') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Mis reportes</a>
+        @if ($apiRole === 'authority')
+            <a href="{{ route('reports.pendientes', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('reports.pendientes') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Pendientes</a>
+            <a href="{{ route('reports.rechazados', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('reports.rechazados') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Rechazados</a>
+        @endif
+        <a href="{{ route('reports.historial', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('reports.historial') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Historial</a>
+        <a href="{{ route('command-center.index', [], false) }}" class="hidden px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('command-center.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Análisis</a>
+        <a href="{{ route('vehiculos.mapa', [], false) }}" class="hidden px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('vehiculos.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Vehículos</a>
         <a href="{{ route('logistica.index', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('logistica.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Logística</a>
         <a href="{{ route('inventario.index', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('inventario.*') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Inventario</a>
         <a href="{{ route('victimas.index', [], false) }}" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap {{ request()->routeIs('victimas.index') ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50' }}">Víctimas</a>
@@ -274,6 +282,58 @@
     </script>
 
     @include('chat.widget')
+
+    {{-- SweetAlert2: toasts globales para mensajes flash + helper de confirmación --}}
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof Swal === 'undefined') return;
+
+            const Toast = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true,
+                didOpen: (toast) => {
+                    toast.addEventListener('mouseenter', Swal.stopTimer);
+                    toast.addEventListener('mouseleave', Swal.resumeTimer);
+                }
+            });
+
+            @if(session('success'))
+                Toast.fire({ icon: 'success', title: {!! json_encode(session('success')) !!} });
+            @elseif(session('error'))
+                Toast.fire({ icon: 'error', title: {!! json_encode(session('error')) !!} });
+            @elseif(session('status'))
+                Toast.fire({ icon: 'info', title: {!! json_encode(session('status')) !!} });
+            @endif
+        });
+
+        // Reemplazo global de onsubmit="return confirm('...')" usando SweetAlert2.
+        function confirmForm(event, message) {
+            event.preventDefault();
+            const form = event.target;
+            if (typeof Swal === 'undefined') {
+                if (confirm(message || '¿Estás seguro?')) form.submit();
+                return false;
+            }
+            Swal.fire({
+                title: '¿Estás seguro?',
+                text: message || 'Esta acción no se puede deshacer.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Sí, continuar',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    form.submit();
+                }
+            });
+            return false;
+        }
+    </script>
 </body>
 
 <script>

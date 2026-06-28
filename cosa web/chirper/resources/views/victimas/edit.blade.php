@@ -222,7 +222,7 @@
             </p>
             <form method="POST"
                   action="{{ route('victimas.destroy', ['id' => $victima->id], false) }}"
-                  onsubmit="return confirm('¿Eliminar definitivamente a {{ addslashes($victima->nombre_completo) }}? Esta acción no se puede deshacer.')">
+                  onsubmit="confirmForm(event, '¿Eliminar definitivamente a {{ addslashes($victima->nombre_completo) }}? Esta acción no se puede deshacer.')">
                 @csrf
                 @method('DELETE')
                 <button type="submit"
