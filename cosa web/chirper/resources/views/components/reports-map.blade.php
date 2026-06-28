@@ -3,6 +3,7 @@
     'pendingReports' => [],
     'showRouting' => false,
     'role' => null,
+    'fetchPending' => false,
     'mapHeight' => '600px'
 ])
 
@@ -192,8 +193,32 @@
 </div>
 
 <script>
+window.SGI_MAP_CONFIG = {
+    apiToken: @json(session('api_token')),
+    fetchPending: @json($fetchPending),
+};
 window.floodReports = @json($reports);
 window.pendingReports = @json($pendingReports);
+window.reportsMapFilter = null;
+
+function bindReportsMapLivewireRefresh() {
+    if (typeof Livewire === 'undefined' || window.__reportsMapLivewireBound) return;
+    window.__reportsMapLivewireBound = true;
+
+    Livewire.on('refreshReports', () => {
+        if (typeof window.refreshReportsMap === 'function') {
+            window.refreshReportsMap();
+        }
+    });
+    Livewire.on('reporte-ttl-renovado', () => {
+        if (typeof window.refreshReportsMap === 'function') {
+            window.refreshReportsMap();
+        }
+    });
+}
+
+document.addEventListener('livewire:initialized', bindReportsMapLivewireRefresh);
+document.addEventListener('DOMContentLoaded', bindReportsMapLivewireRefresh);
 
 function initMap() {
     const mapEl = document.getElementById('map');
@@ -247,6 +272,7 @@ function initMap() {
     const polygonLayer           = L.layerGroup().addTo(map);
     const selectionBorderLayer   = L.layerGroup().addTo(map);
     const individualReportsLayer = L.layerGroup().addTo(map);
+    const pendingReportsLayer    = L.layerGroup().addTo(map);
 
     window.selectedInundacionId = null;
 
@@ -254,6 +280,7 @@ function initMap() {
     layerControl.addOverlay(polygonLayer,           "Zona de Inundación (Mapa de Calor)");
     layerControl.addOverlay(selectionBorderLayer,   "Contorno de Inundación Seleccionada");
     layerControl.addOverlay(individualReportsLayer, "Reportes Ciudadanos (Detalle)");
+    layerControl.addOverlay(pendingReportsLayer,    "Reportes Pendientes (Validación)");
 
     // ── 3b. ESRI Shaded Relief — relieve topográfico superpuesto ─────────
     const reliefOverlay = L.tileLayer(
@@ -677,23 +704,132 @@ function initMap() {
         }
     }
 
-    renderReports(window.floodReports);
+    function applyActiveMapFilter(reports) {
+        const source = Array.isArray(reports) ? reports : [];
+        const filter = window.reportsMapFilter;
+        if (!filter || filter.idPrefix !== 'filter') {
+            return source;
+        }
+
+        return source.filter(function (r) {
+            if (filter.region && window.geographicData && window.geographicData.regiones) {
+                const regData = window.geographicData.regiones.find(function (rg) {
+                    return rg.nombre === filter.region;
+                });
+                if (regData && r.municipio && !regData.municipios.includes(r.municipio)) {
+                    return false;
+                }
+            }
+            if (filter.provincia && r.provincia && r.provincia !== filter.provincia) {
+                return false;
+            }
+            if (filter.municipio && r.municipio && r.municipio !== filter.municipio) {
+                return false;
+            }
+            return true;
+        });
+    }
+
+    function renderPendingReportsOnMap(pendingData) {
+        pendingReportsLayer.clearLayers();
+        if (!Array.isArray(pendingData)) return;
+
+        pendingData.forEach(function (report) {
+            if (report.inundacion_id) return;
+
+            const lat = parseFloat(report.lat_reporte);
+            const lng = parseFloat(report.long_reporte);
+            if (isNaN(lat) || isNaN(lng)) return;
+
+            const intensidad = report.intensidad_propuesta || 'media';
+            const customIcon = L.divIcon({
+                className: 'custom-leaflet-marker',
+                html: '<div style="background-color:#F59E0B;width:16px;height:16px;border-radius:50%;border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.5);"></div>',
+                iconSize: [16, 16],
+                iconAnchor: [8, 8],
+            });
+
+            const popupHtml = '<div class="max-w-xs font-sans">'
+                + '<p class="font-semibold text-sm mb-1 text-orange-600">Reporte Pendiente N°' + report.id + '</p>'
+                + '<p class="text-xs text-gray-600 mb-2"><b>Intensidad propuesta:</b> ' + intensidad + '</p>'
+                + '<div class="flex flex-col gap-2 mt-2">'
+                + '<button type="button" onclick="openApproveModal(' + report.id + ', \'crear\', \'' + intensidad + '\')" class="bg-emerald-600 text-white px-2 py-1.5 text-xs rounded-lg font-bold">Aprobar</button>'
+                + '</div></div>';
+
+            const marker = L.marker([lat, lng], { icon: customIcon })
+                .bindPopup(popupHtml, { minWidth: 200 });
+
+            pendingReportsLayer.addLayer(marker);
+        });
+    }
+
+    window.renderReportsMap = renderReports;
+    window.renderPendingReportsMap = renderPendingReportsOnMap;
+
+    window.refreshReportsMap = async function refreshReportsMap() {
+        const cfg = window.SGI_MAP_CONFIG || {};
+        if (!cfg.apiToken || typeof window.renderReportsMap !== 'function') {
+            return;
+        }
+
+        const headers = {
+            Accept: 'application/json',
+            Authorization: 'Bearer ' + cfg.apiToken,
+        };
+
+        try {
+            const reportsRes = await fetch('/api/reports', {
+                headers: headers,
+                credentials: 'same-origin',
+            });
+
+            if (reportsRes.ok) {
+                const payload = await reportsRes.json();
+                const reports = Array.isArray(payload.data) ? payload.data : [];
+                window.floodReports = reports;
+                window.renderReportsMap(applyActiveMapFilter(reports));
+            }
+
+            if (cfg.fetchPending) {
+                const pendingRes = await fetch('/api/reportes/pendientes', {
+                    headers: headers,
+                    credentials: 'same-origin',
+                });
+
+                if (pendingRes.ok) {
+                    const pending = await pendingRes.json();
+                    const queue = Array.isArray(pending)
+                        ? pending.filter(function (r) { return !r.inundacion_id; })
+                        : [];
+                    window.pendingReports = queue;
+                    renderPendingReportsOnMap(queue);
+                }
+            }
+
+            if (window.mapObj) {
+                setTimeout(function () { window.mapObj.invalidateSize(); }, 50);
+            }
+
+            document.dispatchEvent(new CustomEvent('reportsMapRefreshed'));
+        } catch (err) {
+            console.warn('No se pudo refrescar el mapa de reportes:', err);
+        }
+    };
+
+    renderReports(applyActiveMapFilter(window.floodReports));
+    renderPendingReportsOnMap(
+        Array.isArray(window.pendingReports)
+            ? window.pendingReports.filter(function (r) { return !r.inundacion_id; })
+            : []
+    );
 
     // Filter handling
     window.addEventListener('locationFilterChanged', function (e) {
         const { idPrefix, region, provincia, municipio } = e.detail;
 
         if (idPrefix === 'filter') {
-            const filtered = window.floodReports.filter(r => {
-                if (region && window.geographicData && window.geographicData.regiones) {
-                    const regData = window.geographicData.regiones.find(rg => rg.nombre === region);
-                    if (regData && r.municipio && !regData.municipios.includes(r.municipio)) return false;
-                }
-                if (provincia && r.provincia && r.provincia !== provincia) return false;
-                if (municipio && r.municipio && r.municipio !== municipio) return false;
-                return true;
-            });
-            renderReports(filtered);
+            window.reportsMapFilter = e.detail;
+            renderReports(applyActiveMapFilter(window.floodReports));
         }
 
         if (highlightLayer) { map.removeLayer(highlightLayer); highlightLayer = null; }

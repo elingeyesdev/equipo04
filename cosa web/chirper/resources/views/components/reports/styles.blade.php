@@ -93,6 +93,8 @@
     }
     .report-validation-form textarea {
         min-height: auto;
+        resize: vertical;
+        line-height: 1.4;
     }
     .report-validation-form select:focus,
     .report-validation-form textarea:focus,

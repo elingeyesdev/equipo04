@@ -8,24 +8,10 @@
 <script src="{{ asset('js/safe-routing.js') }}"></script>
 
 <script>
-window.renderPendingReports = function(pendingData) {
-    pendingData.forEach(report => {
-        const lat = parseFloat(report.lat_reporte);
-        const lng = parseFloat(report.long_reporte);
-        if (isNaN(lat) || isNaN(lng)) return;
-
-        const customIcon = L.divIcon({
-            className: 'custom-leaflet-marker',
-            html: '<div style="background-color: #F59E0B; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5); animation: pulse 2s infinite;"></div>',
-            iconSize: [16, 16],
-            iconAnchor: [8, 8]
-        });
-
-        const contentStr = '<div class="max-w-xs"><p class="font-semibold text-sm mb-1 text-orange-600">Reporte Pendiente</p><p class="text-xs text-gray-600 mb-2"><b>Intensidad Propuesta:</b> ' + report.intensidad_propuesta + '</p><div class="flex flex-col space-y-2 mt-2"><button onclick="validateReport(' + report.id + ', \'vincular\', \'' + report.intensidad_propuesta + '\');" class="bg-blue-500 text-white px-2 py-1 text-xs rounded">Vincular a Cercana</button><button onclick="validateReport(' + report.id + ', \'crear\', \'' + report.intensidad_propuesta + '\');" class="bg-green-500 text-white px-2 py-1 text-xs rounded">Crear Nueva</button><button onclick="validateReport(' + report.id + ', \'rechazar\', \'' + report.intensidad_propuesta + '\');" class="bg-red-500 text-white px-2 py-1 text-xs rounded">Rechazar</button></div></div>';
-
-        const marker = L.marker([lat, lng], { icon: customIcon }).bindPopup(contentStr, { minWidth: 200 });
-        if (window.mapObj) window.mapObj.addLayer(marker);
-    });
+window.renderPendingReports = function (pendingData) {
+    if (typeof window.renderPendingReportsMap === 'function') {
+        window.renderPendingReportsMap(pendingData);
+    }
 };
 
 window.validateReport = function(id, action, intensidadPropuesta) {
@@ -86,6 +72,12 @@ window.validateReport = function(id, action, intensidadPropuesta) {
                 .then((data) => {
                     Swal.fire('¡Listo!', data.message, 'success');
                     Livewire.dispatch('refreshReports');
+                    if (typeof window.refreshReportsMap === 'function') {
+                        window.refreshReportsMap();
+                        if (action === 'crear' || action === 'vincular') {
+                            setTimeout(function () { window.refreshReportsMap(); }, 8000);
+                        }
+                    }
                 })
                 .catch((err) => {
                     Swal.fire('Error', err.message || 'Ocurrió un error al procesar la solicitud.', 'error');
@@ -141,13 +133,43 @@ window.validateReport = function(id, action, intensidadPropuesta) {
             closeRejectModal();
         }
 
+        function populateApproveIntensidadOptions(excludeLevel) {
+            const select = document.getElementById('approveIntensidadValidada');
+            const levels = [
+                { value: 'baja', label: 'Baja' },
+                { value: 'media', label: 'Media' },
+                { value: 'alta', label: 'Alta' },
+            ];
+            const available = levels.filter((level) => level.value !== excludeLevel);
+
+            select.innerHTML = '';
+            available.forEach((level) => {
+                const option = document.createElement('option');
+                option.value = level.value;
+                option.textContent = level.label;
+                select.appendChild(option);
+            });
+
+            if (available.length > 0) {
+                select.value = available[0].value;
+            }
+        }
+
+        function setApproveIntensidadPropuestaPill(intensidad) {
+            const el = document.getElementById('approveIntensidadPropuesta');
+            const level = intensidad || 'media';
+            el.textContent = level.charAt(0).toUpperCase() + level.slice(1);
+            el.className = 'inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide intensity-pill-' + (level === 'alta' ? 'alta' : level === 'media' ? 'media' : 'baja');
+        }
+
         function openApproveModal(id, action, intensidadPropuesta, inundacionId = null) {
-            pendingValidation = { id: id, action: action, inundacionId: inundacionId, intensidadPropuesta: intensidadPropuesta || 'media' };
+            const propuesta = intensidadPropuesta || 'media';
+            pendingValidation = { id: id, action: action, inundacionId: inundacionId, intensidadPropuesta: propuesta };
             document.getElementById('approveReportId').textContent = 'N°' + id;
-            document.getElementById('approveIntensidadPropuesta').textContent = (intensidadPropuesta || 'media').charAt(0).toUpperCase() + (intensidadPropuesta || 'media').slice(1);
+            setApproveIntensidadPropuestaPill(propuesta);
+            populateApproveIntensidadOptions(propuesta);
             document.getElementById('approveAjusteToggle').checked = false;
             document.getElementById('approveAjusteFields').classList.add('hidden');
-            document.getElementById('approveIntensidadValidada').value = intensidadPropuesta || 'media';
             document.getElementById('approveComentario').value = '';
             document.getElementById('approveModal').classList.remove('hidden');
             setTimeout(() => document.getElementById('approveModal').classList.remove('opacity-0'), 10);
@@ -214,13 +236,11 @@ window.validateReport = function(id, action, intensidadPropuesta) {
 
             const btnVincular = document.getElementById('reportDetailBtnVincular');
             if (reportDetailCurrentData.hasCercanas && reportRaw) {
+                btnVincular.classList.remove('hidden');
                 btnVincular.disabled = false;
                 btnVincular.title = '';
-                btnVincular.className = 'flex-1 inline-flex items-center justify-center gap-1.5 btn-report-vincular px-3 py-2.5 text-xs rounded-lg font-bold shadow-sm transition-colors';
             } else {
-                btnVincular.disabled = true;
-                btnVincular.title = 'Sin inundaciones activas cercanas';
-                btnVincular.className = 'flex-1 inline-flex items-center justify-center gap-1.5 btn-report-vincular px-3 py-2.5 text-xs rounded-lg font-bold shadow-sm';
+                btnVincular.classList.add('hidden');
             }
 
             const mapEl = document.getElementById('report-detail-minimap');
@@ -315,29 +335,30 @@ window.validateReport = function(id, action, intensidadPropuesta) {
             <div class="px-5 py-4 border-b border-slate-200 bg-slate-50">
                 <h3 class="text-base font-bold text-slate-800">Aprobar reporte <span id="approveReportId"></span></h3>
             </div>
-            <div class="p-5 space-y-4">
-                <p class="text-sm text-slate-600">Intensidad propuesta: <strong id="approveIntensidadPropuesta"></strong></p>
-                <label class="flex items-center gap-2 text-sm text-slate-700">
-                    <input type="checkbox" id="approveAjusteToggle" onchange="toggleApproveAjuste()" class="rounded border-slate-300">
-                    Ajustar intensidad validada
+            <div class="p-5 space-y-4 report-validation-form">
+                <div>
+                    <span class="report-field-label mb-1">Intensidad propuesta</span>
+                    <p class="mt-1.5">
+                        <span id="approveIntensidadPropuesta" class="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide intensity-pill-media">Media</span>
+                    </p>
+                </div>
+                <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                    <input type="checkbox" id="approveAjusteToggle" onchange="toggleApproveAjuste()" class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-0">
+                    <span class="text-sm font-medium text-[#1F2937]">Ajustar intensidad validada</span>
                 </label>
-                <div id="approveAjusteFields" class="hidden space-y-3">
+                <div id="approveAjusteFields" class="hidden space-y-4 pt-1">
                     <div>
-                        <label class="report-field-label">Intensidad validada</label>
-                        <select id="approveIntensidadValidada" class="w-full mt-1 rounded border-slate-200 text-sm">
-                            <option value="baja">Baja</option>
-                            <option value="media">Media</option>
-                            <option value="alta">Alta</option>
-                        </select>
+                        <label class="report-field-label mb-1" for="approveIntensidadValidada">Intensidad validada</label>
+                        <select id="approveIntensidadValidada"></select>
                     </div>
                     <div>
-                        <label class="report-field-label">Comentario del ajuste</label>
-                        <textarea id="approveComentario" rows="3" class="w-full mt-1 rounded border-slate-200 text-sm" placeholder="Explica por qué corriges la intensidad (mín. 10 caracteres)"></textarea>
+                        <label class="report-field-label mb-1" for="approveComentario">Comentario del ajuste</label>
+                        <textarea id="approveComentario" rows="3" placeholder="Explica por qué corriges la intensidad (mín. 10 caracteres)"></textarea>
                     </div>
                 </div>
-                <div class="flex gap-2">
-                    <button type="button" onclick="closeApproveModal()" class="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-200 text-slate-600">Cancelar</button>
-                    <button type="button" onclick="confirmApproveModal()" class="flex-1 px-3 py-2 text-sm rounded-lg btn-report-aprobar font-bold text-white">Confirmar aprobación</button>
+                <div class="flex gap-2 pt-1">
+                    <button type="button" onclick="closeApproveModal()" class="flex-1 px-4 py-2.5 text-sm rounded-lg border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition-colors">Cancelar</button>
+                    <button type="button" onclick="confirmApproveModal()" class="flex-1 px-4 py-2.5 text-sm rounded-lg btn-report-aprobar font-bold text-white shadow-sm transition-colors">Confirmar aprobación</button>
                 </div>
             </div>
         </div>
@@ -400,16 +421,13 @@ window.validateReport = function(id, action, intensidadPropuesta) {
                 </div>
             </div>
             <div class="px-5 py-4 border-t border-slate-200 bg-slate-50 flex gap-2">
-                <button type="button" onclick="reportDetailAprobar()" class="flex-1 inline-flex items-center justify-center gap-1.5 btn-report-aprobar px-3 py-2.5 text-xs rounded-lg font-bold shadow-sm transition-colors">
-                    <x-reports.icon name="check" />
+                <button type="button" onclick="reportDetailAprobar()" class="flex-1 inline-flex items-center justify-center btn-report-aprobar px-3 py-2.5 text-xs rounded-lg font-bold shadow-sm transition-colors">
                     Aprobar
                 </button>
-                <button type="button" id="reportDetailBtnVincular" onclick="reportDetailVincular()" class="flex-1 inline-flex items-center justify-center gap-1.5 btn-report-vincular px-3 py-2.5 text-xs rounded-lg font-bold shadow-sm transition-colors">
-                    <x-reports.icon name="link" />
+                <button type="button" id="reportDetailBtnVincular" onclick="reportDetailVincular()" class="hidden flex-1 inline-flex items-center justify-center btn-report-vincular px-3 py-2.5 text-xs rounded-lg font-bold shadow-sm transition-colors">
                     Vincular
                 </button>
-                <button type="button" onclick="reportDetailRechazar()" class="flex-1 inline-flex items-center justify-center gap-1.5 btn-report-rechazar px-3 py-2.5 text-xs rounded-lg font-bold shadow-sm transition-colors">
-                    <x-reports.icon name="x" />
+                <button type="button" onclick="reportDetailRechazar()" class="flex-1 inline-flex items-center justify-center btn-report-rechazar px-3 py-2.5 text-xs rounded-lg font-bold shadow-sm transition-colors">
                     Rechazar
                 </button>
             </div>

@@ -111,23 +111,15 @@
                                     </td>
                                     <td>
                                         <div class="flex flex-col gap-1.5 w-full max-w-[9.5rem]">
-                                            <button type="button" onclick="openApproveModal({{ $rep->id }}, 'crear', '{{ $rep->intensidad_propuesta }}')" class="w-full inline-flex items-center justify-center gap-1.5 btn-report-aprobar px-3 py-2 text-xs rounded-lg font-bold shadow-sm transition-colors">
-                                                <x-reports.icon name="check" />
+                                            <button type="button" onclick="openApproveModal({{ $rep->id }}, 'crear', '{{ $rep->intensidad_propuesta }}')" class="w-full inline-flex items-center justify-center btn-report-aprobar px-3 py-2 text-xs rounded-lg font-bold shadow-sm transition-colors">
                                                 Aprobar
                                             </button>
                                             @if(count($rep->cercanas ?? []) > 0)
-                                                <button type="button" data-report="{{ json_encode($reportDrawerPayload) }}" onclick="openReviewDrawer(this)" class="w-full inline-flex items-center justify-center gap-1.5 btn-report-vincular px-3 py-2 text-xs rounded-lg font-bold shadow-sm transition-colors report-vincular-btn">
-                                                    <x-reports.icon name="link" />
-                                                    Vincular
-                                                </button>
-                                            @else
-                                                <button type="button" disabled title="Sin inundaciones activas cercanas" class="w-full inline-flex items-center justify-center gap-1.5 btn-report-vincular px-3 py-2 text-xs rounded-lg font-bold shadow-sm report-vincular-btn">
-                                                    <x-reports.icon name="link" />
+                                                <button type="button" data-report="{{ json_encode($reportDrawerPayload) }}" onclick="openReviewDrawer(this)" class="w-full inline-flex items-center justify-center btn-report-vincular px-3 py-2 text-xs rounded-lg font-bold shadow-sm transition-colors report-vincular-btn">
                                                     Vincular
                                                 </button>
                                             @endif
-                                            <button type="button" onclick="openRejectModal({{ $rep->id }}, '{{ e($reporterName) }}', {{ $rep->distancia_gps_metros ?? 'null' }}, {{ $rep->precipitacionAlReportar() ?? 'null' }}, {{ $rep->peso }}, {{ count($rep->cercanas ?? []) }}, {{ $rep->rechazos_previos ?? 0 }})" class="w-full inline-flex items-center justify-center gap-1.5 btn-report-rechazar px-3 py-2 text-xs rounded-lg font-bold shadow-sm transition-colors">
-                                                <x-reports.icon name="x" />
+                                            <button type="button" onclick="openRejectModal({{ $rep->id }}, '{{ e($reporterName) }}', {{ $rep->distancia_gps_metros ?? 'null' }}, {{ $rep->precipitacionAlReportar() ?? 'null' }}, {{ $rep->peso }}, {{ count($rep->cercanas ?? []) }}, {{ $rep->rechazos_previos ?? 0 }})" class="w-full inline-flex items-center justify-center btn-report-rechazar px-3 py-2 text-xs rounded-lg font-bold shadow-sm transition-colors">
                                                 Rechazar
                                             </button>
                                         </div>

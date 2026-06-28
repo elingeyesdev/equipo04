@@ -57,7 +57,7 @@
         <x-location-filter formAction="{{ route('reports.index', [], false) }}" />
     </div>
 
-    <x-reports-map :reports="$inundacionesActivas" :pendingReports="$reportesPendientes ?? []" :showRouting="true" />
+    <x-reports-map :reports="$inundacionesActivas" :pendingReports="$reportesPendientes ?? []" :showRouting="true" :fetchPending="$role === 'authority'" />
 
 
             @if (!empty($error))
