@@ -18,6 +18,8 @@ Route::prefix('auth')->group(function () {
 
 // Rutas públicas de reportes rápidos
 Route::post('reportes', [ReporteController::class, 'store']);
+Route::get('inundaciones/contexto', [\App\Http\Controllers\Api\InundacionPublicController::class, 'contexto'])
+    ->middleware('throttle:60,1');
 
 Route::middleware('auth:sanctum')->group(function () {
     // Rutas protegidas por Sanctum

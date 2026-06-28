@@ -10,8 +10,8 @@ window.SMART_HEATMAP_TIER_COLORS = {
 };
 
 window.SMART_FLOOD_FILL = {
-    edgeMin: { baja: 0.92, media: 0.96, alta: 1.0 },
-    coreMax: { baja: 1.0, media: 1.0, alta: 1.0 },
+    edgeMin: { baja: 0.52, media: 0.56, alta: 0.60 },
+    coreMax: { baja: 0.68, media: 0.72, alta: 0.76 },
     blurPx: 2,
     sampleStepM: 10,
     edgeFeatherM: 10,
@@ -20,6 +20,9 @@ window.SMART_FLOOD_FILL = {
     chaikinIterations: 2,
     geometricRadiusM: { baja: 55, media: 90, alta: 130 },
     maxCanvasPx: 512,
+    ttlHours: 3,
+    ttlWarnMinutes: 15,
+    pulseIntervalMs: 600,
 };
 
 /** @deprecated Mantener alias para compatibilidad con código legacy */
@@ -170,9 +173,9 @@ function distanceToPolygonBorder(lat, lng, ring) {
  * Opacidad dentro del polígono: solo feather hacia el borde (sin depender de epicentros).
  * Así añadir reportes no oscurece el interior existente.
  */
-function computePolygonInteriorAlpha(lat, lng, tier, ttl, fillCfg, ring) {
-    const edgeMin = (fillCfg.edgeMin[tier] || 0.18) * ttl;
-    const coreMax = (fillCfg.coreMax[tier] || 0.34) * ttl;
+function computePolygonInteriorAlpha(lat, lng, tier, fillCfg, ring) {
+    const edgeMin = fillCfg.edgeMin[tier] || 0.18;
+    const coreMax = fillCfg.coreMax[tier] || 0.34;
     const featherM = fillCfg.edgeFeatherM || 10;
     const edgeFloor = fillCfg.edgeFactorFloor || 0.72;
     const distBorder = distanceToPolygonBorder(lat, lng, ring);
@@ -197,22 +200,22 @@ function epicenterRadialBounds(ep, tier, fillCfg) {
     };
 }
 
-function computeEpicenterRadialAlpha(lat, lng, tier, ttl, fillCfg, epicenters) {
+function computeEpicenterRadialAlpha(lat, lng, tier, fillCfg, epicenters) {
     const radiusM = tierRadiusM(tier);
     const marginM = radiusM * 0.15 + (fillCfg.blurPx || 7) * 2;
     let alpha = 0;
 
     epicenters.forEach(function (ep) {
         const dist = haversineM(ep.lat, ep.lng, lat, lng);
-        alpha = Math.max(alpha, computeRadialAlpha(dist, tier, ttl, fillCfg, radiusM, marginM));
+        alpha = Math.max(alpha, computeRadialAlpha(dist, tier, fillCfg, radiusM, marginM));
     });
 
     return alpha;
 }
 
-function computeRadialAlpha(dist, tier, ttl, fillCfg, radiusM, marginM) {
-    const edgeMin = (fillCfg.edgeMin[tier] || 0.18) * ttl;
-    const coreMax = (fillCfg.coreMax[tier] || 0.34) * ttl;
+function computeRadialAlpha(dist, tier, fillCfg, radiusM, marginM) {
+    const edgeMin = fillCfg.edgeMin[tier] || 0.18;
+    const coreMax = fillCfg.coreMax[tier] || 0.34;
     const featherM = fillCfg.edgeFeatherM || 30;
     const coreFloor = fillCfg.coreFactorFloor || 0.78;
     const edgeFloor = fillCfg.edgeFactorFloor || 0.72;
@@ -289,7 +292,7 @@ function gridDimensions(bounds, stepM, maxPx) {
 /**
  * Un solo raster por inundación: polígono (interior estable) + radiales en epicentros (max alpha).
  */
-function buildInundacionHeatRaster(polygonRings, epicenters, tier, ttl, fillCfg) {
+function buildInundacionHeatRaster(polygonRings, epicenters, tier, fillCfg) {
     const validEps = (epicenters || []).filter(function (ep) {
         return ep && !isNaN(ep.lat) && !isNaN(ep.lng);
     });
@@ -339,10 +342,10 @@ function buildInundacionHeatRaster(polygonRings, epicenters, tier, ttl, fillCfg)
 
             smoothRings.forEach(function (ring) {
                 if (!pointInPolygon(lat, lng, ring)) return;
-                alpha = Math.max(alpha, computePolygonInteriorAlpha(lat, lng, tier, ttl, fillCfg, ring));
+                alpha = Math.max(alpha, computePolygonInteriorAlpha(lat, lng, tier, fillCfg, ring));
             });
 
-            alpha = Math.max(alpha, computeEpicenterRadialAlpha(lat, lng, tier, ttl, fillCfg, validEps));
+            alpha = Math.max(alpha, computeEpicenterRadialAlpha(lat, lng, tier, fillCfg, validEps));
 
             if (alpha <= ALPHA_VISIBLE_THRESHOLD) continue;
 
@@ -390,12 +393,55 @@ window.redrawFloodHeatOverlays = function (map, instance) {
     });
 };
 
+function floodExpiresAtMs(updatedAt, ttlHours) {
+    if (!updatedAt) return null;
+
+    const updated = new Date(updatedAt);
+    if (isNaN(updated.getTime())) return null;
+
+    return updated.getTime() + ttlHours * 3600000;
+}
+
+window.floodExpiresAtMs = floodExpiresAtMs;
+
+window.tickFloodHeatTtlPulse = function () {
+    const instance = window.smartHeatmapInstance;
+    if (!instance || !Array.isArray(instance.overlays)) return;
+
+    const fillCfg = window.SMART_FLOOD_FILL || {};
+    const warnMs = (fillCfg.ttlWarnMinutes || 15) * 60 * 1000;
+    const now = Date.now();
+
+    instance.overlays.forEach(function (overlay) {
+        if (!overlay || typeof overlay.setOpacity !== 'function') return;
+
+        const expiresAt = overlay._floodExpiresAt;
+        if (!expiresAt) {
+            overlay.setOpacity(1);
+            return;
+        }
+
+        if (now >= expiresAt) {
+            overlay.setOpacity(0);
+            return;
+        }
+
+        if (now >= expiresAt - warnMs) {
+            const pulse = 0.35 + 0.65 * Math.abs(Math.sin(now / 400));
+            overlay.setOpacity(pulse);
+            return;
+        }
+
+        overlay.setOpacity(1);
+    });
+};
+
 window.createSmartHeatmap = function (map, reports, options = {}) {
     if (!map || !window.L) return null;
 
     const mode = options.mode || 'auto';
-    const ttlHours = options.ttlHours || 3;
     const fillCfg = window.SMART_FLOOD_FILL || {};
+    const ttlHours = options.ttlHours || fillCfg.ttlHours || 3;
 
     const parsedReports = reports.map(function (r) {
         const lat = parseFloat(r.lat || r.lat_reporte || r.latitud);
@@ -440,15 +486,15 @@ window.createSmartHeatmap = function (map, reports, options = {}) {
     const allOverlays = [];
 
     parsedReports.forEach(function (rep) {
-        const ttl = ttlFactor(rep.updatedAt, ttlHours);
-        if (ttl <= 0) return;
+        if (ttlFactor(rep.updatedAt, ttlHours) <= 0) return;
 
         const usePolygons = (mode === 'topographic' || mode === 'auto') && rep.polygonRings.length > 0;
         const rings = usePolygons ? rep.polygonRings : [];
-        const raster = buildInundacionHeatRaster(rings, rep.epicenters, rep.tier, ttl, fillCfg);
+        const raster = buildInundacionHeatRaster(rings, rep.epicenters, rep.tier, fillCfg);
 
         if (raster) {
             const overlay = createHeatOverlay(map, raster, options);
+            overlay._floodExpiresAt = floodExpiresAtMs(rep.updatedAt, ttlHours);
             layersByTier[rep.tier].push(overlay);
             allOverlays.push(overlay);
         }

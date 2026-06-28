@@ -36,11 +36,8 @@ Route::middleware(RedirectIfApiAuthenticated::class)->group(function () {
 
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-Route::get('/reporte-rapido', function () {
-    // Solo id, latitud y longitud — intensidad_actual fue eliminada (cálculo dinámico).
-    $activas = \App\Models\Inundacion::where('estado', 'activa')->get(['id', 'latitud', 'longitud']);
-    return view('reports.rapido', ['inundacionesActivas' => $activas]);
-})->name('reports.rapido');
+Route::get('/reporte-rapido', [\App\Http\Controllers\ReporteRapidoController::class, 'show'])
+    ->name('reports.rapido');
 
 Route::get('/weather/tiles/{layer}/{z}/{x}/{y}', [\App\Http\Controllers\WeatherController::class, 'getTile'])->name('weather.tiles');
 

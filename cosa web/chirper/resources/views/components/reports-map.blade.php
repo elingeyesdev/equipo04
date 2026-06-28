@@ -10,8 +10,9 @@
 <!-- Leaflet CSS & JS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<script src="{{ asset('js/smart-heatmap.js') }}?v=20260629g"></script>
+<script src="{{ asset('js/smart-heatmap.js') }}?v=20260629h"></script>
 <script src="{{ asset('js/flood-outline.js') }}?v=20260627c"></script>
+<script src="{{ asset('js/flood-heat-sources.js') }}?v=1"></script>
 
 <style>
 /* ── Animación de pulso para zonas de alta intensidad ────────────────── */
@@ -501,24 +502,6 @@ function initMap() {
         return rings;
     }
 
-    function getInundacionHeatGeometry(inundacion) {
-        if (window.resolveUnifiedHeatRing) {
-            const unified = window.resolveUnifiedHeatRing(inundacion);
-            if (unified && unified.length >= 3) {
-                return { polygon_coords: unified, polygon_es_fallback: false };
-            }
-        }
-
-        if (window.computeInundacionSelectionOutline) {
-            const outline = window.computeInundacionSelectionOutline(inundacion);
-            if (outline && outline.length >= 3) {
-                return { polygon_coords: outline, polygon_es_fallback: false };
-            }
-        }
-
-        return null;
-    }
-
     function buildCentroidIcon(palette, selected) {
         const cls = selected ? 'custom-leaflet-marker flood-marker-selected' : 'custom-leaflet-marker';
         const border = selected ? '4px solid #fbbf24' : '3px solid white';
@@ -639,7 +622,9 @@ function initMap() {
         selectionBorderLayer.clearLayers();
         individualReportsLayer.clearLayers();
 
-        let heatSources = [];
+        const heatSources = window.buildHeatSourcesFromInundaciones
+            ? window.buildHeatSourcesFromInundaciones(reportsData)
+            : [];
 
         reportsData.forEach(report => {
             const lat = parseFloat(report.latitud);
@@ -708,35 +693,6 @@ function initMap() {
 
             markersLayer.addLayer(marker);
 
-            // Epicentros = ubicación de cada reporte vivo, para ponderar la profundidad
-            // dentro de la zona unificada (centro más intenso, bordes difuminados).
-            const epicenters = activeReps.map(function (rep) {
-                return {
-                    lat: parseFloat(rep.lat_reporte || rep.latitud),
-                    lng: parseFloat(rep.long_reporte || rep.longitud),
-                    updated_at: rep.updated_at || rep.created_at,
-                };
-            }).filter(function (ep) { return !isNaN(ep.lat) && !isNaN(ep.lng); });
-
-            const heatGeometry = getInundacionHeatGeometry(report);
-            const allRepsHavePolygon = activeReps.length > 0 && activeReps.every(function (rep) {
-                if (rep.polygon_es_fallback || !rep.polygon_coords) return false;
-                if (!window.normalizePolygonRings) return false;
-                return window.normalizePolygonRings(rep.polygon_coords).length > 0;
-            });
-
-            // Un solo heatSource por inundación (un raster / un ImageOverlay).
-            // Si algún reporte aún no tiene polígono, omitimos el anillo parcial y pintamos radiales en todos los epicentros.
-            heatSources.push({
-                lat: lat,
-                lng: lng,
-                polygon_coords: (heatGeometry && allRepsHavePolygon) ? heatGeometry.polygon_coords : null,
-                polygon_es_fallback: heatGeometry ? heatGeometry.polygon_es_fallback : false,
-                tier: intensidad,
-                updated_at: report.updated_at,
-                epicenters: epicenters.length > 0 ? epicenters : undefined,
-            });
-
             if (activeReps.length > 0) {
                 activeReps.forEach(rep => {
                     const repLat = parseFloat(rep.lat_reporte || rep.latitud);
@@ -787,6 +743,9 @@ function initMap() {
 
             if (window.smartHeatmapInstance && typeof window.redrawFloodHeatOverlays === 'function') {
                 window.redrawFloodHeatOverlays(map, window.smartHeatmapInstance);
+            }
+            if (typeof window.tickFloodHeatTtlPulse === 'function') {
+                window.tickFloodHeatTtlPulse();
             }
 
             if (heatLegend && window.smartHeatmapInstance && window.smartHeatmapInstance.tiers) {
@@ -947,6 +906,29 @@ function initMap() {
             ? window.pendingReports.filter(function (r) { return !r.inundacion_id; })
             : []
     );
+
+    function startReportsMapTimers() {
+        if (window.__reportsMapTimersStarted) return;
+        window.__reportsMapTimersStarted = true;
+
+        const fillCfg = window.SMART_FLOOD_FILL || {};
+        const pulseMs = fillCfg.pulseIntervalMs || 600;
+
+        window.__floodHeatPulseTimer = setInterval(function () {
+            if (typeof window.tickFloodHeatTtlPulse === 'function') {
+                window.tickFloodHeatTtlPulse();
+            }
+        }, pulseMs);
+
+        window.__floodHeatRefreshTimer = setInterval(function () {
+            if (document.visibilityState !== 'visible') return;
+            if (typeof window.refreshReportsMap === 'function') {
+                window.refreshReportsMap();
+            }
+        }, 5 * 60 * 1000);
+    }
+
+    startReportsMapTimers();
 
     // Filter handling
     window.addEventListener('locationFilterChanged', function (e) {

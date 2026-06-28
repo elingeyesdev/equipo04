@@ -148,8 +148,9 @@ flowchart LR
 - **`Commands\BackfillInundacionMunicipios`** — relleno de municipios.
 
 ### 4.5 API REST (`routes/api.php`)
-- `auth/*` (register/login/me/logout), `reportes` (alta rápida pública), `reports` CRUD (Sanctum), `reportes/pendientes`, `reportes/{id}/validar`, `citizens/search`, `authorities/promote`, `centros` CRUD, `tracking/ping`.
+- `auth/*` (register/login/me/logout), `reportes` (alta rápida pública), `inundaciones/contexto` (contexto público sin auth, throttle 60/min), `reports` CRUD (Sanctum), `reportes/pendientes`, `reportes/{id}/validar`, `citizens/search`, `authorities/promote`, `centros` CRUD, `tracking/ping`.
 - Recursos: **`InundacionResource`** expone datos calculados (quórum, intensidad, confirmación, desglose) + polígonos + reportes activos. Consumido por el mapa vía `refreshReportsMap()` (`GET /api/reports`).
+- Recursos: **`InundacionPublicResource`** — datos sanitizados para reporte rápido (sin PII): intensidad calculada, `reportes_activos` lite (coords + polígonos + `updated_at` ISO8601 para heatmap/TTL), `reportes_activos_count`, `ultima_actividad_at`, polígono unificado, distancia al GPS, flag `dentro_contorno`, `esta_confirmada`. Sin `quorum_total`. Consumido por `GET /api/inundaciones/contexto` y SSR inicial de `/reporte-rapido`.
 
 ### 4.6 Capa Web (`routes/web.php`)
 - Auth de sesión (`AuthController`), módulo **`reports.*`** (Livewire modular + `ReportController`), `command-center.*`, `vehiculos.*`, `victimas.*`, `inventario.*`, `logistica.*`, `authorities.*`, `chat.*`, `profile.*`, `sugerencias.*`.
@@ -169,8 +170,30 @@ flowchart LR
 | `GET /reports/rechazados` | `ReportsRechazados` | Autoridad | Auditoría con filtros (paginado 15) |
 | `GET /reports/create`, `POST /reports` | `ReportController` | Sesión | Alta de reportes |
 | `GET /reports/{id}` | `ReportController` | Sesión | Ficha de reporte |
+| `GET /reporte-rapido` | `ReporteRapidoController` | **Público** | Reporte rápido anónimo: mapa con heatmap, carrusel de cercanía, intensidad por segmented control |
 
 > Las rutas específicas (`/reports/pendientes`, `/reports/rechazados`, etc.) se registran **antes** de `/reports/{id}` para evitar colisiones.
+
+#### Reporte Rápido (`/reporte-rapido`)
+
+Flujo móvil-first para ciudadanos **sin sesión**:
+
+- **Layout:** `layouts/emergency.blade.php` (header mínimo, sin nav completa).
+- **Frontend:** `public/js/reporte-rapido.js` + `public/js/flood-heat-sources.js` (helper compartido con `/reports`) + `components/reports/rapido-styles.blade.php`.
+- **Mapa:** Leaflet + `smart-heatmap.js` / `flood-outline.js` / `flood-heat-sources.js` — mismo pipeline de heatSources que `/reports` (TTL por reportes vivos vía `ultima_actividad_at`, geometría unificada). Capa de calor persistente (`heatLayer`), pane `floodFillPane` (z=450, encima del círculo GPS), redraw en zoom/move y doble pasada tras pintar (como `/reports`). Pin GPS draggable, círculo 500 m, leyenda baja/media/alta, **puntos de reportes activos siempre visibles** (sin toggle). No hay control de capas Leaflet (a diferencia de `/reports`, donde el heatmap vive en la overlay “Zona de Inundación”).
+- **Carrusel:** inundaciones cercanas (≤2 km o dentro de contorno) con flechas, drag-to-scroll y dots; tarjetas muestran distancia, intensidad, **N reportes activos**, estado confirmada/validación y última actividad; modo **Apoyar** pre-rellena intensidad y mantiene el pin en el GPS del usuario. **Cancelar apoyo:** botón × del chip, o segundo clic en la misma tarjeta (toggle); al salir se resetea intensidad a baja y se quita la selección visual.
+- **Envío:** `POST /api/reportes` estándar (`user_uuid`, coords, intensidad). Sin auto-vincular; el quórum sube tras validación de autoridad.
+- **Vinculación:** el backend existente (`InundacionMapaService::inundacionesVinculablesParaReporte` → `enrichPendientesConCercanas`) detecta candidatas por coordenadas del reporte; no se envía `inundacion_id` desde el cliente.
+- **Contexto dinámico:** `GET /api/inundaciones/contexto?lat=&lng=` (público, throttle); refresco cada 60 s tras obtener GPS.
+- **Post-envío:** confirmación in-page (pendiente de validación, referencia de reporte, ETA si aplica); sin redirect forzado a login.
+
+**Correcciones UX/mapa (2026-06-28):**
+
+- **Heatmap:** `heatLayer` persistente (no se recrea en cada refresh); pane `floodFillPane` z-index 450; `scheduleHeatRedraw()` con doble pasada (0 ms + 120 ms) y en `zoomend`/`moveend`; timer `tickFloodHeatTtlPulse` como en `/reports`.
+- **TTL/geometría:** `InundacionPublicResource` serializa `reportes_activos[].updated_at` en ISO8601; `flood-heat-sources.js` usa `ultima_actividad_at` como fallback TTL y permite polígono unificado sin exigir polígono en todos los reportes.
+- **Modo Apoyar:** chip ocultable con `.hidden` en `rapido-styles` (independiente de Tailwind/Vite); cancelar con × o segundo clic en la misma tarjeta; intensidad vuelve a baja al salir.
+- **Puntos de reporte:** siempre visibles; eliminado checkbox `#rapidoShowReportDots`.
+- **Assets:** `reporte-rapido.js?v=3`, `flood-heat-sources.js?v=2`.
 
 ### 4.7 Livewire — Panel de reportes (modular)
 
@@ -283,8 +306,10 @@ Extraído del Blade monolítico anterior. Responsabilidades:
   - Respeta filtro geográfico activo (`window.reportsMapFilter` / evento `locationFilterChanged`).
 - **Disparadores del refresco de mapa:**
   - `Livewire.on('refreshReports')` y `Livewire.on('reporte-ttl-renovado')`.
-  - Tras `validarRapido()` exitoso (`validation-scripts.blade.php`); segundo refresco diferido ~8 s tras **crear** o **vincular** (polígonos topográficos en cola).
+  - Tras `validarRapido()` exitoso (`validation-scripts.blade.php`); reintentos del mapa a 500 ms, 2 s, 5 s y 10 s tras **crear** o **vincular** (topografía en cola).
   - `renovarReporte()` y `desactivar()` en `ReportsHub` emiten `refreshReports`.
+  - Refresco periódico del mapa cada **5 min** (pestaña visible) para sincronizar TTL/expiración con el API.
+  - Pulso TTL cada **600 ms** (`tickFloodHeatTtlPulse`) para parpadeo en ventana final.
 - Evento DOM `reportsMapRefreshed` al terminar el fetch (extensible por otros scripts).
 - Confirmaciones SweetAlert2 en acciones de validación.
 
@@ -302,7 +327,7 @@ Extraído del Blade monolítico anterior. Responsabilidades:
 
 #### Scripts en `public/js/`
 
-- **`smart-heatmap.js`** — mapa de calor rasterizado (`createSmartHeatmap`). Por inundación: grilla dentro del anillo unificado → canvas offscreen con degradado continuo (distancia a epicentros + feather en borde + blur) → **`L.imageOverlay`**. Color fijo por tier (baja `#7dd3fc`, media `#0ea5e9`, alta `#1e3a8a`). Opacidad alta y **estable al zoom** (sin repintado al hacer zoom). Configuración central: `window.SMART_FLOOD_FILL` (`edgeMin`/`coreMax` por tier, `blurPx`, `edgeFeatherM`, `coreFactorFloor`, `edgeFactorFloor`). Anillo suavizado con Chaikin (`window.chaikinSmoothRing` desde `flood-outline.js`) antes de rasterizar. Sin círculos ni halos discretos en epicentros. Pane `floodFillPane` (z≈380). Contorno de selección solo al clic (`selectionBorderLayer`). HUD: `Zoom · edge/core por tier`.
+- **`smart-heatmap.js`** — mapa de calor rasterizado (`createSmartHeatmap`). Por inundación: grilla dentro del anillo unificado → canvas offscreen con degradado (feather en borde + radiales en epicentros, `max(alpha)`) → **`L.imageOverlay`**. Color fijo por tier (baja `#7dd3fc`, media `#0ea5e9`, alta `#1e3a8a`). **Opacidad fija en el PNG** (`SMART_FLOOD_FILL.edgeMin`/`coreMax` calibrados ~0.52–0.76); el TTL **no modula** el alpha del raster durante la vida útil. **Parpadeo TTL:** en los últimos 15 min antes del vencimiento (3 h desde el `updated_at` más reciente de `reportes_activos`), `tickFloodHeatTtlPulse()` aplica `setOpacity` pulsante al overlay completo. Config: `ttlWarnMinutes`, `ttlHours`, `pulseIntervalMs`. Pane `floodFillPane` (z≈380). Contorno de selección solo al clic.
 - **`flood-outline.js`** — fusiona en el cliente todos los polígonos de los reportes de una inundación en un **único contorno suavizado** (cierre morfológico + suavizado de Chaikin; convex hull de respaldo). Expone `computeInundacionSelectionOutline()`, `resolveUnifiedHeatRing()` (prioriza anillo único del API) y **`chaikinSmoothRing`** (reutilizado por el raster del mapa de calor).
 - **`safe-routing.js`** — rutas seguras (OpenRouteService) evitando inundaciones; consume `window.floodReports` y `window.pendingReports`.
 - **`report-minimaps.js`** — minimapas inline en tablas de validación (GPS vs evento, zoom adaptativo, lazy load); escucha `refreshReports` para re-inicializar filas nuevas.
@@ -358,12 +383,14 @@ sequenceDiagram
 1. El **anillo unificado** lo calcula el backend (`InundacionMapaService::polygonCoordsParaMapa` → `unirPoligonosEnAnilloUnico`) solo con reportes vivos (TTL). El frontend usa `resolveUnifiedHeatRing()` para alinear relleno, contorno de selección y drawer de vinculación.
 2. Si no hay polígono unificado, se fusionan polígonos en el cliente (`flood-outline.js`). Fallback geométrico: gradiente radial en canvas (radio 55/90/130 m según tier).
 3. El **color** lo determina `intensidadCalculada()` de la inundación (no la densidad de puntos). Inundaciones distintas → colores distintos; reportes de la misma inundación → una sola zona/color.
-4. **Degradado continuo**: alpha interpolado desde epicentros (`coreMax`) hacia el interior-borde (`edgeMin`) con pisos mínimos (`coreFactorFloor`, `edgeFactorFloor`); feather en el contorno del polígono; blur post-proceso (`blurPx`) para bordes redondeados.
-5. **Opacidad por tier** (`SMART_FLOOD_FILL`, valores de referencia): baja edge/core 0.92/1.0, media 0.96/1.0, alta 1.0/1.0 — manchas claramente visibles; calibrables en un solo objeto JS.
-6. **Sin halos circulares** en ubicación de reportes: el campo de calor es continuo; los puntos azules de reportes individuales siguen en capa aparte (`individualReportsLayer`).
-7. **Opacidad estable al zoom**: `L.imageOverlay` escala geográficamente; raster solo al refrescar datos (`renderReportsMap`), no en cada notch de rueda.
-8. **Contorno visible solo al clic** en la inundación (`selectionBorderLayer`, pane `floodSelectionPane` z≈550).
-9. Un **polígono editado por autoridad** (`polygon_editado_autoridad`) tiene prioridad absoluta y no se sobrescribe.
+4. **Degradado continuo**: interior del polígono con feather hacia el borde; radiales en epicentros compuestos con `max(alpha)`; blur post-proceso (`blurPx`).
+5. **Opacidad por tier** (`SMART_FLOOD_FILL`, valores actuales): baja edge/core 0.52/0.68, media 0.56/0.72, alta 0.60/0.76 — **constantes** en el raster; calibrables en un solo objeto JS. El TTL ya no multiplica el alpha al hornear (comportamiento legacy corregido: antes `edgeMin` 0.92–1.0 × `ttlFactor` producía manchas muy oscuras al crear y más claras tras re-render).
+6. **Parpadeo TTL**: últimos **15 min** antes de expirar → `setOpacity` pulsante en todo el `ImageOverlay`; al expirar la inundación desaparece del API y del mapa en el próximo refresh.
+7. **Sin halos circulares** en ubicación de reportes: el campo de calor es continuo; los puntos azules de reportes individuales siguen en capa aparte (`individualReportsLayer`).
+8. **Opacidad estable al zoom**: `L.imageOverlay` escala geográficamente; raster solo al refrescar datos (`renderReportsMap`), no en cada notch de rueda.
+9. **Contorno visible solo al clic** en la inundación (`selectionBorderLayer`, pane `floodSelectionPane` z≈550).
+10. Un **polígono editado por autoridad** (`polygon_editado_autoridad`) tiene prioridad absoluta y no se sobrescribe.
+11. Referencia TTL del heatmap: `max(updated_at)` de `reportes_activos` (no solo `inundacion.updated_at`).
 
 ---
 
@@ -435,7 +462,7 @@ cosa web/chirper/
 │   ├── Events/                # ChatMessageSent (Reverb)
 │   ├── Http/
 │   │   ├── Controllers/       # Web
-│   │   ├── Controllers/Api/   # API REST (Sanctum)
+│   │   ├── Controllers/Api/   # API REST (Sanctum + InundacionPublicController)
 │   │   ├── Middleware/        # ApiAuthenticate, EnsureApiAuthority, ...
 │   │   └── Resources/         # InundacionResource, ...
 │   ├── Jobs/                  # CalcularPoligonoInundacion
@@ -447,7 +474,7 @@ cosa web/chirper/
 │   └── Support/               # PolygonCoordsHelper, PolygonSimplifier
 ├── tests/Unit/                # TopografiaInundacionServiceTest, PolygonSimplifierTest, ...
 ├── database/migrations/       # esquema (inundaciones, reportes, polígonos, módulos)
-├── public/js/                 # smart-heatmap.js, flood-outline.js, safe-routing.js, report-minimaps.js
+├── public/js/                 # smart-heatmap.js, flood-outline.js, flood-heat-sources.js, reporte-rapido.js, …
 ├── public/icons/reports/      # SVG (ampliar, check, link, x) — assets de UI de validación
 ├── resources/views/
 │   ├── livewire/              # reports-hub, reports-pendientes, reports-rechazados, …
