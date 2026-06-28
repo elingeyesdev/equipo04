@@ -203,7 +203,11 @@
         showBulk: false,
         itemsData: {
             @foreach($inventario as $item)
-            {{ $item->id }}: { status: '{{ $item->status }}', categoria: '{{ $item->categoria }}' },
+            {{ $item->id }}: { 
+                status: '{{ $item->status }}', 
+                categoria: '{{ $item->categoria }}',
+                inundacion_id: '{{ $item->inundacion_id }}'
+            },
             @endforeach
         },
         selectedItemIds: [],
@@ -213,6 +217,11 @@
         get selectedStatus() {
             if (this.selectedItemIds.length === 0) return null;
             return this.itemsData[this.selectedItemIds[0]].status;
+        },
+        
+        get hasInundacion() {
+            if (this.selectedItemIds.length === 0) return false;
+            return this.itemsData[this.selectedItemIds[0]].inundacion_id !== '';
         },
         
         get canDiscard() {
@@ -237,21 +246,20 @@
         <div class="p-4 bg-white border-b border-gray-200">
             <form method="GET" action="{{ route('inventario.show', $centro->id_centro) }}" class="flex flex-col sm:flex-row gap-4 items-end">
                 <div class="w-full sm:w-1/4">
-                    <label class="block text-xs font-medium text-gray-700 mb-1">Estado</label>
-                    <select name="status" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                    <select name="status" onchange="this.form.submit()" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm py-2.5 px-3">
                         <option value="">Activos (Ocultar entregados/desechados)</option>
                         <option value="all" {{ ($status ?? '') == 'all' ? 'selected' : '' }}>Todos los estados</option>
                         <option value="recibido_centro" {{ ($status ?? '') == 'recibido_centro' ? 'selected' : '' }}>Recibido en Centro</option>
                         <option value="almacenado" {{ ($status ?? '') == 'almacenado' ? 'selected' : '' }}>Almacenado</option>
-                        <option value="retirado" {{ ($status ?? '') == 'retirado' ? 'selected' : '' }}>Retirado</option>
                         <option value="en_transito" {{ ($status ?? '') == 'en_transito' ? 'selected' : '' }}>En Tránsito</option>
                         <option value="entregado" {{ ($status ?? '') == 'entregado' ? 'selected' : '' }}>Entregado</option>
                         <option value="desechado" {{ ($status ?? '') == 'desechado' ? 'selected' : '' }}>Desechado</option>
                     </select>
                 </div>
                 <div class="w-full sm:w-1/4">
-                    <label class="block text-xs font-medium text-gray-700 mb-1">Categoría</label>
-                    <select name="categoria" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+                    <select name="categoria" onchange="this.form.submit()" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm py-2.5 px-3">
                         <option value="">Todas las categorías</option>
                         <option value="comida" {{ ($categoria ?? '') == 'comida' ? 'selected' : '' }}>Comida</option>
                         <option value="bebida" {{ ($categoria ?? '') == 'bebida' ? 'selected' : '' }}>Bebidas</option>
@@ -261,19 +269,16 @@
                         <option value="otros" {{ ($categoria ?? '') == 'otros' ? 'selected' : '' }}>Otros</option>
                     </select>
                 </div>
-                <div class="w-full sm:w-1/4 flex items-center h-9">
+                <div class="w-full sm:w-1/4 flex items-center pt-5">
                     <label class="inline-flex items-center cursor-pointer">
-                        <input type="checkbox" name="recent" value="30_days" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-4 w-4" {{ ($recent ?? '') == '30_days' ? 'checked' : '' }}>
+                        <input type="checkbox" name="recent" value="30_days" onchange="this.form.submit()" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-5 w-5" {{ ($recent ?? '') == '30_days' ? 'checked' : '' }}>
                         <span class="ml-2 text-sm text-gray-700 font-medium">Últimos 30 días</span>
                     </label>
                 </div>
-                <div class="w-full sm:w-1/4 flex gap-2">
-                    <button type="submit" class="w-full justify-center inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-                        Filtrar
-                    </button>
+                <div class="w-full sm:w-1/4 flex gap-2 items-center pt-5">
                     @if(request()->hasAny(['status', 'categoria', 'recent']))
-                        <a href="{{ route('inventario.show', $centro->id_centro) }}" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-                            Limpiar
+                        <a href="{{ route('inventario.show', $centro->id_centro) }}" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+                            Limpiar Filtros
                         </a>
                     @endif
                 </div>
@@ -391,7 +396,7 @@
                              
                              <input type="hidden" name="status" :value="isDiscarding ? 'desechado' : nextStatusInfo.value">
                              
-                             <div class="flex-1 min-w-[200px]" x-show="['en_transito', 'entregado'].includes(nextStatusInfo.value)" style="display: none;">
+                             <div class="flex-1 min-w-[200px]" x-show="['en_transito', 'entregado'].includes(nextStatusInfo.value) && !hasInundacion" style="display: none;">
                                  <label class="block text-xs font-medium text-gray-700 mb-1">Inundación Destino (Opcional)</label>
                                  <select name="inundacion_id" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm py-2.5 px-3">
                                      <option value="">-- Ninguna --</option>
