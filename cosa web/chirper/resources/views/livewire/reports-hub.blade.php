@@ -70,13 +70,65 @@
                 <div class="bg-white rounded border border-gray-200 overflow-hidden mb-10 shadow-sm">
                     <div class="px-6 py-5 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3 bg-gray-50">
                         <h2 class="text-xl font-semibold text-gray-800">Mis reportes enviados</h2>
-                        <a href="{{ route('reports.mis', [], false) }}" class="inline-flex items-center gap-1.5 text-sm font-bold text-indigo-600 hover:text-indigo-800">
-                            Ver todos mis reportes
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-                        </a>
+                        <div class="flex flex-wrap items-center gap-3">
+                            @if(($totalMisReportes ?? 0) > 0)
+                                <span class="bg-blue-100 text-blue-800 py-1 px-3 rounded text-xs font-bold">{{ $totalMisReportes }} registro(s)</span>
+                            @endif
+                            <a href="{{ route('reports.mis', [], false) }}" class="inline-flex items-center gap-1.5 text-sm font-bold text-indigo-600 hover:text-indigo-800">
+                                Ver todos mis reportes
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                            </a>
+                        </div>
                     </div>
-                    <div class="px-6 py-4 text-sm text-slate-600">
-                        Consulta el estado de tus reportes, motivos de rechazo y ajustes de intensidad en la sección dedicada.
+                    @if(($totalMisReportes ?? 0) > 2)
+                        <p class="px-6 pt-4 text-xs text-slate-500">Mostrando los 2 reportes más recientes.</p>
+                    @endif
+                    <div class="overflow-x-auto p-2">
+                        <table class="w-full text-sm glass-table rounded-xl overflow-hidden">
+                            <thead class="text-slate-600">
+                                <tr>
+                                    <th class="text-left font-semibold px-4 py-3 rounded-tl-xl">ID</th>
+                                    <th class="text-left font-semibold px-4 py-3">Estado</th>
+                                    <th class="text-left font-semibold px-4 py-3">Intensidad</th>
+                                    <th class="text-left font-semibold px-4 py-3">Detalle</th>
+                                    <th class="text-left font-semibold px-4 py-3 rounded-tr-xl">Actualización</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200/50">
+                                @forelse($misReportes ?? [] as $rep)
+                                    @php /** @var \App\Models\Reporte $rep */ @endphp
+                                    <tr class="transition-colors duration-200">
+                                        <td class="px-4 py-3 font-semibold text-slate-700">N°{{ $rep->id }}</td>
+                                        <td class="px-4 py-3">
+                                            <span class="inline-flex items-center rounded px-2.5 py-1 text-xs font-bold
+                                                {{ (string) $rep->estado_validacion === 'pendiente' ? 'bg-yellow-100 text-yellow-800' : ((string) $rep->estado_validacion === 'aceptado' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800') }}">
+                                                {{ ucfirst((string) $rep->estado_validacion) }}
+                                            </span>
+                                        </td>
+                                        <td class="px-4 py-3 font-medium text-slate-600">
+                                            {{ ucfirst((string) $rep->intensidad_propuesta) }}
+                                            @if($rep->fueAjustado())
+                                                <span class="block text-[11px] text-indigo-600 mt-0.5">Validada: {{ ucfirst((string) $rep->intensidad_validada) }}</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-4 py-3 text-slate-600 text-xs max-w-[14rem]">
+                                            @if((string) $rep->estado_validacion === 'rechazado')
+                                                {{ $rep->motivoRechazo?->label_ciudadano ?? 'Sin motivo registrado.' }}
+                                            @elseif($rep->fueAjustado())
+                                                {{ $rep->ajuste_comentario }}
+                                            @else
+                                                —
+                                            @endif
+                                        </td>
+                                        <td class="px-4 py-3 text-slate-500">{{ optional($rep->updated_at)->format('d/m/Y H:i') }}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="5" class="px-4 py-8 text-slate-500 text-center font-medium">Aún no has enviado reportes. ¡Tu reporte salva vidas!</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             @endif

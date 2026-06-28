@@ -81,6 +81,15 @@ class ReportsHub extends Component
             ->map(fn (Inundacion $i) => $this->serializarActiva($i))
             ->all();
 
+        $misReportes = collect();
+        $totalMisReportes = 0;
+
+        if ($this->carnet !== '') {
+            $misQuery = Reporte::where('citizen_carnet', $this->carnet)->with('motivoRechazo');
+            $totalMisReportes = (clone $misQuery)->count();
+            $misReportes = $misQuery->latest('updated_at')->take(2)->get();
+        }
+
         $reportesPendientes = collect();
         $reportesRechazados = collect();
         $totalPendientes = 0;
@@ -102,6 +111,8 @@ class ReportsHub extends Component
 
         return view('livewire.reports-hub', array_merge([
             'inundacionesActivas' => $inundacionesActivas,
+            'misReportes'         => $misReportes,
+            'totalMisReportes'    => $totalMisReportes,
             'reportesPendientes'  => $reportesPendientes,
             'reportesRechazados'  => $reportesRechazados,
             'totalPendientes'     => $totalPendientes,

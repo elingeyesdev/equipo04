@@ -401,15 +401,15 @@ window.validateReport = function(id, action, intensidadPropuesta) {
             </div>
             <div class="px-5 py-4 border-t border-slate-200 bg-slate-50 flex gap-2">
                 <button type="button" onclick="reportDetailAprobar()" class="flex-1 inline-flex items-center justify-center gap-1.5 btn-report-aprobar px-3 py-2.5 text-xs rounded-lg font-bold shadow-sm transition-colors">
-                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+                    <x-reports.icon name="check" />
                     Aprobar
                 </button>
                 <button type="button" id="reportDetailBtnVincular" onclick="reportDetailVincular()" class="flex-1 inline-flex items-center justify-center gap-1.5 btn-report-vincular px-3 py-2.5 text-xs rounded-lg font-bold shadow-sm transition-colors">
-                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                    <x-reports.icon name="link" />
                     Vincular
                 </button>
                 <button type="button" onclick="reportDetailRechazar()" class="flex-1 inline-flex items-center justify-center gap-1.5 btn-report-rechazar px-3 py-2.5 text-xs rounded-lg font-bold shadow-sm transition-colors">
-                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    <x-reports.icon name="x" />
                     Rechazar
                 </button>
             </div>

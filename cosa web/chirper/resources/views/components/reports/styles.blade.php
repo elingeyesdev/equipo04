@@ -191,4 +191,25 @@
         background: #f1f5f9;
         color: #334155;
     }
+    .report-photo-expand-btn {
+        position: absolute;
+        bottom: 0.25rem;
+        right: 0.25rem;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.625rem;
+        height: 1.625rem;
+        border-radius: 0.375rem;
+        background: rgba(15, 23, 42, 0.65);
+        color: #fff;
+        border: none;
+        cursor: pointer;
+        transition: background 0.15s, transform 0.15s;
+    }
+    .report-photo-expand-btn:hover {
+        background: rgba(15, 23, 42, 0.85);
+        transform: scale(1.05);
+    }
 </style>
