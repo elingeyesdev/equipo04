@@ -20,6 +20,7 @@ class User extends Authenticatable
 
     public const ROLE_CITIZEN = 'citizen';
     public const ROLE_AUTHORITY = 'authority';
+    public const ROLE_SUPER_ADMIN = 'super-admin';
 
     protected $primaryKey = 'carnet';
     protected $keyType = 'string';
@@ -46,7 +47,12 @@ class User extends Authenticatable
 
     public function isAuthority(): bool
     {
-        return $this->role === self::ROLE_AUTHORITY;
+        return in_array($this->role, [self::ROLE_AUTHORITY, self::ROLE_SUPER_ADMIN]);
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === self::ROLE_SUPER_ADMIN;
     }
 
     public function isBanned(): bool

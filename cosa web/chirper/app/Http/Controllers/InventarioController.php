@@ -11,22 +11,61 @@ use Illuminate\Support\Facades\Storage;
 
 class InventarioController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $centros = CentroAsistencia::with('inventario')->get();
-        return view('inventario.index', compact('centros'));
-    }
+        $search = $request->input('search');
 
-    public function show(CentroAsistencia $centro)
-    {
-        $inventario = Inventario::with(['donor', 'trazabilidad', 'registrador'])
-            ->where('centro_id', $centro->id_centro)
-            ->latest()
+        $centros = CentroAsistencia::with('inventario')
+            ->when($search, function ($query) use ($search) {
+                $query->where('nombre', 'ilike', '%' . $search . '%')
+                      ->orWhere('direccion', 'ilike', '%' . $search . '%');
+            })
             ->get();
 
-        $inundaciones = \App\Models\Inundacion::activas()->get();
+        $stats = [
+            'total_centros' => CentroAsistencia::count(),
+            'total_items' => Inventario::count(),
+            'items_hoy' => Inventario::whereDate('created_at', today())->count(),
+        ];
 
-        return view('inventario.show', compact('centro', 'inventario', 'inundaciones'));
+        return view('inventario.index', compact('centros', 'stats', 'search'));
+    }
+
+    public function show(Request $request, CentroAsistencia $centro)
+    {
+        $status = $request->input('status');
+        $categoria = $request->input('categoria');
+        $recent = $request->input('recent');
+
+        $query = Inventario::with(['donor', 'trazabilidad', 'registrador'])
+            ->where('centro_id', $centro->id_centro);
+
+        if ($status && $status !== 'all') {
+            $query->where('status', $status);
+        } elseif ($status !== 'all') {
+            $query->whereNotIn('status', ['entregado', 'desechado']);
+        }
+
+        if ($categoria) {
+            $query->where('categoria', $categoria);
+        }
+
+        if ($recent === '30_days') {
+            $query->where('created_at', '>=', now()->subDays(30));
+        }
+
+        $inventario = $query->latest()->get();
+
+        $stats = [
+            'total' => Inventario::where('centro_id', $centro->id_centro)->count(),
+            'en_almacen' => Inventario::where('centro_id', $centro->id_centro)->whereIn('status', ['recibido_centro', 'almacenado'])->count(),
+            'entregados' => Inventario::where('centro_id', $centro->id_centro)->where('status', 'entregado')->count(),
+        ];
+
+        $inundaciones = \App\Models\Inundacion::activas()->get();
+        $victimas = \App\Models\Victima::all(); // Puedes optimizar esto a víctimas activas si tienes un scope
+
+        return view('inventario.show', compact('centro', 'inventario', 'inundaciones', 'victimas', 'stats', 'status', 'categoria', 'recent'));
     }
 
     public function store(Request $request, CentroAsistencia $centro)
@@ -93,10 +132,11 @@ class InventarioController extends Controller
         $validated = $request->validate([
             'items' => 'required|array|min:1',
             'items.*' => 'exists:inventario,id',
-            'status' => 'required|in:recibido_centro,almacenado,retirado,en_transito,entregado,desechado',
+            'status' => 'required|in:recibido_centro,almacenado,en_transito,entregado,desechado',
             'usage_details' => 'nullable|string',
             'photo' => 'nullable|image|max:5120',
             'inundacion_id' => 'nullable|exists:inundaciones,id',
+            'victima_id' => 'nullable|exists:victimas,id',
         ]);
 
         if ($validated['status'] === 'entregado' && !$request->hasFile('photo')) {
@@ -118,9 +158,10 @@ class InventarioController extends Controller
         $flujo = [
             'recibido_centro' => 1,
             'almacenado' => 2,
-            'retirado' => 3,
-            'en_transito' => 4,
-            'entregado' => 5,
+            'en_inventario' => 2, // Alias por si hay datos viejos
+            'retirado' => 3,      // Alias (fusionado con en_transito)
+            'en_transito' => 3,
+            'entregado' => 4,
         ];
 
         DB::transaction(function () use ($validated, $photoPath, $authorityCarnet, $flujo) {
@@ -171,6 +212,10 @@ class InventarioController extends Controller
                 if (!empty($validated['inundacion_id'])) {
                     $dataToUpdate['inundacion_id'] = $validated['inundacion_id'];
                 }
+                
+                if (!empty($validated['victima_id'])) {
+                    $dataToUpdate['victima_id'] = $validated['victima_id'];
+                }
 
                 $inventario->update($dataToUpdate);
 
@@ -178,7 +223,7 @@ class InventarioController extends Controller
                     'inventario_id' => $inventario->id,
                     'estado_anterior' => $oldStatus,
                     'estado_nuevo' => $nuevoStatus,
-                    'observacion' => $validated['usage_details'] ?? 'Actualización masiva de estado.',
+                    'observacion' => $validated['usage_details'] ?? 'No se proporcionaron comentarios u observaciones adicionales.',
                     'fecha_actualizacion' => now(),
                     'registrado_por' => $authorityCarnet,
                     'photo_path' => $photoPath,

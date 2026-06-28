@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             MotivoRechazoSeeder::class,
             ProvinciasMunicipiosSeeder::class,
+            SuperAdminSeeder::class,
         ]);
 
         User::query()->updateOrCreate(['carnet' => '10000001'], [
