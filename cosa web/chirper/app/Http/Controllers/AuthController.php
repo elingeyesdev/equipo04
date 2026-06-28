@@ -90,12 +90,12 @@ final class AuthController
     public function register(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'carnet' => ['required', 'string', 'max:20', 'regex:/^\d+$/'],
+            'carnet' => ['required', 'string','min:6', 'max:9', 'regex:/^\d+$/'],
             'name' => ['required', 'string', 'max:255'],
             'phone' => ['required', 'string', 'max:30'],
             'address' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
-            'password' => ['required', 'string', 'min:8'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
         try {

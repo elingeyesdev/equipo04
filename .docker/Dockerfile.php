@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y \
     unzip \
     git \
     curl \
-    && docker-php-ext-install pdo pdo_pgsql \
+    && docker-php-ext-install pdo pdo_pgsql pcntl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
