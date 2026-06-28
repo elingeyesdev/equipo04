@@ -142,7 +142,9 @@ window.buildPendingValidationPopupHtml = function (report) {
                     if (typeof window.refreshReportsMap === 'function') {
                         window.refreshReportsMap();
                         if (action === 'crear' || action === 'vincular') {
-                            setTimeout(function () { window.refreshReportsMap(); }, 8000);
+                            [500, 2000, 5000, 10000].forEach(function (delayMs) {
+                                setTimeout(function () { window.refreshReportsMap(); }, delayMs);
+                            });
                         }
                     }
                 })

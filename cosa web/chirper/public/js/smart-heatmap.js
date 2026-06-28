@@ -1,15 +1,7 @@
 /**
  * Smart Flood Visual Layer — mapa de calor rasterizado (Canvas + ImageOverlay)
  *
- * El COLOR representa la intensidad de la inundación (baja/media/alta). Degradado
- * continuo desde epicentros hacia bordes; bordes suavizados con blur. Estable al
- * zoom (sin Leaflet.heat ni repintados en cada notch).
- *
- * options:
- *   mode: 'auto' | 'geometric' | 'topographic'
- *   ttlHours: number (default 3)
- *   targetLayer: L.layerGroup
- *   pane: string (default 'overlayPane')
+ * Una capa raster por inundación; opacidad estable al añadir reportes (max alpha, sin apilar).
  */
 window.SMART_HEATMAP_TIER_COLORS = {
     baja:  '#7dd3fc',
@@ -34,6 +26,7 @@ window.SMART_FLOOD_FILL = {
 window.SMART_HEATMAP_OPACITY = window.SMART_FLOOD_FILL;
 
 const SMART_HEATMAP_TIER_ORDER = ['baja', 'media', 'alta'];
+const ALPHA_VISIBLE_THRESHOLD = 0.004;
 
 function normalizeTier(value) {
     if (value === 'alta' || value === 'media' || value === 'baja') return value;
@@ -109,6 +102,28 @@ function ringBounds(ring, marginM) {
     };
 }
 
+function boundsFromBoxes(boxes) {
+    let minLat = Infinity;
+    let maxLat = -Infinity;
+    let minLng = Infinity;
+    let maxLng = -Infinity;
+
+    boxes.forEach(function (b) {
+        minLat = Math.min(minLat, b.minLat);
+        maxLat = Math.max(maxLat, b.maxLat);
+        minLng = Math.min(minLng, b.minLng);
+        maxLng = Math.max(maxLng, b.maxLng);
+    });
+
+    return {
+        minLat: minLat,
+        maxLat: maxLat,
+        minLng: minLng,
+        maxLng: maxLng,
+        centerLat: (minLat + maxLat) / 2,
+    };
+}
+
 function distPointToSegmentM(lat, lng, aLat, aLng, bLat, bLng) {
     const cosLat = Math.cos(lat * Math.PI / 180);
     const mPerDegLat = 111320;
@@ -151,46 +166,77 @@ function distanceToPolygonBorder(lat, lng, ring) {
     return minDist;
 }
 
-function nearestEpicenterDist(lat, lng, epicenters) {
-    let minDist = Infinity;
-
-    epicenters.forEach(function (ep) {
-        minDist = Math.min(minDist, haversineM(lat, lng, ep.lat, ep.lng));
-    });
-
-    return minDist;
-}
-
-function maxEpicenterSpread(ring, epicenters) {
-    let maxD = 20;
-
-    epicenters.forEach(function (ep) {
-        ring.forEach(function (v) {
-            maxD = Math.max(maxD, haversineM(ep.lat, ep.lng, v[0], v[1]));
-        });
-    });
-
-    return maxD;
-}
-
-function computeHeatAlpha(lat, lng, tier, ttl, fillCfg, epicenters, ring, maxSpread) {
+/**
+ * Opacidad dentro del polígono: solo feather hacia el borde (sin depender de epicentros).
+ * Así añadir reportes no oscurece el interior existente.
+ */
+function computePolygonInteriorAlpha(lat, lng, tier, ttl, fillCfg, ring) {
     const edgeMin = (fillCfg.edgeMin[tier] || 0.18) * ttl;
     const coreMax = (fillCfg.coreMax[tier] || 0.34) * ttl;
     const featherM = fillCfg.edgeFeatherM || 10;
+    const edgeFloor = fillCfg.edgeFactorFloor || 0.72;
+    const distBorder = distanceToPolygonBorder(lat, lng, ring);
+    const edgeFactor = Math.min(1, Math.max(edgeFloor, distBorder / Math.max(featherM, 6)));
+
+    return Math.max(0, Math.min(1, edgeMin + edgeFactor * (coreMax - edgeMin)));
+}
+
+function epicenterRadialBounds(ep, tier, fillCfg) {
+    const radiusM = tierRadiusM(tier);
+    const marginM = radiusM * 0.15 + (fillCfg.blurPx || 7) * 2;
+    const cosLat = Math.cos(ep.lat * Math.PI / 180);
+    const dLat = (radiusM + marginM) / 111320;
+    const dLng = (radiusM + marginM) / (111320 * Math.max(cosLat, 0.01));
+
+    return {
+        minLat: ep.lat - dLat,
+        maxLat: ep.lat + dLat,
+        minLng: ep.lng - dLng,
+        maxLng: ep.lng + dLng,
+        centerLat: ep.lat,
+    };
+}
+
+function computeEpicenterRadialAlpha(lat, lng, tier, ttl, fillCfg, epicenters) {
+    const radiusM = tierRadiusM(tier);
+    const marginM = radiusM * 0.15 + (fillCfg.blurPx || 7) * 2;
+    let alpha = 0;
+
+    epicenters.forEach(function (ep) {
+        const dist = haversineM(ep.lat, ep.lng, lat, lng);
+        alpha = Math.max(alpha, computeRadialAlpha(dist, tier, ttl, fillCfg, radiusM, marginM));
+    });
+
+    return alpha;
+}
+
+function computeRadialAlpha(dist, tier, ttl, fillCfg, radiusM, marginM) {
+    const edgeMin = (fillCfg.edgeMin[tier] || 0.18) * ttl;
+    const coreMax = (fillCfg.coreMax[tier] || 0.34) * ttl;
+    const featherM = fillCfg.edgeFeatherM || 30;
     const coreFloor = fillCfg.coreFactorFloor || 0.78;
     const edgeFloor = fillCfg.edgeFactorFloor || 0.72;
 
-    const distEp = nearestEpicenterDist(lat, lng, epicenters);
-    const coreFactor = Math.max(coreFloor, 1 - 0.55 * (distEp / maxSpread));
-    let alpha = edgeMin + coreFactor * (coreMax - edgeMin);
+    if (dist > radiusM + marginM * 0.5) return 0;
 
-    if (ring) {
-        const distBorder = distanceToPolygonBorder(lat, lng, ring);
-        const edgeFactor = Math.min(1, Math.max(edgeFloor, distBorder / Math.max(featherM, 6)));
-        alpha *= edgeFactor;
+    const coreFactor = Math.max(coreFloor, 1 - 0.55 * (dist / radiusM));
+    const edgeFactor = dist <= radiusM
+        ? Math.min(1, Math.max(edgeFloor, (radiusM - dist) / featherM + edgeFloor))
+        : Math.max(edgeFloor * 0.5, 1 - (dist - radiusM) / marginM);
+
+    return (edgeMin + coreFactor * (coreMax - edgeMin)) * Math.min(1, edgeFactor);
+}
+
+function canvasMaxAlpha(canvas) {
+    const ctx = canvas.getContext('2d');
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let maxA = 0;
+
+    for (let i = 3; i < data.length; i += 4) {
+        maxA = Math.max(maxA, data[i]);
     }
 
-    return Math.max(0, Math.min(1, alpha));
+    return maxA / 255;
 }
 
 function applyCanvasBlur(sourceCanvas, blurPx) {
@@ -217,52 +263,7 @@ function applyCanvasBlur(sourceCanvas, blurPx) {
     return cropped;
 }
 
-function buildHeatRaster(ring, epicenters, tier, ttl, fillCfg) {
-    const smoothRing = chaikinSmoothRing(ring, fillCfg.chaikinIterations || 2);
-    const marginM = (fillCfg.edgeFeatherM || 30) + (fillCfg.blurPx || 7) * 2;
-    const bounds = ringBounds(smoothRing, marginM);
-    const maxSpread = maxEpicenterSpread(smoothRing, epicenters);
-    const rgb = hexToRgb(window.SMART_HEATMAP_TIER_COLORS[tier]);
-
-    const latSpanM = haversineM(bounds.minLat, bounds.minLng, bounds.maxLat, bounds.minLng);
-    const lngSpanM = haversineM(bounds.centerLat, bounds.minLng, bounds.centerLat, bounds.maxLng);
-    const stepM = fillCfg.sampleStepM || 10;
-    const maxPx = fillCfg.maxCanvasPx || 512;
-
-    let cols = Math.max(16, Math.ceil(lngSpanM / stepM));
-    let rows = Math.max(16, Math.ceil(latSpanM / stepM));
-    const scale = Math.min(1, maxPx / Math.max(cols, rows));
-
-    cols = Math.max(16, Math.round(cols * scale));
-    rows = Math.max(16, Math.round(rows * scale));
-
-    const canvas = document.createElement('canvas');
-    canvas.width = cols;
-    canvas.height = rows;
-    const ctx = canvas.getContext('2d');
-    const imageData = ctx.createImageData(cols, rows);
-    const data = imageData.data;
-
-    for (let row = 0; row < rows; row++) {
-        const lat = bounds.maxLat - (row / Math.max(rows - 1, 1)) * (bounds.maxLat - bounds.minLat);
-
-        for (let col = 0; col < cols; col++) {
-            const lng = bounds.minLng + (col / Math.max(cols - 1, 1)) * (bounds.maxLng - bounds.minLng);
-
-            if (!pointInPolygon(lat, lng, smoothRing)) continue;
-
-            const alpha = computeHeatAlpha(lat, lng, tier, ttl, fillCfg, epicenters, smoothRing, maxSpread);
-            if (alpha <= 0.004) continue;
-
-            const idx = (row * cols + col) * 4;
-            data[idx] = rgb[0];
-            data[idx + 1] = rgb[1];
-            data[idx + 2] = rgb[2];
-            data[idx + 3] = Math.round(alpha * 255);
-        }
-    }
-
-    ctx.putImageData(imageData, 0, 0);
+function rasterFromCanvas(canvas, bounds, fillCfg) {
     const blurred = applyCanvasBlur(canvas, fillCfg.blurPx || 7);
 
     return {
@@ -271,61 +272,81 @@ function buildHeatRaster(ring, epicenters, tier, ttl, fillCfg) {
     };
 }
 
-function buildRadialHeatRaster(lat, lng, tier, ttl, fillCfg) {
-    const radiusM = tierRadiusM(tier);
-    const marginM = radiusM * 0.15 + (fillCfg.blurPx || 7) * 2;
-    const cosLat = Math.cos(lat * Math.PI / 180);
-    const dLat = (radiusM + marginM) / 111320;
-    const dLng = (radiusM + marginM) / (111320 * Math.max(cosLat, 0.01));
+function gridDimensions(bounds, stepM, maxPx) {
+    const latSpanM = haversineM(bounds.minLat, bounds.minLng, bounds.maxLat, bounds.minLng);
+    const lngSpanM = haversineM(bounds.centerLat, bounds.minLng, bounds.centerLat, bounds.maxLng);
 
-    const bounds = {
-        minLat: lat - dLat,
-        maxLat: lat + dLat,
-        minLng: lng - dLng,
-        maxLng: lng + dLng,
-        centerLat: lat,
-    };
+    let cols = Math.max(16, Math.ceil(lngSpanM / stepM));
+    let rows = Math.max(16, Math.ceil(latSpanM / stepM));
+    const scale = Math.min(1, maxPx / Math.max(cols, rows));
+
+    cols = Math.max(16, Math.round(cols * scale));
+    rows = Math.max(16, Math.round(rows * scale));
+
+    return { cols: cols, rows: rows };
+}
+
+/**
+ * Un solo raster por inundación: polígono (interior estable) + radiales en epicentros (max alpha).
+ */
+function buildInundacionHeatRaster(polygonRings, epicenters, tier, ttl, fillCfg) {
+    const validEps = (epicenters || []).filter(function (ep) {
+        return ep && !isNaN(ep.lat) && !isNaN(ep.lng);
+    });
+
+    if (validEps.length === 0) return null;
+
+    const smoothRings = (polygonRings || []).map(function (ring) {
+        return chaikinSmoothRing(ring, fillCfg.chaikinIterations || 2);
+    }).filter(function (ring) {
+        return ring && ring.length >= 3;
+    });
+
+    const marginM = (fillCfg.edgeFeatherM || 30) + (fillCfg.blurPx || 7) * 2;
+    const boxes = [];
+
+    smoothRings.forEach(function (ring) {
+        boxes.push(ringBounds(ring, marginM));
+    });
+    validEps.forEach(function (ep) {
+        boxes.push(epicenterRadialBounds(ep, tier, fillCfg));
+    });
+
+    if (boxes.length === 0) return null;
+
+    const bounds = boundsFromBoxes(boxes);
+    bounds.centerLat = (bounds.minLat + bounds.maxLat) / 2;
 
     const rgb = hexToRgb(window.SMART_HEATMAP_TIER_COLORS[tier]);
-    const edgeMin = (fillCfg.edgeMin[tier] || 0.18) * ttl;
-    const coreMax = (fillCfg.coreMax[tier] || 0.34) * ttl;
-    const featherM = fillCfg.edgeFeatherM || 30;
     const stepM = fillCfg.sampleStepM || 10;
     const maxPx = fillCfg.maxCanvasPx || 512;
-
-    let cols = Math.max(16, Math.ceil((radiusM + marginM) * 2 / stepM));
-    let rows = cols;
-    const scale = Math.min(1, maxPx / cols);
-    cols = Math.max(16, Math.round(cols * scale));
-    rows = cols;
+    const grid = gridDimensions(bounds, stepM, maxPx);
 
     const canvas = document.createElement('canvas');
-    canvas.width = cols;
-    canvas.height = rows;
+    canvas.width = grid.cols;
+    canvas.height = grid.rows;
     const ctx = canvas.getContext('2d');
-    const imageData = ctx.createImageData(cols, rows);
+    const imageData = ctx.createImageData(grid.cols, grid.rows);
     const data = imageData.data;
 
-    for (let row = 0; row < rows; row++) {
-        const pLat = bounds.maxLat - (row / Math.max(rows - 1, 1)) * (bounds.maxLat - bounds.minLat);
+    for (let row = 0; row < grid.rows; row++) {
+        const lat = bounds.maxLat - (row / Math.max(grid.rows - 1, 1)) * (bounds.maxLat - bounds.minLat);
 
-        for (let col = 0; col < cols; col++) {
-            const pLng = bounds.minLng + (col / Math.max(cols - 1, 1)) * (bounds.maxLng - bounds.minLng);
-            const dist = haversineM(lat, lng, pLat, pLng);
+        for (let col = 0; col < grid.cols; col++) {
+            const lng = bounds.minLng + (col / Math.max(grid.cols - 1, 1)) * (bounds.maxLng - bounds.minLng);
 
-            if (dist > radiusM + marginM * 0.5) continue;
+            let alpha = 0;
 
-            const coreFloor = fillCfg.coreFactorFloor || 0.78;
-            const edgeFloor = fillCfg.edgeFactorFloor || 0.72;
-            const coreFactor = Math.max(coreFloor, 1 - 0.55 * (dist / radiusM));
-            const edgeFactor = dist <= radiusM
-                ? Math.min(1, Math.max(edgeFloor, (radiusM - dist) / featherM + edgeFloor))
-                : Math.max(edgeFloor * 0.5, 1 - (dist - radiusM) / marginM);
+            smoothRings.forEach(function (ring) {
+                if (!pointInPolygon(lat, lng, ring)) return;
+                alpha = Math.max(alpha, computePolygonInteriorAlpha(lat, lng, tier, ttl, fillCfg, ring));
+            });
 
-            let alpha = (edgeMin + coreFactor * (coreMax - edgeMin)) * Math.min(1, edgeFactor);
-            if (alpha <= 0.004) continue;
+            alpha = Math.max(alpha, computeEpicenterRadialAlpha(lat, lng, tier, ttl, fillCfg, validEps));
 
-            const idx = (row * cols + col) * 4;
+            if (alpha <= ALPHA_VISIBLE_THRESHOLD) continue;
+
+            const idx = (row * grid.cols + col) * 4;
             data[idx] = rgb[0];
             data[idx + 1] = rgb[1];
             data[idx + 2] = rgb[2];
@@ -334,12 +355,12 @@ function buildRadialHeatRaster(lat, lng, tier, ttl, fillCfg) {
     }
 
     ctx.putImageData(imageData, 0, 0);
-    const blurred = applyCanvasBlur(canvas, fillCfg.blurPx || 7);
 
-    return {
-        dataUrl: blurred.toDataURL('image/png'),
-        bounds: [[bounds.minLat, bounds.minLng], [bounds.maxLat, bounds.maxLng]],
-    };
+    if (canvasMaxAlpha(canvas) <= ALPHA_VISIBLE_THRESHOLD) {
+        return null;
+    }
+
+    return rasterFromCanvas(canvas, bounds, fillCfg);
 }
 
 function createHeatOverlay(map, raster, options) {
@@ -350,6 +371,24 @@ function createHeatOverlay(map, raster, options) {
         className: 'flood-heat-overlay',
     });
 }
+
+window.redrawFloodHeatOverlays = function (map, instance) {
+    if (!map || !instance || !Array.isArray(instance.overlays)) return;
+
+    function resetOverlays() {
+        instance.overlays.forEach(function (overlay) {
+            if (overlay && typeof overlay._reset === 'function') {
+                overlay._reset();
+            }
+        });
+    }
+
+    resetOverlays();
+    requestAnimationFrame(function () {
+        resetOverlays();
+        map.fire('moveend');
+    });
+};
 
 window.createSmartHeatmap = function (map, reports, options = {}) {
     if (!map || !window.L) return null;
@@ -397,29 +436,21 @@ window.createSmartHeatmap = function (map, reports, options = {}) {
 
     if (parsedReports.length === 0) return null;
 
-    const hasPolygons = parsedReports.some(function (r) {
-        return r.polygonRings.length > 0;
-    });
-
-    const useTopographic = mode === 'topographic' || (mode === 'auto' && hasPolygons);
     const layersByTier = { baja: [], media: [], alta: [] };
+    const allOverlays = [];
 
     parsedReports.forEach(function (rep) {
         const ttl = ttlFactor(rep.updatedAt, ttlHours);
         if (ttl <= 0) return;
 
-        if (useTopographic && rep.polygonRings.length > 0) {
-            rep.polygonRings.forEach(function (ring) {
-                const ringRaster = buildHeatRaster(ring, rep.epicenters, rep.tier, ttl, fillCfg);
-                if (ringRaster) {
-                    layersByTier[rep.tier].push(createHeatOverlay(map, ringRaster, options));
-                }
-            });
-        } else {
-            const radialRaster = buildRadialHeatRaster(rep.lat, rep.lng, rep.tier, ttl, fillCfg);
-            if (radialRaster) {
-                layersByTier[rep.tier].push(createHeatOverlay(map, radialRaster, options));
-            }
+        const usePolygons = (mode === 'topographic' || mode === 'auto') && rep.polygonRings.length > 0;
+        const rings = usePolygons ? rep.polygonRings : [];
+        const raster = buildInundacionHeatRaster(rings, rep.epicenters, rep.tier, ttl, fillCfg);
+
+        if (raster) {
+            const overlay = createHeatOverlay(map, raster, options);
+            layersByTier[rep.tier].push(overlay);
+            allOverlays.push(overlay);
         }
     });
 
@@ -453,8 +484,9 @@ window.createSmartHeatmap = function (map, reports, options = {}) {
 
     return {
         layers: tierGroups,
+        overlays: allOverlays,
         tiers: tiersPresent,
-        mode: useTopographic ? 'topographic' : 'geometric',
+        mode: parsedReports.some(function (r) { return r.polygonRings.length > 0; }) ? 'topographic' : 'geometric',
         debugOpacity: debugOpacity,
         get lastRadius() { return null; },
         get lastMax() { return null; },

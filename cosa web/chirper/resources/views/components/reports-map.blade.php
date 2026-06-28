@@ -10,7 +10,7 @@
 <!-- Leaflet CSS & JS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<script src="{{ asset('js/smart-heatmap.js') }}?v=20260629e"></script>
+<script src="{{ asset('js/smart-heatmap.js') }}?v=20260629g"></script>
 <script src="{{ asset('js/flood-outline.js') }}?v=20260627c"></script>
 
 <style>
@@ -629,14 +629,15 @@ function initMap() {
     });
 
     function renderReports(reportsData) {
+        if (window.smartHeatmapInstance) {
+            window.smartHeatmapInstance.remove();
+            window.smartHeatmapInstance = null;
+        }
+
         markersLayer.clearLayers();
         polygonLayer.clearLayers();
         selectionBorderLayer.clearLayers();
         individualReportsLayer.clearLayers();
-
-        if (window.smartHeatmapInstance) {
-            window.smartHeatmapInstance.remove();
-        }
 
         let heatSources = [];
 
@@ -718,37 +719,23 @@ function initMap() {
             }).filter(function (ep) { return !isNaN(ep.lat) && !isNaN(ep.lng); });
 
             const heatGeometry = getInundacionHeatGeometry(report);
+            const allRepsHavePolygon = activeReps.length > 0 && activeReps.every(function (rep) {
+                if (rep.polygon_es_fallback || !rep.polygon_coords) return false;
+                if (!window.normalizePolygonRings) return false;
+                return window.normalizePolygonRings(rep.polygon_coords).length > 0;
+            });
 
-            if (heatGeometry) {
-                heatSources.push({
-                    lat: lat,
-                    lng: lng,
-                    polygon_coords: heatGeometry.polygon_coords,
-                    polygon_es_fallback: heatGeometry.polygon_es_fallback,
-                    tier: intensidad,
-                    updated_at: report.updated_at,
-                    epicenters: epicenters.length > 0 ? epicenters : undefined,
-                });
-            } else if (activeReps.length > 0) {
-                activeReps.forEach(rep => {
-                    const repLat = parseFloat(rep.lat_reporte || rep.latitud);
-                    const repLng = parseFloat(rep.long_reporte || rep.longitud);
-                    if (isNaN(repLat) || isNaN(repLng)) return;
-
-                    heatSources.push({
-                        lat: repLat,
-                        lng: repLng,
-                        lat_reporte: repLat,
-                        long_reporte: repLng,
-                        polygon_coords: rep.polygon_es_fallback ? null : rep.polygon_coords,
-                        polygon_es_fallback: !!rep.polygon_es_fallback,
-                        intensidad_propuesta: rep.intensidad_propuesta || rep.intensidad || 'baja',
-                        tier: intensidad,
-                        updated_at: rep.updated_at || rep.created_at,
-                        epicenters: epicenters.length > 0 ? epicenters : undefined,
-                    });
-                });
-            }
+            // Un solo heatSource por inundación (un raster / un ImageOverlay).
+            // Si algún reporte aún no tiene polígono, omitimos el anillo parcial y pintamos radiales en todos los epicentros.
+            heatSources.push({
+                lat: lat,
+                lng: lng,
+                polygon_coords: (heatGeometry && allRepsHavePolygon) ? heatGeometry.polygon_coords : null,
+                polygon_es_fallback: heatGeometry ? heatGeometry.polygon_es_fallback : false,
+                tier: intensidad,
+                updated_at: report.updated_at,
+                epicenters: epicenters.length > 0 ? epicenters : undefined,
+            });
 
             if (activeReps.length > 0) {
                 activeReps.forEach(rep => {
@@ -797,6 +784,10 @@ function initMap() {
                 ttlHours: 3,
                 pane: 'floodFillPane',
             });
+
+            if (window.smartHeatmapInstance && typeof window.redrawFloodHeatOverlays === 'function') {
+                window.redrawFloodHeatOverlays(map, window.smartHeatmapInstance);
+            }
 
             if (heatLegend && window.smartHeatmapInstance && window.smartHeatmapInstance.tiers) {
                 const tiers = window.smartHeatmapInstance.tiers;
@@ -890,6 +881,9 @@ function initMap() {
             return;
         }
 
+        window.__reportsMapFetchGen = (window.__reportsMapFetchGen || 0) + 1;
+        const fetchGen = window.__reportsMapFetchGen;
+
         const headers = {
             Accept: 'application/json',
             Authorization: 'Bearer ' + cfg.apiToken,
@@ -899,19 +893,34 @@ function initMap() {
             const reportsRes = await fetch('/api/reports', {
                 headers: headers,
                 credentials: 'same-origin',
+                cache: 'no-store',
             });
 
-            if (reportsRes.ok) {
+            if (reportsRes.ok && fetchGen === window.__reportsMapFetchGen) {
                 const payload = await reportsRes.json();
                 const reports = Array.isArray(payload.data) ? payload.data : [];
                 window.floodReports = reports;
                 window.renderReportsMap(applyActiveMapFilter(reports));
+
+                if (window.smartHeatmapInstance && typeof window.redrawFloodHeatOverlays === 'function') {
+                    window.redrawFloodHeatOverlays(window.mapObj, window.smartHeatmapInstance);
+                    setTimeout(function () {
+                        if (fetchGen !== window.__reportsMapFetchGen || !window.smartHeatmapInstance) return;
+                        window.redrawFloodHeatOverlays(window.mapObj, window.smartHeatmapInstance);
+                    }, 120);
+                }
+
+                setTimeout(function () {
+                    if (fetchGen !== window.__reportsMapFetchGen) return;
+                    restoreInundacionSelectionAfterMapPaint();
+                }, 50);
             }
 
-            if (cfg.fetchPending) {
+            if (cfg.fetchPending && fetchGen === window.__reportsMapFetchGen) {
                 const pendingRes = await fetch('/api/reportes/pendientes', {
                     headers: headers,
                     credentials: 'same-origin',
+                    cache: 'no-store',
                 });
 
                 if (pendingRes.ok) {
@@ -924,16 +933,9 @@ function initMap() {
                 }
             }
 
-            if (window.mapObj) {
-                setTimeout(function () {
-                    window.mapObj.invalidateSize();
-                    // invalidateSize repinta el canvas del heatmap encima del contorno SVG;
-                    // volver a dibujar la selección en su pane (z-index 550).
-                    restoreInundacionSelectionAfterMapPaint();
-                }, 50);
+            if (fetchGen === window.__reportsMapFetchGen) {
+                document.dispatchEvent(new CustomEvent('reportsMapRefreshed'));
             }
-
-            document.dispatchEvent(new CustomEvent('reportsMapRefreshed'));
         } catch (err) {
             console.warn('No se pudo refrescar el mapa de reportes:', err);
         }
