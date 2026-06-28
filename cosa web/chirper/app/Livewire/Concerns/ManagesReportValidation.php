@@ -7,6 +7,7 @@ use App\Models\MotivoRechazo;
 use App\Models\Reporte;
 use App\Models\ReporteValidacionHistorial;
 use App\Models\User;
+use App\Services\InundacionMapaService;
 use App\Services\ReporteValidacionService;
 use Illuminate\Validation\ValidationException;
 
@@ -138,27 +139,9 @@ trait ManagesReportValidation
 
     protected function enrichPendientesWithCercanas($reportesPendientes, $activas, ReporteValidacionService $validacion): void
     {
+        app(InundacionMapaService::class)->enrichPendientesConCercanas($reportesPendientes, $activas);
+
         foreach ($reportesPendientes as $rep) {
-            $cercanas = [];
-            foreach ($activas as $activa) {
-                $lat1 = deg2rad((float) $rep->lat_reporte);
-                $lon1 = deg2rad((float) $rep->long_reporte);
-                $lat2 = deg2rad((float) $activa->latitud);
-                $lon2 = deg2rad((float) $activa->longitud);
-                $dLat = $lat2 - $lat1;
-                $dLon = $lon2 - $lon1;
-                $a    = sin($dLat / 2) ** 2 + cos($lat1) * cos($lat2) * sin($dLon / 2) ** 2;
-                $dist = 6371000 * 2 * atan2(sqrt($a), sqrt(1 - $a));
-                if ($dist <= 300) {
-                    $cercanas[] = [
-                        'id'                   => $activa->id,
-                        'latitud'              => $activa->latitud,
-                        'longitud'             => $activa->longitud,
-                        'intensidad_calculada' => $activa->intensidadCalculada(),
-                    ];
-                }
-            }
-            $rep->cercanas = collect($cercanas);
             $rep->rechazos_previos = $validacion->contarRechazosCiudadano($rep->citizen_carnet);
         }
     }
@@ -228,7 +211,8 @@ trait ManagesReportValidation
 
         if ($this->role === 'authority') {
             $motivosRechazo = MotivoRechazo::activos()->orderBy('codigo')->get();
-            $inundacionesActivasParaVincular = Inundacion::activas()->get();
+            $inundacionesActivasParaVincular = Inundacion::activas()->with('reportesActivosTTL')->get()
+                ->filter(fn (Inundacion $i) => app(InundacionMapaService::class)->inundacionTieneReportesVivos($i));
             $validadoresRechazo = $this->validadoresRechazoList();
         }
 

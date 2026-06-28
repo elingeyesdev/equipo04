@@ -17,7 +17,7 @@ Características diferenciadoras:
 - **Unificación de zona**: los reportes de una misma inundación se fusionan en una sola mancha mediante cierre morfológico.
 - **Contornos optimizados**: simplificación Douglas-Peucker (≤150 vértices) para rendimiento en mapa, API y Livewire.
 - **Mapa de calor por niveles de intensidad** (baja/media/alta) con leyenda y etiquetas.
-- **Validación geográfica**: minimapas inline en cada fila + drawer lateral para vincular reportes pendientes a inundaciones cercanas (≤300 m).
+- **Validación geográfica**: minimapas inline en cada fila + drawer lateral para vincular reportes pendientes a inundaciones cercanas (≤300 m al centroide **o** dentro del contorno activo del mapa de calor).
 
 ---
 
@@ -122,7 +122,8 @@ flowchart LR
 - **`TopografiaInundacionService`** — núcleo geoespacial:
   - `calcularResultado()` — region growing sobre grilla de elevación (celda 25 m, tolerancia 0.5 m, radios por intensidad 100/200/300 m); fallback geométrico si no hay datos.
   - `chainBoundaryEdges()` — extrae el contorno de celdas inundadas; si el contorno no cierra o supera ~400 vértices, usa **envolvente convexa** como fallback (evita polígonos rotos de miles de puntos).
-  - `unirPoligonosReportes()` — **cierre morfológico** (rasterizar → dilatar → erosionar → componentes conexas) para fusionar polígonos de reportes en una zona unificada (celda 10 m, puente 100 m). Devuelve `Polygon` o `MultiPolygon`.
+  - `unirPoligonosReportes()` — **cierre morfológico** (rasterizar → dilatar → erosionar → componentes conexas) para fusionar polígonos de reportes en una zona unificada (celda 10 m, puente configurable, default 100 m). Devuelve `Polygon` o `MultiPolygon`.
+  - `unirPoligonosEnAnilloUnico()` — unión adaptativa para **mapa de calor y contornos**: puente inicial `max(distancia_epicentros, 100) + 120 m`, reintentos +80 m (tope 400 m), fallback envolvente convexa. Garantiza un solo anillo visible aunque los reportes estén separados.
   - Todos los polígonos generados pasan por **`PolygonSimplifier`** antes de persistirse.
 - **`ElevationService`** (implementa `ElevationProvider`) — consulta Open Topo Data por lotes (100 puntos, ~1 req/s) con caché de 24 h.
 - **`PoligonoTopografiaCacheService`** — construye GeoJSON (`Polygon`/`MultiPolygon`), **simplifica** `polygon_coords` y persiste en `Reporte`/`Inundacion`.
@@ -224,7 +225,9 @@ El antiguo monolito **`ReportsIndex`** fue sustituido por **varios componentes L
 | Reporte | N°, Fecha (`created_at`), Reportado por (`citizen`) |
 | Detalles | Descripción; fila 50/50 Dirección + **Intensidad propuesta** (pill `intensity-pill-*`); enlace *Ver detalle completo* → `openReportDetailModal()` |
 | Mapa | `#report-minimap-pending-{id}` con `wire:ignore`; `report-minimaps.js` |
-| Acciones | **Aprobar** (`openApproveModal` / `validarRapido(id,'crear')`); **Vincular** solo si hay inundaciones activas a ≤300 m (`openReviewDrawer()`); **Rechazar** |
+| Acciones | **Aprobar** (oculto si `solo_vincular`: reporte dentro del contorno activo); **Vincular** si hay candidatas (`openReviewDrawer()`); **Rechazar** |
+
+**Reglas de vinculación** (`InundacionMapaService`): una inundación activa con TTL es candidata si el punto del reporte está **dentro del contorno** (`polygonCoordsParaMapa` + point-in-polygon) **o** a ≤300 m del centroide. Si `dentro_contorno_activo`, el backend bloquea `crear` y la UI oculta **Aprobar**; el drawer pre-selecciona la inundación cuando hay una sola candidata dentro del contorno. Misma lógica en panel, popup del mapa y `GET /api/reportes/pendientes`.
 
 En `/reports/pendientes`: misma tabla, paginación 10, scripts de validación completos. Los botones de acción son **solo texto** (sin iconos inline).
 
@@ -264,7 +267,7 @@ Extraído del Blade monolítico anterior. Responsabilidades:
 
 #### Review Drawer y modales auxiliares
 
-- **`#review-drawer`** (z-index 2500+): vinculación con mapa ampliado e inundaciones cercanas (≤300 m). Confirmación → `POST /api/reportes/{id}/validar`.
+- **`#review-drawer`** (z-index 2500+): vinculación con mapa ampliado e inundaciones candidatas (contorno activo o ≤300 m). Confirmación → `POST /api/reportes/{id}/validar`.
 - **`#rejectModal`**, **`#approveModal`**, **`#imageModal`**, **`#reportDetailModal`**: validación rápida y detalle (scripts en `validation-scripts.blade.php`, envueltos en `wire:ignore`).
 - **`#approveModal`:** intensidad propuesta como pill; checkbox «Ajustar intensidad validada»; select de intensidad validada **excluye** el nivel ya propuesto; comentario de ajuste con estilos `.report-validation-form`.
 - **`#reportDetailModal`:** botón **Vincular** oculto si el reporte no tiene inundaciones cercanas (misma regla que la fila de la tabla).
@@ -275,7 +278,7 @@ Extraído del Blade monolítico anterior. Responsabilidades:
 - **Tablas Livewire:** listeners `refreshReports`, Echo `ReporteCreado`, `InundacionActualizada` en `ReportsHub` y `ReportsPendientes` (re-render sin recargar la página).
 - **Mapa principal** (`components/reports-map.blade.php`, contenedor `wire:ignore`): no participa del morph de Livewire; se actualiza vía **`window.refreshReportsMap()`**:
   - `GET /api/reports` → `InundacionResource` → `window.floodReports` → `renderReportsMap()`.
-  - Si `fetchPending` (autoridad): `GET /api/reportes/pendientes` → filtra `inundacion_id` nulo → capa **`pendingReportsLayer`**.
+  - Si `fetchPending` (autoridad): `GET /api/reportes/pendientes` (enriquecido con `cercanas`, `solo_vincular`, `dentro_contorno_activo`) → filtra `inundacion_id` nulo → capa **`pendingReportsLayer`** con popup Aprobar/Vincular/Rechazar.
   - Token Sanctum en `window.SGI_MAP_CONFIG.apiToken` (sesión `api_token`).
   - Respeta filtro geográfico activo (`window.reportsMapFilter` / evento `locationFilterChanged`).
 - **Disparadores del refresco de mapa:**
@@ -299,8 +302,8 @@ Extraído del Blade monolítico anterior. Responsabilidades:
 
 #### Scripts en `public/js/`
 
-- **`smart-heatmap.js`** — render del mapa de calor. Una **capa por nivel de intensidad** con color azul fijo (baja `#7dd3fc`, media `#0ea5e9`, alta `#1e3a8a`); el peso de cada punto modula sólo la opacidad. Radio del blob fijado en **metros reales** convertidos a píxeles por zoom (mantiene la forma a cualquier escala). Muestreo dentro del polígono (paso 12 m) o fallback geométrico.
-- **`flood-outline.js`** — fusiona en el cliente todos los polígonos de los reportes de una inundación en un **único contorno suavizado** (cierre morfológico + suavizado de Chaikin; convex hull de respaldo). Usado para el contorno de selección y como respaldo de unificación de la zona de calor.
+- **`smart-heatmap.js`** — render del mapa de calor (hint de intensidad). Una **capa por nivel** con color azul fijo (baja `#7dd3fc`, media `#0ea5e9`, alta `#1e3a8a`). Opacidad y color **constantes en todo zoom**: `radius`/`blur`/`max`/`minOpacity` fijos al crear la capa; sin `setOptions` al zoom (Leaflet.heat escala el canvas con CSS). `maxZoom: 8` en la capa anula atenuación interna en zooms urbanos. Contorno solo al clic; geometría unificada vía `getInundacionHeatGeometry`. HUD: `Zoom · r · max`.
+- **`flood-outline.js`** — fusiona en el cliente todos los polígonos de los reportes de una inundación en un **único contorno suavizado** (cierre morfológico + suavizado de Chaikin; convex hull de respaldo). Expone `computeInundacionSelectionOutline()` y `resolveUnifiedHeatRing()` (prioriza anillo único del API, luego outline adaptativo).
 - **`safe-routing.js`** — rutas seguras (OpenRouteService) evitando inundaciones; consume `window.floodReports` y `window.pendingReports`.
 - **`report-minimaps.js`** — minimapas inline en tablas de validación (GPS vs evento, zoom adaptativo, lazy load); escucha `refreshReports` para re-inicializar filas nuevas.
 
@@ -352,10 +355,12 @@ sequenceDiagram
 ```
 
 ### Reglas de visualización del mapa de calor
-1. Se prioriza el **polígono unificado de la inundación** (aunque sea fallback). Si no existe, se fusionan los polígonos de reportes en el cliente (`flood-outline.js`). Solo como último recurso se pintan manchas por reporte.
-2. El **color** lo determina `intensidadCalculada()` de la inundación (no la densidad de puntos). Inundaciones distintas → colores distintos; reportes de la misma inundación → una sola zona/color.
-3. El **radio del blob** se fija en metros reales y escala con el zoom para evitar círculos sueltos a gran acercamiento.
-4. Un **polígono editado por autoridad** (`polygon_editado_autoridad`) tiene prioridad absoluta y no se sobrescribe.
+1. El **anillo unificado** lo calcula el backend (`InundacionMapaService::polygonCoordsParaMapa` → `unirPoligonosEnAnilloUnico`) solo con reportes vivos (TTL). El frontend usa `resolveUnifiedHeatRing()` para alinear heat, contorno de selección y drawer de vinculación.
+2. Si no hay polígono unificado, se fusionan polígonos en el cliente (`flood-outline.js`). Solo como último recurso se pintan manchas por reporte individual.
+3. El **color** lo determina `intensidadCalculada()` de la inundación (no la densidad de puntos). Inundaciones distintas → colores distintos; reportes de la misma inundación → una sola zona/color.
+4. El **radio del blob** se fija en metros reales y escala con el zoom para evitar círculos sueltos a gran acercamiento.
+5. Un **polígono editado por autoridad** (`polygon_editado_autoridad`) tiene prioridad absoluta y no se sobrescribe.
+6. **Puentes:** unión morfológica adaptativa en backend (primaria); corredores entre epicentros en `smart-heatmap.js` (fallback visual para datos cacheados multiparte).
 
 ---
 

@@ -4,9 +4,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 pest()->extend(TestCase::class)
-    ->in('Feature');
-
-pest()->extend(TestCase::class)
     ->in('Unit');
 
 uses(TestCase::class, RefreshDatabase::class)

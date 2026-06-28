@@ -36,7 +36,7 @@ class ReportsPendientes extends Component
     public function render()
     {
         $validacion = app(ReporteValidacionService::class);
-        $activas = Inundacion::activas()->get();
+        $activas = Inundacion::activas()->with('reportesActivosTTL')->get();
 
         $reportesPendientes = $this->queryReportesPendientes()
             ->paginate(10);

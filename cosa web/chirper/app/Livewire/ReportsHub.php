@@ -106,7 +106,7 @@ class ReportsHub extends Component
             $totalRechazados = (clone $rechazadosQuery)->count();
             $reportesRechazados = $rechazadosQuery->take(5)->get();
 
-            $activas = Inundacion::activas()->get();
+            $activas = Inundacion::activas()->with('reportesActivosTTL')->get();
             $this->enrichPendientesWithCercanas($reportesPendientes, $activas, $validacion);
         }
 

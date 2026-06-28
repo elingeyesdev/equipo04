@@ -25,7 +25,8 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-<script src="{{ asset('js/smart-heatmap.js') }}?v=20260623f"></script>
+<script src="{{ asset('js/smart-heatmap.js') }}?v=20260628i"></script>
+<script src="{{ asset('js/flood-outline.js') }}?v=20260627b"></script>
 @endonce
 
 {{-- ─── Input hidden real (va en el form) ───────────────────────────────── --}}
@@ -213,21 +214,19 @@
     }
 
     function buildHeatData(flood, lat, lng) {
-        const hasAuthorityPolygon = window.normalizePolygonRings
-            ? window.normalizePolygonRings(flood.polygon_coords).length > 0
-            : (flood
-                && flood.polygon_coords
-                && Array.isArray(flood.polygon_coords)
-                && flood.polygon_coords.length >= 3);
-
+        const reportes = flood.reportes_activos || flood.reportes || [];
         const floodTier = (flood && flood.intensidad_calculada) || 'media';
 
-        if (hasAuthorityPolygon) {
-            const reportes = flood.reportes || [];
+        const floodLike = Object.assign({}, flood, { reportes_activos: reportes });
+        const unifiedRing = window.resolveUnifiedHeatRing
+            ? window.resolveUnifiedHeatRing(floodLike)
+            : null;
+
+        if (unifiedRing && unifiedRing.length >= 3) {
             return [{
                 lat: lat,
                 lng: lng,
-                polygon_coords: flood.polygon_coords,
+                polygon_coords: unifiedRing,
                 intensidad_propuesta: flood.intensidad_calculada || 'media',
                 tier: floodTier,
                 updated_at: flood.updated_at,
@@ -241,8 +240,8 @@
             }];
         }
 
-        if (flood && flood.reportes && flood.reportes.length > 0) {
-            return flood.reportes.map(function (rep) {
+        if (reportes.length > 0) {
+            return reportes.map(function (rep) {
                 return Object.assign({}, rep, { tier: floodTier });
             });
         }

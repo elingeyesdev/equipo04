@@ -10,6 +10,7 @@ use App\Models\MotivoRechazo;
 use App\Models\Reporte;
 use App\Models\ReporteValidacionHistorial;
 use App\Models\User;
+use App\Services\InundacionMapaService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -28,6 +29,7 @@ final class ReporteValidacionService
         ?string $ajusteComentario = null,
     ): Inundacion {
         $this->validarAjusteIntensidad($reporte, $intensidadValidada, $ajusteComentario);
+        $this->validarNoDentroContornoActivo($reporte);
 
         return DB::transaction(function () use ($reporte, $validadorCarnet, $intensidadValidada, $ajusteComentario) {
             $estadoAnterior = $reporte->estado_validacion;
@@ -92,7 +94,40 @@ final class ReporteValidacionService
             $intensidadFinal = $this->resolverIntensidadValidada($reporte, $intensidadValidada);
             $huboAjuste = $intensidadFinal !== null;
 
-            $inundacion = Inundacion::findOrFail($inundacionId);
+            $inundacion = Inundacion::with('reportesActivosTTL')->findOrFail($inundacionId);
+
+            if ($inundacion->estado !== Inundacion::ESTADO_ACTIVA) {
+                throw ValidationException::withMessages([
+                    'inundacion_id' => 'Solo se puede vincular a inundaciones activas.',
+                ]);
+            }
+
+            $mapaService = app(InundacionMapaService::class);
+
+            if (! $mapaService->inundacionTieneReportesVivos($inundacion)) {
+                throw ValidationException::withMessages([
+                    'inundacion_id' => 'La inundación seleccionada no tiene reportes con TTL vigente.',
+                ]);
+            }
+
+            $distancia = $mapaService->distanciaMetros(
+                (float) $reporte->lat_reporte,
+                (float) $reporte->long_reporte,
+                (float) $inundacion->latitud,
+                (float) $inundacion->longitud,
+            );
+
+            $dentroContorno = $mapaService->puntoDentroContornoActivo(
+                (float) $reporte->lat_reporte,
+                (float) $reporte->long_reporte,
+                $inundacion,
+            );
+
+            if (! $dentroContorno && $distancia > InundacionMapaService::RADIO_VINCULACION_METROS) {
+                throw ValidationException::withMessages([
+                    'inundacion_id' => 'La inundación está a más de '.InundacionMapaService::RADIO_VINCULACION_METROS.' m del evento reportado y fuera de su contorno activo.',
+                ]);
+            }
 
             $reporte->update([
                 'estado_validacion'     => Reporte::VALIDACION_ACEPTADO,
@@ -228,6 +263,22 @@ final class ReporteValidacionService
             ->where('citizen_carnet', $citizenCarnet)
             ->where('estado_validacion', Reporte::VALIDACION_RECHAZADO)
             ->count();
+    }
+
+    private function validarNoDentroContornoActivo(Reporte $reporte): void
+    {
+        $mapaService = app(InundacionMapaService::class);
+
+        $activas = Inundacion::activas()
+            ->with('reportesActivosTTL')
+            ->get()
+            ->filter(static fn (Inundacion $i): bool => $mapaService->inundacionTieneReportesVivos($i));
+
+        if ($mapaService->reporteDentroInundacionActiva($reporte, $activas)) {
+            throw ValidationException::withMessages([
+                'action' => 'El reporte está dentro de una inundación activa; debe vincularse en lugar de crear una nueva.',
+            ]);
+        }
     }
 
     private function validarAjusteIntensidad(

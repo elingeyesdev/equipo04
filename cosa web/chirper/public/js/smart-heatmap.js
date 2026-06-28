@@ -22,6 +22,23 @@ window.SMART_HEATMAP_TIER_COLORS = {
     alta:  '#1e3a8a',
 };
 
+window.SMART_HEATMAP_OPACITY = {
+    gradientPeak: 0.042,
+    minFloor: 0.004,
+    minCeiling: 0.014,
+    heatMax: 5.2,
+    tierPeakScale: {
+        baja: 0.88,
+        media: 0.92,
+        alta: 0.28,
+    },
+    tierHeatMaxScale: {
+        baja: 1.0,
+        media: 1.0,
+        alta: 1.1,
+    },
+};
+
 const SMART_HEATMAP_TIER_ORDER = ['baja', 'media', 'alta'];
 
 function normalizeTier(value) {
@@ -37,13 +54,28 @@ function hexToRgba(hex, alpha) {
     return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
 }
 
-function tierGradient(hex) {
+function tierPeakScaleFor(tier) {
+    const OP = window.SMART_HEATMAP_OPACITY || {};
+    const scales = OP.tierPeakScale || {};
+    return scales[tier] != null ? scales[tier] : 1.0;
+}
+
+function tierHeatMaxScaleFor(tier) {
+    const OP = window.SMART_HEATMAP_OPACITY || {};
+    const scales = OP.tierHeatMaxScale || {};
+    return scales[tier] != null ? scales[tier] : 1.0;
+}
+
+function tierGradient(hex, tier) {
+    const OP = window.SMART_HEATMAP_OPACITY || {};
+    const tierScale = tierPeakScaleFor(tier);
+    const peak = (OP.gradientPeak || 0.10) * tierScale;
     return {
         0.0: hexToRgba(hex, 0),
-        0.2: hexToRgba(hex, 0.28),
-        0.5: hexToRgba(hex, 0.6),
-        0.8: hexToRgba(hex, 0.85),
-        1.0: hex,
+        0.2: hexToRgba(hex, peak * 0.18),
+        0.5: hexToRgba(hex, peak * 0.45),
+        0.8: hexToRgba(hex, peak * 0.75),
+        1.0: hexToRgba(hex, peak),
     };
 }
 
@@ -117,6 +149,11 @@ window.createSmartHeatmap = function (map, reports, options = {}) {
             } else {
                 addPoints(rep.tier, sampleGeometricHeatPoints(rep.lat, rep.lng, rep.tier, rep.updatedAt, ttlHours));
             }
+            // Con anillo unificado (1 polígono) los corredores legacy extienden la mancha
+            // más allá del contorno de selección; sólo aplicarlos si aún hay multiparte.
+            if (rep.epicenters.length >= 2 && rep.polygonRings.length !== 1) {
+                addPoints(rep.tier, buildEpicenterCorridors(rep.epicenters, sampleStepM, ttlHours, 400));
+            }
         });
     } else {
         parsedReports.forEach(function (rep) {
@@ -138,47 +175,50 @@ window.createSmartHeatmap = function (map, reports, options = {}) {
         return sum + ttlFactor(r.updatedAt, ttlHours);
     }, 0) / parsedReports.length;
 
-    // El radio del "blob" se fija en METROS reales y se convierte a píxeles según
-    // el zoom. La escala del mapa crece x2 por nivel de zoom; si el radio no sigue
-    // esa misma escala (antes crecía solo x1.4), a mucho zoom los puntos de la grilla
-    // se separan y aparecen círculos sueltos y colores sólidos en vez de un degradado.
-    const HEAT_RADIUS_M = Math.max(sampleStepM * 3.5, 42); // cobertura real del blob
-    const MIN_RADIUS_PX = 16;
-    const MAX_RADIUS_PX = 240;
+    // Radio/blur fijos en píxeles: mismo color y opacidad en todo zoom.
+    // Leaflet.heat escala el canvas con CSS durante el gesto; no tocar setOptions al zoom.
+    // maxZoom bajo (8) anula el factor interno v en zooms urbanos (≥10) → intensidad estable.
+    const HEAT_RADIUS_PX = 28;
+    const HEAT_BLUR_PX = 22;
+    const HEAT_FIXED_MAX_ZOOM = 8;
 
-    function metersPerPixel(lat, zoom) {
-        return 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom);
+    const OP = window.SMART_HEATMAP_OPACITY || {
+        minFloor: 0.004,
+        minCeiling: 0.014,
+        heatMax: 5.2,
+    };
+
+    function baseMinOpacity(tier) {
+        const tierScale = tierPeakScaleFor(tier);
+        return Math.max(OP.minFloor, Math.min(OP.minCeiling, 0.006 + 0.022 * avgTtl)) * tierScale;
     }
 
-    function radiusForZoom(zoom) {
-        const lat = map.getCenter().lat;
-        const mpp = metersPerPixel(lat, zoom) || 1;
-        const px = HEAT_RADIUS_M / mpp;
-        return Math.round(Math.max(MIN_RADIUS_PX, Math.min(MAX_RADIUS_PX, px)));
+    function heatMaxForTier(tier) {
+        return (OP.heatMax || 5.2) * tierHeatMaxScaleFor(tier);
     }
 
-    function blurForRadius(radius) {
-        return Math.max(12, Math.round(radius * 0.85));
-    }
-
-    const initialRadius = radiusForZoom(map.getZoom());
-    const initialBlur = blurForRadius(initialRadius);
-    const minOpacity = Math.max(0.18, Math.min(0.45, 0.16 + 0.3 * avgTtl));
+    const heatDebugState = {
+        lastRadius: HEAT_RADIUS_PX,
+        lastMax: 0,
+    };
 
     // Una capa de calor por nivel; orden baja→media→alta (alta arriba).
     const heatLayers = [];
 
     tiersPresent.forEach(function (tier) {
         const color = window.SMART_HEATMAP_TIER_COLORS[tier];
+        const tierMax = heatMaxForTier(tier);
+        if (tierMax > heatDebugState.lastMax) heatDebugState.lastMax = tierMax;
+
         const layerOptions = Object.assign({
-            radius: initialRadius,
-            blur: initialBlur,
-            minOpacity: minOpacity,
-            max: 1.0,
-            maxZoom: 18,
+            radius: HEAT_RADIUS_PX,
+            blur: HEAT_BLUR_PX,
+            minOpacity: baseMinOpacity(tier),
+            max: tierMax,
+            maxZoom: HEAT_FIXED_MAX_ZOOM,
         }, options.heatOptions || {});
         // El gradiente por nivel manda; no permitir override del color.
-        layerOptions.gradient = tierGradient(color);
+        layerOptions.gradient = tierGradient(color, tier);
 
         const layer = L.heatLayer(pointsByTier[tier], layerOptions);
 
@@ -191,20 +231,12 @@ window.createSmartHeatmap = function (map, reports, options = {}) {
         heatLayers.push(layer);
     });
 
-    const zoomListener = function () {
-        const newRadius = radiusForZoom(map.getZoom());
-        const newBlur = blurForRadius(newRadius);
-        heatLayers.forEach(function (layer) {
-            layer.setOptions({ radius: newRadius, blur: newBlur });
-        });
-    };
-
-    map.on('zoomend', zoomListener);
-
     return {
         layers: heatLayers,
         tiers: tiersPresent,
         mode: useTopographic ? 'topographic' : 'geometric',
+        get lastRadius() { return heatDebugState.lastRadius; },
+        get lastMax() { return heatDebugState.lastMax; },
         remove: function () {
             heatLayers.forEach(function (layer) {
                 if (options.targetLayer) {
@@ -213,7 +245,6 @@ window.createSmartHeatmap = function (map, reports, options = {}) {
                     map.removeLayer(layer);
                 }
             });
-            map.off('zoomend', zoomListener);
         },
     };
 };
@@ -263,7 +294,9 @@ function ttlFactor(updatedAt, ttlHours) {
     const ttlMs = ttlHours * 3600000;
     const remaining = (updated.getTime() + ttlMs - Date.now()) / ttlMs;
 
-    return Math.max(0.12, Math.min(1, remaining));
+    if (remaining <= 0) return 0;
+
+    return Math.min(1, remaining);
 }
 
 function haversineM(lat1, lng1, lat2, lng2) {
@@ -343,7 +376,7 @@ function samplePolygonHeatPoints(polygon, epicenters, stepM, ttlHours) {
             const nearest = nearestEpicenter(lat, lng, epicenters);
             const ttl = ttlFactor(nearest.epicenter.updatedAt, ttlHours);
             const depthFactor = Math.max(0.25, 1 - 0.7 * (nearest.distance / (maxDist || stepM)));
-            const weight = depthFactor * ttl;
+            const weight = Math.min(0.28, depthFactor * ttl);
 
             if (weight > 0.02) {
                 points.push([lat, lng, weight]);
@@ -417,6 +450,65 @@ function buildThermalBridges(reports) {
     }
 
     return bridges;
+}
+
+/**
+ * Corredores de calor entre epicentros (fallback visual para datos legacy multiparte).
+ * Muestrea una cápsula suave entre pares de epicentros dentro de maxDistM.
+ */
+function buildEpicenterCorridors(epicenters, stepM, ttlHours, maxDistM) {
+    const corridors = [];
+    if (!Array.isArray(epicenters) || epicenters.length < 2) return corridors;
+
+    const maxDist = maxDistM || 400;
+    const corridorHalfWidthM = Math.max(stepM * 2, 20);
+
+    for (let i = 0; i < epicenters.length; i++) {
+        for (let j = i + 1; j < epicenters.length; j++) {
+            const ep1 = epicenters[i];
+            const ep2 = epicenters[j];
+            const lat1 = parseFloat(ep1.lat);
+            const lng1 = parseFloat(ep1.lng);
+            const lat2 = parseFloat(ep2.lat);
+            const lng2 = parseFloat(ep2.lng);
+
+            if (isNaN(lat1) || isNaN(lng1) || isNaN(lat2) || isNaN(lng2)) continue;
+
+            const dist = haversineM(lat1, lng1, lat2, lng2);
+            if (dist <= 10 || dist > maxDist) continue;
+
+            const ttl = Math.min(
+                ttlFactor(ep1.updatedAt || ep1.updated_at, ttlHours),
+                ttlFactor(ep2.updatedAt || ep2.updated_at, ttlHours)
+            );
+            if (ttl <= 0) continue;
+
+            const steps = Math.max(3, Math.floor(dist / Math.max(8, stepM / 2)));
+            const centerLat = (lat1 + lat2) / 2;
+            const cosLat = Math.cos(centerLat * Math.PI / 180);
+            const perpLat = -(lng2 - lng1);
+            const perpLng = (lat2 - lat1);
+            const perpLen = Math.sqrt(perpLat * perpLat + perpLng * perpLng) || 1;
+            const offLat = (perpLat / perpLen) * (corridorHalfWidthM / 111320);
+            const offLng = (perpLng / perpLen) * (corridorHalfWidthM / (111320 * Math.max(cosLat, 0.01)));
+
+            for (let k = 0; k <= steps; k++) {
+                const t = k / steps;
+                const baseLat = lat1 + (lat2 - lat1) * t;
+                const baseLng = lng1 + (lng2 - lng1) * t;
+                const alongFactor = Math.max(0.35, 1 - Math.abs(t - 0.5) * 1.2);
+                const weight = alongFactor * ttl * 0.55;
+
+                if (weight > 0.02) {
+                    corridors.push([baseLat, baseLng, weight]);
+                    corridors.push([baseLat + offLat, baseLng + offLng, weight * 0.75]);
+                    corridors.push([baseLat - offLat, baseLng - offLng, weight * 0.75]);
+                }
+            }
+        }
+    }
+
+    return corridors;
 }
 
 // Export helpers for reports-map

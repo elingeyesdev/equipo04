@@ -80,26 +80,11 @@ final class ReportController
                 ->latest('updated_at')
                 ->get();
 
-            // Calcular inundaciones cercanas (radio 300 m) a cada reporte pendiente
-            $activas = Inundacion::activas()->get();
+            // Calcular inundaciones cercanas (radio 300 m, con reportes vivos) a cada reporte pendiente
+            $activas = Inundacion::activas()->with('reportesActivosTTL')->get();
             $inundacionesActivasParaVincular = $activas;
-            foreach ($reportesPendientes as $rep) {
-                $cercanas = [];
-                foreach ($activas as $activa) {
-                    $lat1 = deg2rad((float) $rep->lat_reporte);
-                    $lon1 = deg2rad((float) $rep->long_reporte);
-                    $lat2 = deg2rad((float) $activa->latitud);
-                    $lon2 = deg2rad((float) $activa->longitud);
-                    $dLat = $lat2 - $lat1;
-                    $dLon = $lon2 - $lon1;
-                    $a    = sin($dLat / 2) ** 2 + cos($lat1) * cos($lat2) * sin($dLon / 2) ** 2;
-                    $dist = 6371000 * 2 * atan2(sqrt($a), sqrt(1 - $a));
-                    if ($dist <= 300) {
-                        $cercanas[] = $activa;
-                    }
-                }
-                $rep->cercanas = collect($cercanas);
-            }
+            $mapaService = app(\App\Services\InundacionMapaService::class);
+            $mapaService->enrichPendientesConCercanas(collect($reportesPendientes), $activas);
         }
 
         return view('reports.index', [
@@ -168,6 +153,8 @@ final class ReportController
             'caducado_hace'        => ($r->updated_at ?? $r->created_at)?->diffForHumans(),
         ])->toArray();
 
+        $mapaService = app(\App\Services\InundacionMapaService::class);
+
         return [
             'id'                        => $i->id,
             'latitud'                   => $i->latitud,
@@ -177,7 +164,8 @@ final class ReportController
             'updated_at'                => $i->updated_at,
             'address'                   => $i->reportes->first()?->address,
             'description'               => $i->reportes->first()?->description,
-            'polygon_coords'            => $i->polygon_coords,
+            'polygon_coords'            => $mapaService->polygonCoordsParaMapa($i),
+            'mostrar_en_mapa'           => $i->reportesActivosTTL->isNotEmpty(),
             'polygon_editado_autoridad' => $i->polygon_editado_autoridad,
             'polygon_es_fallback'       => (bool) $i->polygon_es_fallback,
             // Quórum dinámico — solo reportes últimas 3h, excluyendo rechazados

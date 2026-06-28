@@ -276,7 +276,8 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-<script src="{{ asset('js/smart-heatmap.js') }}?v=20260623f"></script>
+<script src="{{ asset('js/smart-heatmap.js') }}?v=20260628i"></script>
+<script src="{{ asset('js/flood-outline.js') }}?v=20260627b"></script>
 
 
 <!-- Drawer (Flood Picker Dark Mode) -->
@@ -463,19 +464,30 @@
             if (activeReports.length > 0) {
                 allActiveReports.push(...activeReports);
 
-                const hasAuthorityPolygon = window.normalizePolygonRings
-                    ? window.normalizePolygonRings(inun.polygon_coords).length > 0
-                    : (inun.polygon_coords
-                        && Array.isArray(inun.polygon_coords)
-                        && inun.polygon_coords.length >= 3);
-
                 const inunTier = inun.intensidad_calculada || 'baja';
 
-                if (hasAuthorityPolygon) {
+                const floodLike = {
+                    polygon_coords: inun.polygon_coords,
+                    polygon_es_multipolygon: inun.polygon_es_multipolygon,
+                    reportes_activos: activeReports.map(function (rep) {
+                        return {
+                            lat_reporte: rep.lat || rep.lat_reporte,
+                            long_reporte: rep.lng || rep.long_reporte,
+                            polygon_coords: rep.polygon_coords,
+                            updated_at: rep.updated_at,
+                        };
+                    }),
+                };
+
+                const unifiedRing = window.resolveUnifiedHeatRing
+                    ? window.resolveUnifiedHeatRing(floodLike)
+                    : null;
+
+                if (unifiedRing && unifiedRing.length >= 3) {
                     heatSources.push({
                         lat: parseFloat(inun.centroide.lat),
                         lng: parseFloat(inun.centroide.lng),
-                        polygon_coords: inun.polygon_coords,
+                        polygon_coords: unifiedRing,
                         intensidad_propuesta: inun.intensidad_calculada,
                         tier: inunTier,
                         updated_at: inun.updated_at,
@@ -595,7 +607,6 @@
                 heatOptions: {
                     radius: 75,
                     blur: 45,
-                    minOpacity: 0.4
                 }
             }).layer;
         }

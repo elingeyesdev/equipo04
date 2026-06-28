@@ -1,7 +1,8 @@
 
 
 <div wire:ignore>
-<script src="{{ asset('js/smart-heatmap.js') }}?v=20260623b"></script>
+<script src="{{ asset('js/smart-heatmap.js') }}?v=20260628i"></script>
+<script src="{{ asset('js/flood-outline.js') }}?v=20260627b"></script>
 <script>
     window.ORS_API_KEY = "{{ $ors_key ?? '' }}";
 </script>
@@ -20,6 +21,72 @@ window.validateReport = function(id, action, intensidadPropuesta) {
         return;
     }
     openApproveModal(id, action, intensidadPropuesta || 'media');
+};
+
+window.buildPendingReportDrawerPayload = function (report) {
+    const cercanas = Array.isArray(report.cercanas) ? report.cercanas : [];
+    return {
+        id: report.id,
+        description: report.description || '',
+        address: report.address || '',
+        intensidad_propuesta: report.intensidad_propuesta || 'media',
+        lat_reporte: report.lat_reporte,
+        long_reporte: report.long_reporte,
+        lat_gps: report.lat_gps,
+        long_gps: report.long_gps,
+        cercanas: cercanas,
+        solo_vincular: !!report.solo_vincular,
+        dentro_contorno_activo: !!report.dentro_contorno_activo,
+    };
+};
+
+window.openReviewDrawerFromReport = function (report) {
+    const fakeBtn = document.createElement('button');
+    fakeBtn.setAttribute('data-report', JSON.stringify(window.buildPendingReportDrawerPayload(report)));
+    openReviewDrawer(fakeBtn);
+};
+
+window.openReviewDrawerByReportId = function (reportId) {
+    const report = (window.pendingReports || []).find(function (r) {
+        return r.id === reportId;
+    });
+    if (report) {
+        window.openReviewDrawerFromReport(report);
+    }
+};
+
+window.buildPendingValidationPopupHtml = function (report) {
+    const intensidad = (report.intensidad_propuesta || 'media').replace(/'/g, "\\'");
+    const reporter = (report.reporter_name || 'Ciudadano').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const cercanasCount = Array.isArray(report.cercanas) ? report.cercanas.length : 0;
+    const soloVincular = !!report.solo_vincular;
+    const dentroContorno = !!report.dentro_contorno_activo;
+    const distancia = report.distancia_gps_metros != null ? report.distancia_gps_metros : 'null';
+    const peso = report.peso != null ? report.peso : 1;
+    const rechazos = report.rechazos_previos || 0;
+
+    let html = '<div class="max-w-xs font-sans">'
+        + '<p class="font-semibold text-sm mb-1 text-orange-600">Reporte Pendiente N°' + report.id + '</p>'
+        + '<p class="text-xs text-gray-600 mb-1"><b>Intensidad propuesta:</b> ' + (report.intensidad_propuesta || 'media') + '</p>';
+
+    if (dentroContorno) {
+        html += '<p class="text-[10px] text-blue-700 bg-blue-50 rounded px-2 py-1 mb-2 font-semibold">Dentro de zona de inundación activa — vincular</p>';
+    }
+
+    html += '<div class="flex flex-col gap-2 mt-2">';
+
+    if (!soloVincular) {
+        html += '<button type="button" onclick="openApproveModal(' + report.id + ', \'crear\', \'' + intensidad + '\')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1.5 text-xs rounded-lg font-bold">Aprobar</button>';
+    }
+
+    if (cercanasCount > 0) {
+        html += '<button type="button" onclick="openReviewDrawerByReportId(' + report.id + ')" class="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1.5 text-xs rounded-lg font-bold">Vincular</button>';
+    }
+
+    html += '<button type="button" onclick="openRejectModal(' + report.id + ', \'' + reporter + '\', ' + distancia + ', null, ' + peso + ', ' + cercanasCount + ', ' + rechazos + ')" class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-2 py-1.5 text-xs rounded-lg font-bold">Rechazar</button>'
+        + '</div></div>';
+
+    return html;
 };
 </script>
 
@@ -221,6 +288,7 @@ window.validateReport = function(id, action, intensidadPropuesta) {
                 id: parseInt(btn.dataset.id, 10),
                 reportRaw,
                 hasCercanas: btn.dataset.hasCercanas === '1',
+                soloVincular: btn.dataset.soloVincular === '1',
             };
 
             document.getElementById('reportDetailId').textContent = 'N°' + btn.dataset.id;
@@ -235,12 +303,22 @@ window.validateReport = function(id, action, intensidadPropuesta) {
             intensityEl.className = 'inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide mt-0.5 intensity-pill-' + (intensity === 'alta' ? 'alta' : intensity === 'media' ? 'media' : 'baja');
 
             const btnVincular = document.getElementById('reportDetailBtnVincular');
+            const btnAprobar = document.querySelector('#reportDetailModal [onclick="reportDetailAprobar()"]');
+
             if (reportDetailCurrentData.hasCercanas && reportRaw) {
                 btnVincular.classList.remove('hidden');
                 btnVincular.disabled = false;
                 btnVincular.title = '';
             } else {
                 btnVincular.classList.add('hidden');
+            }
+
+            if (btnAprobar) {
+                if (reportDetailCurrentData.soloVincular) {
+                    btnAprobar.classList.add('hidden');
+                } else {
+                    btnAprobar.classList.remove('hidden');
+                }
             }
 
             const mapEl = document.getElementById('report-detail-minimap');
@@ -526,10 +604,14 @@ window.validateReport = function(id, action, intensidadPropuesta) {
                     const card = document.createElement('div');
                     card.id = `flood-card-${flood.id}`;
                     card.className = `p-3 rounded-xl border-2 border-slate-200 bg-white shadow-sm cursor-pointer hover:border-blue-300 transition-all flex justify-between items-center`;
+                    const distLabel = flood.distancia_metros != null ? Math.round(flood.distancia_metros) + ' m' : '';
+                    const contornoBadge = flood.dentro_contorno
+                        ? '<span class="text-[9px] font-bold uppercase tracking-wide text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded ml-1">Dentro del contorno</span>'
+                        : '';
                     card.innerHTML = `
                         <div>
-                            <span class="text-xs font-bold text-slate-800">Inundación N°${flood.id}</span>
-                            <p class="text-[10px] text-slate-500 mt-1">Intensidad ${flood.intensidad_calculada || flood.intensidad || 'N/A'}</p>
+                            <span class="text-xs font-bold text-slate-800">Inundación N°${flood.id}</span>${contornoBadge}
+                            <p class="text-[10px] text-slate-500 mt-1">Intensidad ${flood.intensidad_calculada || flood.intensidad || 'N/A'}${distLabel ? ' · ' + distLabel : ''}</p>
                         </div>
                     `;
 
@@ -628,33 +710,28 @@ window.validateReport = function(id, action, intensidadPropuesta) {
                     const latC = parseFloat(flood.latitud);
                     const lngC = parseFloat(flood.longitud);
 
-                    // El polígono NO viaja en data-report (sería enorme). Lo buscamos en
-                    // window.floodReports (ya cargado por el mapa) por id.
                     let floodGeom = null;
                     if (Array.isArray(window.floodReports)) {
                         floodGeom = window.floodReports.find(f => String(f.id) === String(flood.id));
                     }
-                    const polygonCoords = floodGeom ? floodGeom.polygon_coords : null;
 
-                    // Normalizamos igual que el mapa principal: soporta anillo simple,
-                    // multipolígono (inundaciones unificadas) y pares [lat,lng] u objetos {lat,lng}.
-                    let rings = (window.normalizePolygonRings)
-                        ? window.normalizePolygonRings(polygonCoords)
-                        : [];
-
-                    // Algunas inundaciones guardan polygon_coords como una grilla densa de
-                    // muestreo (miles de puntos sin orden de contorno). Dibujarla como
-                    // polígono produce una forma auto-intersectada. En esos casos usamos la
-                    // envolvente convexa para representar el área de forma limpia.
-                    rings = rings.map(r => r.length > 400 ? convexHullLatLng(r) : r)
-                                 .filter(r => r && r.length >= 3);
+                    let ring = null;
+                    if (floodGeom && window.resolveUnifiedHeatRing) {
+                        ring = window.resolveUnifiedHeatRing(floodGeom);
+                    }
+                    if (!ring && floodGeom && window.computeInundacionSelectionOutline) {
+                        ring = window.computeInundacionSelectionOutline(floodGeom);
+                    }
+                    if (!ring && floodGeom && window.normalizePolygonRings) {
+                        const rings = window.normalizePolygonRings(floodGeom.polygon_coords);
+                        if (rings.length === 1) {
+                            ring = rings[0];
+                        }
+                    }
 
                     let shape = null;
-                    if (rings.length === 1) {
-                        shape = L.polygon(rings[0], baseStyle);
-                    } else if (rings.length > 1) {
-                        // multipolígono: cada anillo es un área separada
-                        shape = L.polygon(rings.map(r => [r]), baseStyle);
+                    if (ring && ring.length >= 3) {
+                        shape = L.polygon(ring, baseStyle);
                     } else if (!isNaN(latC) && !isNaN(lngC)) {
                         shape = L.circle([latC, lngC], { radius: 150, ...baseStyle });
                     }
@@ -678,6 +755,10 @@ window.validateReport = function(id, action, intensidadPropuesta) {
                 reviewMap.invalidateSize();
                 if (bounds.isValid()) {
                     reviewMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+                }
+                const dentroContorno = (report.cercanas || []).filter(function (f) { return f.dentro_contorno; });
+                if (dentroContorno.length === 1) {
+                    selectFloodToLink(dentroContorno[0].id);
                 }
             }, 100);
         }

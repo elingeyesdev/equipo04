@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Reporte;
 use App\Models\Inundacion;
+use App\Services\InundacionMapaService;
 use App\Services\ReporteValidacionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -127,11 +128,31 @@ class ReporteController extends Controller
      */
     public function pending(): JsonResponse
     {
+        $mapaService = app(InundacionMapaService::class);
+        $validacion = app(ReporteValidacionService::class);
+
         $reportes = Reporte::where('estado_validacion', Reporte::VALIDACION_PENDIENTE)
+            ->whereNull('inundacion_id')
+            ->with('citizen')
             ->latest()
             ->get();
 
-        return response()->json($reportes);
+        $activas = Inundacion::activas()
+            ->with('reportesActivosTTL')
+            ->get()
+            ->filter(static fn (Inundacion $i): bool => $mapaService->inundacionTieneReportesVivos($i));
+
+        $mapaService->enrichPendientesConCercanas($reportes, $activas);
+
+        foreach ($reportes as $rep) {
+            $rep->rechazos_previos = $validacion->contarRechazosCiudadano($rep->citizen_carnet);
+        }
+
+        $payload = $reportes->map(
+            static fn (Reporte $rep): array => $mapaService->serializarPendiente($rep),
+        )->values();
+
+        return response()->json($payload);
     }
 
     /**

@@ -32,7 +32,7 @@ class FloodsSeeder extends Seeder
             'updated_at' => now(),
         ]);
 
-        DB::table('reportes')->insert([
+        $reportes = [
             [
                 'inundacion_id' => $id1,
                 'citizen_carnet' => '10000001',
@@ -120,6 +120,10 @@ class FloodsSeeder extends Seeder
                 'created_at' => now()->subDays(2),
                 'updated_at' => now()->subDay(),
             ],
-        ]);
+        ];
+
+        foreach ($reportes as $reporte) {
+            DB::table('reportes')->insert($reporte);
+        }
     }
 }

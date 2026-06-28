@@ -4,6 +4,7 @@ namespace App\Livewire\Concerns;
 
 use App\Models\Inundacion;
 use App\Models\Reporte;
+use App\Services\InundacionMapaService;
 
 trait SerializesInundaciones
 {
@@ -54,6 +55,8 @@ trait SerializesInundaciones
             'caducado_hace'        => ($r->updated_at ?? $r->created_at)?->diffForHumans(),
         ])->toArray();
 
+        $mapaService = app(InundacionMapaService::class);
+
         return [
             'id'                        => $i->id,
             'latitud'                   => $i->latitud,
@@ -63,7 +66,8 @@ trait SerializesInundaciones
             'updated_at'                => $i->updated_at,
             'address'                   => $i->reportes->first()?->address,
             'description'               => $i->reportes->first()?->description,
-            'polygon_coords'            => $i->polygon_coords,
+            'polygon_coords'            => $mapaService->polygonCoordsParaMapa($i),
+            'mostrar_en_mapa'           => $i->reportesActivosTTL->isNotEmpty(),
             'polygon_editado_autoridad' => $i->polygon_editado_autoridad,
             'polygon_es_fallback'       => (bool) $i->polygon_es_fallback,
             'quorum_total'              => $i->quorumTotal(),

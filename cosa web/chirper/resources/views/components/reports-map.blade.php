@@ -11,8 +11,8 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-<script src="{{ asset('js/smart-heatmap.js') }}?v=20260623g"></script>
-<script src="{{ asset('js/flood-outline.js') }}?v=20260623g"></script>
+<script src="{{ asset('js/smart-heatmap.js') }}?v=20260628i"></script>
+<script src="{{ asset('js/flood-outline.js') }}?v=20260627c"></script>
 
 <style>
 /* ── Animación de pulso para zonas de alta intensidad ────────────────── */
@@ -115,11 +115,46 @@
     margin-top: 8px;
     font-style: italic;
 }
+#map-zoom-debug {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 1000;
+    pointer-events: none;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 10px;
+    line-height: 1.2;
+    color: rgba(55, 65, 81, 0.85);
+    background: rgba(255, 255, 255, 0.72);
+    padding: 3px 6px;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    user-select: none;
+}
+#map-container.routing-pick-mode,
+#map-container.routing-pick-mode .leaflet-container {
+    cursor: crosshair !important;
+}
+#routing-map-hint {
+    animation: routing-hint-pulse 2s ease-in-out infinite;
+}
+@keyframes routing-hint-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.85; }
+}
 </style>
 
 <div class="relative mb-10">
     <div id="map-container" class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden relative z-0" style="height: {{ $mapHeight }};" wire:ignore>
         <div id="map" class="absolute inset-0 z-0"></div>
+
+        @if($showRouting)
+        <div id="routing-map-hint" class="hidden absolute top-3 left-1/2 -translate-x-1/2 z-[1100] pointer-events-none bg-emerald-600/95 text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg backdrop-blur-sm max-w-[90%] text-center">
+            Haz clic en el mapa para marcar un punto
+        </div>
+        @endif
+
+        <div id="map-zoom-debug" aria-hidden="true">Zoom: —</div>
         
         <!-- Botón Pantalla Completa -->
         <button id="btn-fullscreen-map" class="absolute top-[80px] left-[10px] z-[1000] bg-white text-gray-700 p-1.5 rounded-[4px] shadow-[0_1px_5px_rgba(0,0,0,0.65)] hover:bg-gray-100 transition-colors" title="Pantalla Completa" onclick="toggleMapFullscreen()">
@@ -161,31 +196,31 @@
                 </div>
             </div>
         </div>
+
+        <!-- LEYENDA DE INTENSIDAD DEL MAPA DE CALOR -->
+        <div id="heat-intensity-legend" class="hidden absolute bottom-6 right-6 bg-white/95 backdrop-blur p-3.5 rounded-xl shadow-xl border border-gray-100 z-[1000] pointer-events-none transition-all duration-300">
+            <h4 class="text-[11px] font-bold text-gray-800 mb-2.5 uppercase tracking-wider flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a6 6 0 016 6c0 4-6 10-6 10S4 12 4 8a6 6 0 016-6z"/></svg>
+                <span>Intensidad de Inundación</span>
+            </h4>
+            <div class="space-y-1.5">
+                <div class="flex items-center gap-2.5" data-heat-tier="alta">
+                    <span class="w-5 h-5 rounded-md shadow-inner border border-black/10" style="background:#1e3a8a"></span>
+                    <span class="text-xs text-gray-700 font-semibold">Alta</span>
+                </div>
+                <div class="flex items-center gap-2.5" data-heat-tier="media">
+                    <span class="w-5 h-5 rounded-md shadow-inner border border-black/10" style="background:#0ea5e9"></span>
+                    <span class="text-xs text-gray-700 font-semibold">Media</span>
+                </div>
+                <div class="flex items-center gap-2.5" data-heat-tier="baja">
+                    <span class="w-5 h-5 rounded-md shadow-inner border border-black/10" style="background:#7dd3fc"></span>
+                    <span class="text-xs text-gray-700 font-semibold">Baja</span>
+                </div>
+            </div>
+            <p class="text-[10px] text-gray-400 mt-2.5 italic max-w-[170px] leading-tight">El color refleja la intensidad calculada por peso de los reportes.</p>
+        </div>
     </div>
     
-    <!-- LEYENDA DE INTENSIDAD DEL MAPA DE CALOR -->
-    <div id="heat-intensity-legend" class="hidden absolute top-4 right-4 bg-white/95 backdrop-blur p-3.5 rounded-xl shadow-xl border border-gray-100 z-[1000] pointer-events-none transition-all duration-300">
-        <h4 class="text-[11px] font-bold text-gray-800 mb-2.5 uppercase tracking-wider flex items-center gap-1.5">
-            <svg class="w-3.5 h-3.5 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a6 6 0 016 6c0 4-6 10-6 10S4 12 4 8a6 6 0 016-6z"/></svg>
-            <span>Intensidad de Inundación</span>
-        </h4>
-        <div class="space-y-1.5">
-            <div class="flex items-center gap-2.5" data-heat-tier="alta">
-                <span class="w-5 h-5 rounded-md shadow-inner border border-black/10" style="background:#1e3a8a"></span>
-                <span class="text-xs text-gray-700 font-semibold">Alta</span>
-            </div>
-            <div class="flex items-center gap-2.5" data-heat-tier="media">
-                <span class="w-5 h-5 rounded-md shadow-inner border border-black/10" style="background:#0ea5e9"></span>
-                <span class="text-xs text-gray-700 font-semibold">Media</span>
-            </div>
-            <div class="flex items-center gap-2.5" data-heat-tier="baja">
-                <span class="w-5 h-5 rounded-md shadow-inner border border-black/10" style="background:#7dd3fc"></span>
-                <span class="text-xs text-gray-700 font-semibold">Baja</span>
-            </div>
-        </div>
-        <p class="text-[10px] text-gray-400 mt-2.5 italic max-w-[170px] leading-tight">El color refleja la intensidad calculada por peso de los reportes.</p>
-    </div>
-
     @if($showRouting)
         <!-- Panel de Rutas Seguras -->
         <x-routing-panel />
@@ -197,8 +232,17 @@ window.SGI_MAP_CONFIG = {
     apiToken: @json(session('api_token')),
     fetchPending: @json($fetchPending),
 };
+@php
+    $mapaService = app(\App\Services\InundacionMapaService::class);
+    $pendingForMap = collect($pendingReports)->map(function ($rep) use ($mapaService) {
+        if ($rep instanceof \App\Models\Reporte) {
+            return $mapaService->serializarPendiente($rep);
+        }
+        return $rep;
+    })->values()->all();
+@endphp
 window.floodReports = @json($reports);
-window.pendingReports = @json($pendingReports);
+window.pendingReports = @json($pendingForMap);
 window.reportsMapFilter = null;
 
 function bindReportsMapLivewireRefresh() {
@@ -241,6 +285,29 @@ function initMap() {
     // ── 1. Inicializar Mapa ───────────────────────────────────────────────
     const map = L.map('map', { preferCanvas: true }).setView(centerLoc, 12);
     window.mapObj = map;
+
+    const zoomDebugEl = document.getElementById('map-zoom-debug');
+    function updateMapZoomDebug() {
+        if (!zoomDebugEl) return;
+        const zoom = map.getZoom().toFixed(1);
+        const inst = window.smartHeatmapInstance;
+        if (inst && inst.lastRadius != null) {
+            zoomDebugEl.textContent = 'Zoom: ' + zoom
+                + ' · r:' + inst.lastRadius
+                + ' · max:' + inst.lastMax.toFixed(1);
+        } else {
+            zoomDebugEl.textContent = 'Zoom: ' + zoom;
+        }
+    }
+    map.on('zoom zoomend moveend', updateMapZoomDebug);
+    updateMapZoomDebug();
+
+    // Pane dedicado: el canvas del mapa de calor (overlayPane, z≈400) no debe tapar el contorno.
+    if (!map.getPane('floodSelectionPane')) {
+        map.createPane('floodSelectionPane');
+        map.getPane('floodSelectionPane').style.zIndex = 550;
+        map.getPane('floodSelectionPane').style.pointerEvents = 'none';
+    }
 
     // Bounding box del departamento de Santa Cruz (para limitar capas externas)
     const santaCruzBounds = [[-20.5, -64.8], [-13.5, -57.4]];
@@ -390,6 +457,13 @@ function initMap() {
     }
 
     function getInundacionOutlineRings(inundacion) {
+        if (window.resolveUnifiedHeatRing) {
+            const unified = window.resolveUnifiedHeatRing(inundacion);
+            if (unified && unified.length >= 3) {
+                return [unified];
+            }
+        }
+
         if (window.computeInundacionSelectionOutline) {
             const unified = window.computeInundacionSelectionOutline(inundacion);
             if (unified && unified.length >= 3) {
@@ -397,7 +471,7 @@ function initMap() {
             }
         }
 
-        const activeReps = inundacion.reportes_activos || inundacion.reportes || [];
+        const activeReps = inundacion.reportes_activos || [];
         const rings = [];
 
         activeReps.forEach(function (rep) {
@@ -409,6 +483,24 @@ function initMap() {
         });
 
         return rings;
+    }
+
+    function getInundacionHeatGeometry(inundacion) {
+        if (window.resolveUnifiedHeatRing) {
+            const unified = window.resolveUnifiedHeatRing(inundacion);
+            if (unified && unified.length >= 3) {
+                return { polygon_coords: unified, polygon_es_fallback: false };
+            }
+        }
+
+        if (window.computeInundacionSelectionOutline) {
+            const outline = window.computeInundacionSelectionOutline(inundacion);
+            if (outline && outline.length >= 3) {
+                return { polygon_coords: outline, polygon_es_fallback: false };
+            }
+        }
+
+        return null;
     }
 
     function buildCentroidIcon(palette, selected) {
@@ -449,8 +541,26 @@ function initMap() {
 
     function clearInundacionSelection() {
         window.selectedInundacionId = null;
+        window._lastSelectedInundacion = null;
         selectionBorderLayer.clearLayers();
         updateSelectionMarkerStyles();
+    }
+
+    function restoreInundacionSelectionAfterMapPaint() {
+        if (!window.selectedInundacionId) return;
+
+        const fromCache = window._lastSelectedInundacion
+            && window._lastSelectedInundacion.id === window.selectedInundacionId
+            ? window._lastSelectedInundacion
+            : null;
+        const fromReports = Array.isArray(window.floodReports)
+            ? window.floodReports.find(function (r) { return r.id === window.selectedInundacionId; })
+            : null;
+        const inundacion = fromReports || fromCache;
+
+        if (inundacion) {
+            selectInundacion(inundacion, { fly: false });
+        }
     }
 
     function selectInundacion(inundacion, options) {
@@ -461,6 +571,7 @@ function initMap() {
         const palette = getPalette(intensidad);
 
         window.selectedInundacionId = inundacion.id;
+        window._lastSelectedInundacion = inundacion;
         selectionBorderLayer.clearLayers();
 
         const rings = getInundacionOutlineRings(inundacion);
@@ -475,6 +586,7 @@ function initMap() {
                 fillOpacity: 0.08,
                 smoothFactor: 2.5,
                 interactive: false,
+                pane: 'floodSelectionPane',
                 className: intensidad === 'alta'
                     ? 'flood-polygon-alta flood-selected-outline'
                     : 'flood-selected-outline',
@@ -496,6 +608,7 @@ function initMap() {
     }
 
     map.on('click', function () {
+        if (window.SGI_ROUTING?.isPicking?.()) return;
         clearInundacionSelection();
     });
 
@@ -516,6 +629,10 @@ function initMap() {
             const lng = parseFloat(report.longitud);
             if (isNaN(lat) || isNaN(lng)) return;
 
+            const activeReps = Array.isArray(report.reportes_activos) ? report.reportes_activos : [];
+            const mostrarEnMapa = report.mostrar_en_mapa !== false && activeReps.length > 0;
+            if (!mostrarEnMapa) return;
+
             const intensidad = report.intensidad_calculada || report.intensidad || 'baja';
             const palette    = getPalette(intensidad);
 
@@ -530,12 +647,7 @@ function initMap() {
             const shortDesc   = desc.length > 120 ? desc.substring(0, 120) + '…' : desc;
             const quorumStr   = report.quorum_total !== undefined ? `<b>Quórum Global:</b> ${report.quorum_total} pts` : '';
             
-            let numReports = 0;
-            if (report.reportes_activos && Array.isArray(report.reportes_activos)) {
-                numReports = report.reportes_activos.length;
-            } else if (report.reportes && Array.isArray(report.reportes)) {
-                numReports = report.reportes.length;
-            }
+            let numReports = activeReps.length;
 
             const polygonNote = report.polygon_coords
                 ? `<p class="text-[10px] text-blue-600 mt-1">Zona de impacto en mapa de calor (${numReports} reportes)</p>`
@@ -579,11 +691,9 @@ function initMap() {
 
             markersLayer.addLayer(marker);
 
-            const activeReps = report.reportes_activos || report.reportes || [];
-
-            // Epicentros = ubicación de cada reporte, para ponderar la profundidad
+            // Epicentros = ubicación de cada reporte vivo, para ponderar la profundidad
             // dentro de la zona unificada (centro más intenso, bordes difuminados).
-            const epicenters = (Array.isArray(activeReps) ? activeReps : []).map(function (rep) {
+            const epicenters = activeReps.map(function (rep) {
                 return {
                     lat: parseFloat(rep.lat_reporte || rep.latitud),
                     lng: parseFloat(rep.long_reporte || rep.longitud),
@@ -591,53 +701,44 @@ function initMap() {
                 };
             }).filter(function (ep) { return !isNaN(ep.lat) && !isNaN(ep.lng); });
 
-            // Zona UNIFICADA de la inundación: una sola mancha para todos sus reportes.
-            // 1º) el polígono unificado del backend (aunque sea fallback geométrico: sigue
-            // siendo la zona unida); 2º) si no existe, lo fusionamos en el frontend con la
-            // misma lógica del contorno. Solo si no se puede unir, caemos a manchas por reporte.
-            let unifiedRings = window.normalizePolygonRings
-                ? window.normalizePolygonRings(report.polygon_coords)
-                : [];
+            const heatGeometry = getInundacionHeatGeometry(report);
 
-            if (unifiedRings.length === 0 && window.computeInundacionSelectionOutline) {
-                const outline = window.computeInundacionSelectionOutline(report);
-                if (outline && outline.length >= 3) {
-                    unifiedRings = [outline];
-                }
-            }
-
-            if (unifiedRings.length > 0) {
+            if (heatGeometry) {
                 heatSources.push({
                     lat: lat,
                     lng: lng,
-                    polygon_coords: unifiedRings.length === 1 ? unifiedRings[0] : unifiedRings,
-                    polygon_es_fallback: false,
+                    polygon_coords: heatGeometry.polygon_coords,
+                    polygon_es_fallback: heatGeometry.polygon_es_fallback,
                     tier: intensidad,
                     updated_at: report.updated_at,
                     epicenters: epicenters.length > 0 ? epicenters : undefined,
                 });
-            }
-
-            if (activeReps && Array.isArray(activeReps)) {
+            } else if (activeReps.length > 0) {
                 activeReps.forEach(rep => {
                     const repLat = parseFloat(rep.lat_reporte || rep.latitud);
                     const repLng = parseFloat(rep.long_reporte || rep.longitud);
                     if (isNaN(repLat) || isNaN(repLng)) return;
 
-                    // Sin zona unificada, cada reporte aporta su propia mancha.
-                    if (unifiedRings.length === 0) {
-                        heatSources.push({
-                            lat: repLat,
-                            lng: repLng,
-                            lat_reporte: repLat,
-                            long_reporte: repLng,
-                            polygon_coords: rep.polygon_es_fallback ? null : rep.polygon_coords,
-                            polygon_es_fallback: !!rep.polygon_es_fallback,
-                            intensidad_propuesta: rep.intensidad_propuesta || rep.intensidad || 'baja',
-                            tier: intensidad,
-                            updated_at: rep.updated_at || rep.created_at,
-                        });
-                    }
+                    heatSources.push({
+                        lat: repLat,
+                        lng: repLng,
+                        lat_reporte: repLat,
+                        long_reporte: repLng,
+                        polygon_coords: rep.polygon_es_fallback ? null : rep.polygon_coords,
+                        polygon_es_fallback: !!rep.polygon_es_fallback,
+                        intensidad_propuesta: rep.intensidad_propuesta || rep.intensidad || 'baja',
+                        tier: intensidad,
+                        updated_at: rep.updated_at || rep.created_at,
+                        epicenters: epicenters.length > 0 ? epicenters : undefined,
+                    });
+                });
+            }
+
+            if (activeReps.length > 0) {
+                activeReps.forEach(rep => {
+                    const repLat = parseFloat(rep.lat_reporte || rep.latitud);
+                    const repLng = parseFloat(rep.long_reporte || rep.longitud);
+                    if (isNaN(repLat) || isNaN(repLng)) return;
 
                     const repSelected = window.selectedInundacionId === report.id;
                     const repIcon = buildReportIcon(repSelected);
@@ -688,6 +789,7 @@ function initMap() {
                     row.style.display = tiers.indexOf(row.getAttribute('data-heat-tier')) !== -1 ? '' : 'none';
                 });
             }
+            updateMapZoomDebug();
         } else if (heatLegend) {
             heatLegend.classList.add('hidden');
         }
@@ -741,7 +843,6 @@ function initMap() {
             const lng = parseFloat(report.long_reporte);
             if (isNaN(lat) || isNaN(lng)) return;
 
-            const intensidad = report.intensidad_propuesta || 'media';
             const customIcon = L.divIcon({
                 className: 'custom-leaflet-marker',
                 html: '<div style="background-color:#F59E0B;width:16px;height:16px;border-radius:50%;border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.5);"></div>',
@@ -749,12 +850,12 @@ function initMap() {
                 iconAnchor: [8, 8],
             });
 
-            const popupHtml = '<div class="max-w-xs font-sans">'
-                + '<p class="font-semibold text-sm mb-1 text-orange-600">Reporte Pendiente N°' + report.id + '</p>'
-                + '<p class="text-xs text-gray-600 mb-2"><b>Intensidad propuesta:</b> ' + intensidad + '</p>'
-                + '<div class="flex flex-col gap-2 mt-2">'
-                + '<button type="button" onclick="openApproveModal(' + report.id + ', \'crear\', \'' + intensidad + '\')" class="bg-emerald-600 text-white px-2 py-1.5 text-xs rounded-lg font-bold">Aprobar</button>'
-                + '</div></div>';
+            const popupHtml = typeof window.buildPendingValidationPopupHtml === 'function'
+                ? window.buildPendingValidationPopupHtml(report)
+                : ('<div class="max-w-xs font-sans">'
+                    + '<p class="font-semibold text-sm mb-1 text-orange-600">Reporte Pendiente N°' + report.id + '</p>'
+                    + '<p class="text-xs text-gray-600 mb-2">Intensidad: ' + (report.intensidad_propuesta || 'media') + '</p>'
+                    + '</div>');
 
             const marker = L.marker([lat, lng], { icon: customIcon })
                 .bindPopup(popupHtml, { minWidth: 200 });
@@ -765,6 +866,7 @@ function initMap() {
 
     window.renderReportsMap = renderReports;
     window.renderPendingReportsMap = renderPendingReportsOnMap;
+    window.restoreInundacionSelectionAfterMapPaint = restoreInundacionSelectionAfterMapPaint;
 
     window.refreshReportsMap = async function refreshReportsMap() {
         const cfg = window.SGI_MAP_CONFIG || {};
@@ -807,7 +909,12 @@ function initMap() {
             }
 
             if (window.mapObj) {
-                setTimeout(function () { window.mapObj.invalidateSize(); }, 50);
+                setTimeout(function () {
+                    window.mapObj.invalidateSize();
+                    // invalidateSize repinta el canvas del heatmap encima del contorno SVG;
+                    // volver a dibujar la selección en su pane (z-index 550).
+                    restoreInundacionSelectionAfterMapPaint();
+                }, 50);
             }
 
             document.dispatchEvent(new CustomEvent('reportsMapRefreshed'));

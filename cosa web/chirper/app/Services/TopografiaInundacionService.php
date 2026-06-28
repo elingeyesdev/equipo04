@@ -38,8 +38,17 @@ final class TopografiaInundacionService
     /** Celda de la grilla de unión de polígonos de reportes (metros). */
     private const UNION_GRID_CELL_M = 10.0;
 
-    /** Distancia máxima entre bordes para fusionar polígonos de una misma inundación. */
+    /** Distancia mínima de puente morfológico entre polígonos de reportes (unión base). */
     public const UNION_BRIDGE_M = 100.0;
+
+    /** Tope de puente morfológico (coherente con radio de vinculación ~300 m + margen). */
+    public const UNION_BRIDGE_MAX_M = 400.0;
+
+    /** Incremento de puente por reintento (equivalente a flood-outline.js). */
+    private const UNION_BRIDGE_STEP_M = 80.0;
+
+    /** Margen inicial sobre la distancia máxima entre epicentros. */
+    private const UNION_BRIDGE_MARGIN_M = 120.0;
 
     public function __construct(
         private readonly ElevationProvider $elevationService,
@@ -196,6 +205,137 @@ final class TopografiaInundacionService
             'es_multipolygon' => $esMultipolygon,
             'polygon_coords' => $polygonCoords,
         ];
+    }
+
+    /**
+     * Fusiona polígonos de reportes en un **único anillo** para mapa de calor y contornos.
+     * Reintenta con puente creciente (como flood-outline.js); fallback: envolvente convexa.
+     *
+     * @param  array<int, array<int, array{0: float, 1: float}>>  $poligonos
+     * @param  array<int, array{0: float, 1: float}>  $epicentros  Pares [lat, lng] opcionales
+     * @return array<int, array{0: float, 1: float}>|null
+     */
+    public function unirPoligonosEnAnilloUnico(
+        array $poligonos,
+        array $epicentros = [],
+        float $bridgeInicialM = self::UNION_BRIDGE_M,
+        int $maxIntentos = 8,
+    ): ?array {
+        $poligonos = array_values(array_filter($poligonos, static fn (array $p): bool => count($p) >= 3));
+
+        if ($poligonos === []) {
+            return null;
+        }
+
+        if (count($poligonos) === 1) {
+            $ring = PolygonSimplifier::simplificarCoords($poligonos[0]);
+
+            return count($ring) >= 3 ? $ring : null;
+        }
+
+        $maxDist = $this->maxDistanciaEntrePuntos(
+            $epicentros !== [] ? $epicentros : $this->centroidesDePoligonos($poligonos)
+        );
+
+        $bridge = min(
+            self::UNION_BRIDGE_MAX_M,
+            max($bridgeInicialM, $maxDist + self::UNION_BRIDGE_MARGIN_M)
+        );
+
+        for ($attempt = 0; $attempt < $maxIntentos; $attempt++) {
+            $result = $this->unirPoligonosReportes($poligonos, $bridge);
+
+            if (! $result['es_multipolygon']
+                && PolygonCoordsHelper::tieneGeometriaValida($result['polygon_coords'])
+                && ! PolygonCoordsHelper::esMultipolygon($result['polygon_coords'])) {
+                $ring = PolygonCoordsHelper::normalizarAnillos($result['polygon_coords'])[0] ?? null;
+
+                if ($ring !== null && count($ring) >= 3) {
+                    return PolygonSimplifier::simplificarCoords($ring);
+                }
+            }
+
+            $bridge = min(self::UNION_BRIDGE_MAX_M, $bridge + self::UNION_BRIDGE_STEP_M);
+        }
+
+        $allPoints = [];
+        foreach ($poligonos as $polygon) {
+            foreach ($polygon as $point) {
+                $allPoints[] = $point;
+            }
+        }
+        foreach ($epicentros as $ep) {
+            if (count($ep) >= 2) {
+                $allPoints[] = [(float) $ep[0], (float) $ep[1]];
+            }
+        }
+
+        $hull = PolygonSimplifier::convexHullLatLng($allPoints);
+
+        return count($hull) >= 3 ? PolygonSimplifier::simplificarCoords($hull) : null;
+    }
+
+    /**
+     * @param  array<int, array<int, array{0: float, 1: float}>>  $poligonos
+     * @return array<int, array{0: float, 1: float}>
+     */
+    private function centroidesDePoligonos(array $poligonos): array
+    {
+        $centroids = [];
+
+        foreach ($poligonos as $polygon) {
+            $sumLat = 0.0;
+            $sumLng = 0.0;
+            $count = count($polygon);
+
+            if ($count === 0) {
+                continue;
+            }
+
+            foreach ($polygon as [$lat, $lng]) {
+                $sumLat += $lat;
+                $sumLng += $lng;
+            }
+
+            $centroids[] = [$sumLat / $count, $sumLng / $count];
+        }
+
+        return $centroids;
+    }
+
+    /**
+     * @param  array<int, array{0: float, 1: float}>  $points
+     */
+    private function maxDistanciaEntrePuntos(array $points): float
+    {
+        $max = 0.0;
+        $count = count($points);
+
+        for ($i = 0; $i < $count; $i++) {
+            for ($j = $i + 1; $j < $count; $j++) {
+                $max = max($max, $this->haversineM(
+                    (float) $points[$i][0],
+                    (float) $points[$i][1],
+                    (float) $points[$j][0],
+                    (float) $points[$j][1],
+                ));
+            }
+        }
+
+        return $max;
+    }
+
+    private function haversineM(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $lat1Rad = deg2rad($lat1);
+        $lng1Rad = deg2rad($lng1);
+        $lat2Rad = deg2rad($lat2);
+        $lng2Rad = deg2rad($lng2);
+        $dLat = $lat2Rad - $lat1Rad;
+        $dLng = $lng2Rad - $lng1Rad;
+        $a = sin($dLat / 2) ** 2 + cos($lat1Rad) * cos($lat2Rad) * sin($dLng / 2) ** 2;
+
+        return 6371000 * 2 * atan2(sqrt($a), sqrt(1 - $a));
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\Inundacion;
+use App\Services\InundacionMapaService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Carbon;
@@ -64,6 +65,18 @@ class InundacionResource extends JsonResource
             return $desglose;
         });
 
+        $mapaService = app(InundacionMapaService::class);
+        $polygonMapa = $this->whenLoaded(
+            'reportesActivosTTL',
+            fn () => $mapaService->polygonCoordsParaMapa($this->resource),
+            $this->polygon_coords,
+        );
+        $mostrarEnMapa = $this->whenLoaded(
+            'reportesActivosTTL',
+            fn () => $this->reportesActivosTTL->isNotEmpty(),
+            true,
+        );
+
         return [
             // ── Datos estáticos ──────────────────────────────────────────
             'id'         => $this->id,
@@ -92,9 +105,14 @@ class InundacionResource extends JsonResource
             'esta_confirmada'      => $estaConfirmada,
             'desglose_puntos'      => $desglosePuntos,
 
-            // ── Polígono de área de inundación (calculado por CalcularPoligonoInundacion Job) ──
-            // Array de [lat, lng] pares. Null si aún no fue calculado.
-            'polygon_coords'            => $this->polygon_coords,
+            // Polígono visible en mapa: solo reportes vivos (TTL). Null si todos caducaron.
+            'polygon_coords'            => $polygonMapa,
+            'mostrar_en_mapa'           => $mostrarEnMapa,
+            'polygon_es_multipolygon'   => $this->whenLoaded(
+                'reportesActivosTTL',
+                fn () => $polygonMapa !== null && \App\Support\PolygonCoordsHelper::esMultipolygon($polygonMapa),
+                false,
+            ),
             'polygon_calculado_at'      => $this->polygon_calculado_at?->toISOString(),
             'polygon_editado_autoridad' => (bool) $this->polygon_editado_autoridad,
             'polygon_es_fallback'       => (bool) $this->polygon_es_fallback,

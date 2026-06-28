@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Contracts\ElevationProvider;
 use App\Services\PoligonoTopografiaCacheService;
 use App\Services\TopografiaInundacionService;
+use App\Support\PolygonCoordsHelper;
 use Illuminate\Support\Facades\Cache;
 
 describe('PoligonoTopografiaCacheService', function () {
@@ -105,6 +106,51 @@ describe('TopografiaInundacionService union', function () {
 
         expect($result['es_multipolygon'])->toBeFalse()
             ->and($result['polygon_coords'])->toBe($p1);
+    });
+});
+
+describe('TopografiaInundacionService adaptive single ring', function () {
+    it('une dos polígonos separados ~180 m en un solo anillo', function () {
+        $elevation = Mockery::mock(ElevationProvider::class);
+        $service = new TopografiaInundacionService($elevation);
+
+        $p1 = $service->buildCircularFallback(-17.78, -63.18, 40.0);
+        $lat2 = -17.78 + (180.0 / 111_320.0);
+        $p2 = $service->buildCircularFallback($lat2, -63.18, 40.0);
+
+        $ring = $service->unirPoligonosEnAnilloUnico(
+            [$p1, $p2],
+            [[-17.78, -63.18], [$lat2, -63.18]],
+        );
+
+        expect($ring)->not->toBeNull()
+            ->and($ring)->toBeArray()
+            ->and(count($ring))->toBeGreaterThanOrEqual(3)
+            ->and(PolygonCoordsHelper::esMultipolygon($ring))->toBeFalse();
+    });
+
+    it('devuelve envolvente convexa cuando el puente máximo no alcanza', function () {
+        $elevation = Mockery::mock(ElevationProvider::class);
+        $service = new TopografiaInundacionService($elevation);
+
+        $p1 = $service->buildCircularFallback(-17.78, -63.18, 30.0);
+        $p2 = $service->buildCircularFallback(-17.79, -63.19, 30.0);
+
+        $ring = $service->unirPoligonosEnAnilloUnico(
+            [$p1, $p2],
+            [[-17.78, -63.18], [-17.79, -63.19]],
+        );
+
+        expect($ring)->not->toBeNull()
+            ->and(count($ring))->toBeGreaterThanOrEqual(3)
+            ->and(PolygonCoordsHelper::esMultipolygon($ring))->toBeFalse();
+    });
+
+    it('devuelve null con lista vacía', function () {
+        $elevation = Mockery::mock(ElevationProvider::class);
+        $service = new TopografiaInundacionService($elevation);
+
+        expect($service->unirPoligonosEnAnilloUnico([]))->toBeNull();
     });
 });
 

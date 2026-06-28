@@ -101,7 +101,7 @@ final class CalcularPoligonoInundacion implements ShouldQueue
         TopografiaInundacionService $topografia,
         PoligonoTopografiaCacheService $cacheService,
     ): void {
-        $inundacion = Inundacion::with('reportes')->find($this->entityId);
+        $inundacion = Inundacion::with('reportesActivosTTL')->find($this->entityId);
 
         if ($inundacion === null) {
             Log::warning("CalcularPoligonoInundacion: Inundación #{$this->entityId} no encontrada.");
@@ -122,7 +122,7 @@ final class CalcularPoligonoInundacion implements ShouldQueue
             return;
         }
 
-        $poligonosReportes = $inundacion->reportes
+        $poligonosReportes = $inundacion->reportesActivosTTL
             ->filter(static fn (Reporte $r): bool => PolygonCoordsHelper::tieneGeometriaValida((array) ($r->polygon_coords ?? [])))
             ->map(static fn (Reporte $r): array => PolygonCoordsHelper::normalizarAnillos((array) $r->polygon_coords)[0])
             ->values()
@@ -133,17 +133,24 @@ final class CalcularPoligonoInundacion implements ShouldQueue
         $fuente = 'union_reportes';
 
         if (count($poligonosReportes) >= 2) {
-            Log::info('CalcularPoligonoInundacion: Unión de '.count($poligonosReportes)." polígonos para Inundación #{$this->entityId}.");
+            Log::info('CalcularPoligonoInundacion: Unión adaptativa de '.count($poligonosReportes)." polígonos (TTL vigente) para Inundación #{$this->entityId}.");
 
-            $union = $topografia->unirPoligonosReportes($poligonosReportes);
-            $polygonCoords = $union['polygon_coords'];
+            $epicentros = $inundacion->reportesActivosTTL
+                ->map(static fn (Reporte $r): array => [
+                    (float) $r->lat_reporte,
+                    (float) $r->long_reporte,
+                ])
+                ->values()
+                ->all();
 
-            $esFallback = $inundacion->reportes->contains(
+            $polygonCoords = $topografia->unirPoligonosEnAnilloUnico($poligonosReportes, $epicentros);
+
+            $esFallback = $inundacion->reportesActivosTTL->contains(
                 static fn (Reporte $r): bool => (bool) $r->polygon_es_fallback
             );
         } elseif (count($poligonosReportes) === 1) {
             $polygonCoords = $poligonosReportes[0];
-            $esFallback = (bool) $inundacion->reportes->first(
+            $esFallback = (bool) $inundacion->reportesActivosTTL->first(
                 static fn (Reporte $r): bool => PolygonCoordsHelper::tieneGeometriaValida((array) ($r->polygon_coords ?? []))
             )?->polygon_es_fallback;
             $fuente = 'reporte_unico';

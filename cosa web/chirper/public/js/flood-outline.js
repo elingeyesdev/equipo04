@@ -415,7 +415,7 @@
      * @returns {number[][]|null} ring [[lat,lng],...]
      */
     window.computeInundacionSelectionOutline = function (inundacion) {
-        const activeReps = inundacion.reportes_activos || inundacion.reportes || [];
+        const activeReps = inundacion.reportes_activos || [];
         const polygons = [];
 
         // Incluimos también polígonos fallback (círculos): unir círculos sigue
@@ -456,5 +456,39 @@
         }
 
         return chaikinSmooth(ring, 3);
+    };
+
+    /**
+     * Anillo único para mapa de calor: prioriza API (1 anillo), luego outline adaptativo.
+     * @returns {number[][]|null}
+     */
+    window.resolveUnifiedHeatRing = function (inundacion) {
+        if (!inundacion) return null;
+
+        if (window.normalizePolygonRings && inundacion.polygon_coords) {
+            const fromApi = window.normalizePolygonRings(inundacion.polygon_coords);
+            if (fromApi.length === 1 && fromApi[0].length >= 3) {
+                return fromApi[0];
+            }
+            if (inundacion.polygon_es_multipolygon === false && fromApi.length >= 1 && fromApi[0].length >= 3) {
+                return fromApi[0];
+            }
+        }
+
+        if (window.computeInundacionSelectionOutline) {
+            const outline = window.computeInundacionSelectionOutline(inundacion);
+            if (outline && outline.length >= 3) {
+                return outline;
+            }
+        }
+
+        if (window.normalizePolygonRings && inundacion.polygon_coords) {
+            const rings = window.normalizePolygonRings(inundacion.polygon_coords);
+            if (rings.length >= 1 && rings[0].length >= 3) {
+                return rings[0];
+            }
+        }
+
+        return null;
     };
 })();

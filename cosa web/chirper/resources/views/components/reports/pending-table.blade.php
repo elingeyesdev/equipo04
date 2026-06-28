@@ -24,6 +24,8 @@
                                     };
                                     $reportDrawerPayload = array_merge($rep->toArray(), [
                                         'cercanas' => collect($rep->cercanas ?? [])->values()->all(),
+                                        'solo_vincular' => (bool) ($rep->solo_vincular ?? false),
+                                        'dentro_contorno_activo' => (bool) ($rep->dentro_contorno_activo ?? false),
                                     ]);
                                 @endphp
                                 <tr class="transition-colors duration-200 hover:bg-white/30">
@@ -72,6 +74,9 @@
                                                 @if(($rep->rechazos_previos ?? 0) > 0)
                                                     <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">{{ $rep->rechazos_previos }} rechazo(s) previo(s)</span>
                                                 @endif
+                                                @if($rep->dentro_contorno_activo ?? false)
+                                                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-semibold">Dentro de zona activa</span>
+                                                @endif
                                             </div>
                                         </div>
                                         <button
@@ -89,6 +94,7 @@
                                             data-lat-rep="{{ $rep->lat_reporte }}"
                                             data-lng-rep="{{ $rep->long_reporte }}"
                                             data-has-cercanas="{{ count($rep->cercanas ?? []) > 0 ? '1' : '0' }}"
+                                            data-solo-vincular="{{ ($rep->solo_vincular ?? false) ? '1' : '0' }}"
                                             data-distancia="{{ $rep->distancia_gps_metros ?? '' }}"
                                             data-precipitacion="{{ $rep->precipitacionAlReportar() ?? '' }}"
                                             data-peso="{{ $rep->peso }}"
@@ -111,9 +117,11 @@
                                     </td>
                                     <td>
                                         <div class="flex flex-col gap-1.5 w-full max-w-[9.5rem]">
-                                            <button type="button" onclick="openApproveModal({{ $rep->id }}, 'crear', '{{ $rep->intensidad_propuesta }}')" class="w-full inline-flex items-center justify-center btn-report-aprobar px-3 py-2 text-xs rounded-lg font-bold shadow-sm transition-colors">
-                                                Aprobar
-                                            </button>
+                                            @if(!($rep->solo_vincular ?? false))
+                                                <button type="button" onclick="openApproveModal({{ $rep->id }}, 'crear', '{{ $rep->intensidad_propuesta }}')" class="w-full inline-flex items-center justify-center btn-report-aprobar px-3 py-2 text-xs rounded-lg font-bold shadow-sm transition-colors">
+                                                    Aprobar
+                                                </button>
+                                            @endif
                                             @if(count($rep->cercanas ?? []) > 0)
                                                 <button type="button" data-report="{{ json_encode($reportDrawerPayload) }}" onclick="openReviewDrawer(this)" class="w-full inline-flex items-center justify-center btn-report-vincular px-3 py-2 text-xs rounded-lg font-bold shadow-sm transition-colors report-vincular-btn">
                                                     Vincular

@@ -1010,7 +1010,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <!-- LEAFLET HEATMAP PLUGIN -->
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-<script src="{{ asset('js/smart-heatmap.js') }}?v=20260623b"></script>
+<script src="{{ asset('js/smart-heatmap.js') }}?v=20260628i"></script>
 
 <!-- RUTAS SEGURAS -->
 <script>
