@@ -491,4 +491,6 @@
 
         return null;
     };
+
+    window.chaikinSmoothRing = chaikinSmooth;
 })();

@@ -24,8 +24,7 @@
 @once
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-<script src="{{ asset('js/smart-heatmap.js') }}?v=20260628i"></script>
+<script src="{{ asset('js/smart-heatmap.js') }}?v=20260629e"></script>
 <script src="{{ asset('js/flood-outline.js') }}?v=20260627b"></script>
 @endonce
 

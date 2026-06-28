@@ -23,7 +23,7 @@ Monolito Laravel impulsado por eventos. La capa web usa `FloodApiClient` para in
 | Frontend | Blade + Livewire + Tailwind CSS 4 + JS vanilla |
 | Tiempo real | Laravel Reverb + Laravel Echo (chat de autoridades) |
 | Base de datos | PostgreSQL (`jsonb` para polígonos y clima) |
-| Mapas | Leaflet.js + Leaflet.heat |
+| Mapas | Leaflet.js + mapa de calor Canvas/ImageOverlay (`smart-heatmap.js`) |
 | Colas | driver `database` (`queue:work` para topografía) |
 | Infra | Docker Compose (`postgres_db`, `web_app`, `queue_worker`) |
 
@@ -76,7 +76,32 @@ El SGI no muestra solo marcadores estáticos: simula acumulación de agua según
 ### 4. Mapa de calor por intensidad
 
 - Capas fijas: baja `#7dd3fc`, media `#0ea5e9`, alta `#1e3a8a`.
-- Radio en metros reales; leyenda y etiqueta por inundación.
+- Canvas raster + `L.imageOverlay`: degradado suave desde epicentros, bordes difuminados, opacidad alta por tier (`SMART_FLOOD_FILL`); estable al zoom; leyenda y etiqueta por inundación.
+
+#### ¿Cómo funciona la mancha en el mapa? (explicación sencilla)
+
+Cuando abres `/reports`, cada inundación activa aparece como una **mancha de color semitransparente** sobre el mapa de calles. No es un simple círculo: la forma sigue la **zona donde el agua podría acumularse**, calculada con la topografía del terreno (más abajo, en el motor topográfico).
+
+**Paso a paso, sin tecnicismos:**
+
+1. **Ciudadanos reportan** dónde hay agua. Varios reportes de la misma zona se agrupan en una sola inundación.
+2. **El sistema calcula el contorno** de esa zona (como dibujar el borde de un charco sobre un mapa del barrio). Si hace falta, une varios polígonos en uno solo.
+3. **Se elige el color según la intensidad** acordada por los reportes (no según cuántos puntos hay):
+   - **Baja** → celeste claro  
+   - **Media** → azul  
+   - **Alta** → azul oscuro  
+4. **Se pinta la mancha por dentro del contorno**, como si coloreáramos una silueta:
+   - Más **intensa cerca de donde reportaron** el epicentro del agua.
+   - Más **suave hacia los bordes** de la zona.
+   - Los **bordes están difuminados** (no se ven esquinas duras ni líneas rectas rígidas).
+5. Esa pintura se convierte en una **imagen transparente** pegada al mapa en la posición correcta. Al **acercar o alejar** con la rueda del mouse, la mancha **crece o se achica con el mapa** igual que un barrio, sin cambiar de color ni parpadear.
+6. La mancha **se desvanece sola** si pasa el tiempo de vida (TTL, 3 horas) sin renovación.
+7. Si **haces clic** en una inundación, aparece el **contorno** de su zona; sin clic, solo ves la mancha de color.
+8. Los **puntitos azules** son los reportes individuales; la mancha grande es la **zona unificada** de toda la inundación.
+
+**En una frase:** el mapa muestra *dónde* está el agua (forma topográfica), *qué tan grave* parece (color baja/media/alta) y *desde dónde se reportó* (centro un poco más marcado), todo en una capa suave que no tapa las calles por completo.
+
+Implementación técnica: [`public/js/smart-heatmap.js`](cosa%20web/chirper/public/js/smart-heatmap.js) (detalle en [SCD §4.8 y §6](cosa%20web/chirper/SCD.md)).
 
 ### 5. Intervención de autoridades
 

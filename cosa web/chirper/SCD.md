@@ -87,7 +87,7 @@ flowchart LR
 - **Tailwind CSS** `^4` (`@tailwindcss/vite`).
 - **laravel-echo** `^2` + **pusher-js** `^8` (cliente Reverb).
 - **axios**.
-- **Leaflet 1.9.4** + **Leaflet.heat 0.2.0** (cargados por CDN en las vistas de mapa).
+- **Leaflet 1.9.4** (CDN en vistas de mapa). Capas de inundación vía **Canvas raster + `L.imageOverlay`** (`smart-heatmap.js`); sin Leaflet.heat.
 - **SweetAlert2** v11 (CDN en `layouts/app.blade.php`) — toasts globales para mensajes flash y confirmaciones (`confirmForm()`).
 
 ### 3.3 Datos e Infraestructura
@@ -302,8 +302,8 @@ Extraído del Blade monolítico anterior. Responsabilidades:
 
 #### Scripts en `public/js/`
 
-- **`smart-heatmap.js`** — render del mapa de calor (hint de intensidad). Una **capa por nivel** con color azul fijo (baja `#7dd3fc`, media `#0ea5e9`, alta `#1e3a8a`). Opacidad y color **constantes en todo zoom**: `radius`/`blur`/`max`/`minOpacity` fijos al crear la capa; sin `setOptions` al zoom (Leaflet.heat escala el canvas con CSS). `maxZoom: 8` en la capa anula atenuación interna en zooms urbanos. Contorno solo al clic; geometría unificada vía `getInundacionHeatGeometry`. HUD: `Zoom · r · max`.
-- **`flood-outline.js`** — fusiona en el cliente todos los polígonos de los reportes de una inundación en un **único contorno suavizado** (cierre morfológico + suavizado de Chaikin; convex hull de respaldo). Expone `computeInundacionSelectionOutline()` y `resolveUnifiedHeatRing()` (prioriza anillo único del API, luego outline adaptativo).
+- **`smart-heatmap.js`** — mapa de calor rasterizado (`createSmartHeatmap`). Por inundación: grilla dentro del anillo unificado → canvas offscreen con degradado continuo (distancia a epicentros + feather en borde + blur) → **`L.imageOverlay`**. Color fijo por tier (baja `#7dd3fc`, media `#0ea5e9`, alta `#1e3a8a`). Opacidad alta y **estable al zoom** (sin repintado al hacer zoom). Configuración central: `window.SMART_FLOOD_FILL` (`edgeMin`/`coreMax` por tier, `blurPx`, `edgeFeatherM`, `coreFactorFloor`, `edgeFactorFloor`). Anillo suavizado con Chaikin (`window.chaikinSmoothRing` desde `flood-outline.js`) antes de rasterizar. Sin círculos ni halos discretos en epicentros. Pane `floodFillPane` (z≈380). Contorno de selección solo al clic (`selectionBorderLayer`). HUD: `Zoom · edge/core por tier`.
+- **`flood-outline.js`** — fusiona en el cliente todos los polígonos de los reportes de una inundación en un **único contorno suavizado** (cierre morfológico + suavizado de Chaikin; convex hull de respaldo). Expone `computeInundacionSelectionOutline()`, `resolveUnifiedHeatRing()` (prioriza anillo único del API) y **`chaikinSmoothRing`** (reutilizado por el raster del mapa de calor).
 - **`safe-routing.js`** — rutas seguras (OpenRouteService) evitando inundaciones; consume `window.floodReports` y `window.pendingReports`.
 - **`report-minimaps.js`** — minimapas inline en tablas de validación (GPS vs evento, zoom adaptativo, lazy load); escucha `refreshReports` para re-inicializar filas nuevas.
 
@@ -355,12 +355,15 @@ sequenceDiagram
 ```
 
 ### Reglas de visualización del mapa de calor
-1. El **anillo unificado** lo calcula el backend (`InundacionMapaService::polygonCoordsParaMapa` → `unirPoligonosEnAnilloUnico`) solo con reportes vivos (TTL). El frontend usa `resolveUnifiedHeatRing()` para alinear heat, contorno de selección y drawer de vinculación.
-2. Si no hay polígono unificado, se fusionan polígonos en el cliente (`flood-outline.js`). Solo como último recurso se pintan manchas por reporte individual.
+1. El **anillo unificado** lo calcula el backend (`InundacionMapaService::polygonCoordsParaMapa` → `unirPoligonosEnAnilloUnico`) solo con reportes vivos (TTL). El frontend usa `resolveUnifiedHeatRing()` para alinear relleno, contorno de selección y drawer de vinculación.
+2. Si no hay polígono unificado, se fusionan polígonos en el cliente (`flood-outline.js`). Fallback geométrico: gradiente radial en canvas (radio 55/90/130 m según tier).
 3. El **color** lo determina `intensidadCalculada()` de la inundación (no la densidad de puntos). Inundaciones distintas → colores distintos; reportes de la misma inundación → una sola zona/color.
-4. El **radio del blob** se fija en metros reales y escala con el zoom para evitar círculos sueltos a gran acercamiento.
-5. Un **polígono editado por autoridad** (`polygon_editado_autoridad`) tiene prioridad absoluta y no se sobrescribe.
-6. **Puentes:** unión morfológica adaptativa en backend (primaria); corredores entre epicentros en `smart-heatmap.js` (fallback visual para datos cacheados multiparte).
+4. **Degradado continuo**: alpha interpolado desde epicentros (`coreMax`) hacia el interior-borde (`edgeMin`) con pisos mínimos (`coreFactorFloor`, `edgeFactorFloor`); feather en el contorno del polígono; blur post-proceso (`blurPx`) para bordes redondeados.
+5. **Opacidad por tier** (`SMART_FLOOD_FILL`, valores de referencia): baja edge/core 0.92/1.0, media 0.96/1.0, alta 1.0/1.0 — manchas claramente visibles; calibrables en un solo objeto JS.
+6. **Sin halos circulares** en ubicación de reportes: el campo de calor es continuo; los puntos azules de reportes individuales siguen en capa aparte (`individualReportsLayer`).
+7. **Opacidad estable al zoom**: `L.imageOverlay` escala geográficamente; raster solo al refrescar datos (`renderReportsMap`), no en cada notch de rueda.
+8. **Contorno visible solo al clic** en la inundación (`selectionBorderLayer`, pane `floodSelectionPane` z≈550).
+9. Un **polígono editado por autoridad** (`polygon_editado_autoridad`) tiene prioridad absoluta y no se sobrescribe.
 
 ---
 

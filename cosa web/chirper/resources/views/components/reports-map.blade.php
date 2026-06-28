@@ -10,8 +10,7 @@
 <!-- Leaflet CSS & JS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-<script src="{{ asset('js/smart-heatmap.js') }}?v=20260628i"></script>
+<script src="{{ asset('js/smart-heatmap.js') }}?v=20260629e"></script>
 <script src="{{ asset('js/flood-outline.js') }}?v=20260627c"></script>
 
 <style>
@@ -115,7 +114,9 @@
     margin-top: 8px;
     font-style: italic;
 }
+/* HUD de zoom/opacidad — solo para pruebas de calibración del mapa de calor (oculto) */
 #map-zoom-debug {
+    display: none !important;
     position: absolute;
     top: 10px;
     left: 10px;
@@ -154,7 +155,8 @@
         </div>
         @endif
 
-        <div id="map-zoom-debug" aria-hidden="true">Zoom: —</div>
+        {{-- HUD debug: nivel de zoom y opacidad por tier — solo pruebas, oculto --}}
+        <div id="map-zoom-debug" class="hidden" aria-hidden="true">Zoom: —</div>
         
         <!-- Botón Pantalla Completa -->
         <button id="btn-fullscreen-map" class="absolute top-[80px] left-[10px] z-[1000] bg-white text-gray-700 p-1.5 rounded-[4px] shadow-[0_1px_5px_rgba(0,0,0,0.65)] hover:bg-gray-100 transition-colors" title="Pantalla Completa" onclick="toggleMapFullscreen()">
@@ -286,23 +288,37 @@ function initMap() {
     const map = L.map('map', { preferCanvas: true }).setView(centerLoc, 12);
     window.mapObj = map;
 
+    // HUD debug (solo pruebas): zoom actual + edge/core por tier del heatmap.
+    // Oculto en UI (#map-zoom-debug). Descomentar listeners para recalibrar opacidad.
     const zoomDebugEl = document.getElementById('map-zoom-debug');
     function updateMapZoomDebug() {
         if (!zoomDebugEl) return;
         const zoom = map.getZoom().toFixed(1);
         const inst = window.smartHeatmapInstance;
-        if (inst && inst.lastRadius != null) {
+        if (inst && inst.debugOpacity) {
+            const op = inst.debugOpacity;
+            const fmt = function (tier) {
+                if (!op[tier]) return '—';
+                return op[tier].edge.toFixed(2) + '/' + op[tier].core.toFixed(2);
+            };
             zoomDebugEl.textContent = 'Zoom: ' + zoom
-                + ' · r:' + inst.lastRadius
-                + ' · max:' + inst.lastMax.toFixed(1);
+                + ' · b:' + fmt('baja')
+                + ' m:' + fmt('media')
+                + ' a:' + fmt('alta');
         } else {
             zoomDebugEl.textContent = 'Zoom: ' + zoom;
         }
     }
-    map.on('zoom zoomend moveend', updateMapZoomDebug);
-    updateMapZoomDebug();
+    // map.on('zoom zoomend moveend', updateMapZoomDebug);
+    // updateMapZoomDebug();
 
-    // Pane dedicado: el canvas del mapa de calor (overlayPane, z≈400) no debe tapar el contorno.
+    // Pane de relleno SVG (debajo del contorno de selección).
+    if (!map.getPane('floodFillPane')) {
+        map.createPane('floodFillPane');
+        map.getPane('floodFillPane').style.zIndex = 380;
+    }
+
+    // Pane dedicado: el relleno no debe tapar el contorno al seleccionar.
     if (!map.getPane('floodSelectionPane')) {
         map.createPane('floodSelectionPane');
         map.getPane('floodSelectionPane').style.zIndex = 550;
@@ -344,7 +360,7 @@ function initMap() {
     window.selectedInundacionId = null;
 
     layerControl.addOverlay(markersLayer,           "Centros de Inundación (Centroides)");
-    layerControl.addOverlay(polygonLayer,           "Zona de Inundación (Mapa de Calor)");
+    layerControl.addOverlay(polygonLayer,           "Zona de Inundación");
     layerControl.addOverlay(selectionBorderLayer,   "Contorno de Inundación Seleccionada");
     layerControl.addOverlay(individualReportsLayer, "Reportes Ciudadanos (Detalle)");
     layerControl.addOverlay(pendingReportsLayer,    "Reportes Pendientes (Validación)");
@@ -779,7 +795,7 @@ function initMap() {
                 targetLayer: polygonLayer,
                 mode: 'auto',
                 ttlHours: 3,
-                sampleStepM: 12,
+                pane: 'floodFillPane',
             });
 
             if (heatLegend && window.smartHeatmapInstance && window.smartHeatmapInstance.tiers) {
@@ -789,7 +805,7 @@ function initMap() {
                     row.style.display = tiers.indexOf(row.getAttribute('data-heat-tier')) !== -1 ? '' : 'none';
                 });
             }
-            updateMapZoomDebug();
+            // updateMapZoomDebug(); // pruebas heatmap — HUD oculto
         } else if (heatLegend) {
             heatLegend.classList.add('hidden');
         }

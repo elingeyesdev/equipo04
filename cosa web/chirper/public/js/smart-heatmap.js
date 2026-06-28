@@ -1,20 +1,15 @@
 /**
- * Smart Heatmap - Lógica compartida para mapas de calor
+ * Smart Flood Visual Layer — mapa de calor rasterizado (Canvas + ImageOverlay)
  *
- * El COLOR representa la intensidad de la inundación (baja/media/alta), calculada
- * en el backend por voto ponderado de peso. Cada nivel se pinta como una capa de
- * calor independiente con un azul fijo, así el tono no depende de la densidad de
- * puntos sino de la intensidad real. Inundaciones distintas con distinta intensidad
- * se ven de distinto color; reportes de una misma inundación forman una sola zona.
- *
- * Cada fuente puede declarar `tier` ('baja'|'media'|'alta'); si no, se infiere de
- * su intensidad. La opacidad dentro de la mancha refleja profundidad/TTL.
+ * El COLOR representa la intensidad de la inundación (baja/media/alta). Degradado
+ * continuo desde epicentros hacia bordes; bordes suavizados con blur. Estable al
+ * zoom (sin Leaflet.heat ni repintados en cada notch).
  *
  * options:
  *   mode: 'auto' | 'geometric' | 'topographic'
  *   ttlHours: number (default 3)
- *   sampleStepM: number (default 12) — paso de grilla dentro del polígono
- *   targetLayer, heatOptions — sin cambios
+ *   targetLayer: L.layerGroup
+ *   pane: string (default 'overlayPane')
  */
 window.SMART_HEATMAP_TIER_COLORS = {
     baja:  '#7dd3fc',
@@ -22,22 +17,21 @@ window.SMART_HEATMAP_TIER_COLORS = {
     alta:  '#1e3a8a',
 };
 
-window.SMART_HEATMAP_OPACITY = {
-    gradientPeak: 0.042,
-    minFloor: 0.004,
-    minCeiling: 0.014,
-    heatMax: 5.2,
-    tierPeakScale: {
-        baja: 0.88,
-        media: 0.92,
-        alta: 0.28,
-    },
-    tierHeatMaxScale: {
-        baja: 1.0,
-        media: 1.0,
-        alta: 1.1,
-    },
+window.SMART_FLOOD_FILL = {
+    edgeMin: { baja: 0.92, media: 0.96, alta: 1.0 },
+    coreMax: { baja: 1.0, media: 1.0, alta: 1.0 },
+    blurPx: 2,
+    sampleStepM: 10,
+    edgeFeatherM: 10,
+    coreFactorFloor: 0.78,
+    edgeFactorFloor: 0.72,
+    chaikinIterations: 2,
+    geometricRadiusM: { baja: 55, media: 90, alta: 130 },
+    maxCanvasPx: 512,
 };
+
+/** @deprecated Mantener alias para compatibilidad con código legacy */
+window.SMART_HEATMAP_OPACITY = window.SMART_FLOOD_FILL;
 
 const SMART_HEATMAP_TIER_ORDER = ['baja', 'media', 'alta'];
 
@@ -46,45 +40,323 @@ function normalizeTier(value) {
     return 'baja';
 }
 
-function hexToRgba(hex, alpha) {
+function tierRadiusM(tier) {
+    const radii = window.SMART_FLOOD_FILL.geometricRadiusM || {};
+    return radii[tier] != null ? radii[tier] : 55;
+}
+
+function hexToRgb(hex) {
     const h = hex.replace('#', '');
-    const r = parseInt(h.substring(0, 2), 16);
-    const g = parseInt(h.substring(2, 4), 16);
-    const b = parseInt(h.substring(4, 6), 16);
-    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+    return [
+        parseInt(h.substring(0, 2), 16),
+        parseInt(h.substring(2, 4), 16),
+        parseInt(h.substring(4, 6), 16),
+    ];
 }
 
-function tierPeakScaleFor(tier) {
-    const OP = window.SMART_HEATMAP_OPACITY || {};
-    const scales = OP.tierPeakScale || {};
-    return scales[tier] != null ? scales[tier] : 1.0;
+function chaikinSmoothRing(ring, iterations) {
+    if (window.chaikinSmoothRing) {
+        return window.chaikinSmoothRing(ring, iterations);
+    }
+
+    iterations = iterations || 2;
+    let pts = ring.slice();
+    if (pts.length < 3) return pts;
+
+    if (pts[0][0] === pts[pts.length - 1][0] && pts[0][1] === pts[pts.length - 1][1]) {
+        pts = pts.slice(0, -1);
+    }
+
+    for (let iter = 0; iter < iterations; iter++) {
+        const next = [];
+        const n = pts.length;
+        for (let i = 0; i < n; i++) {
+            const p0 = pts[i];
+            const p1 = pts[(i + 1) % n];
+            next.push([0.75 * p0[0] + 0.25 * p1[0], 0.75 * p0[1] + 0.25 * p1[1]]);
+            next.push([0.25 * p0[0] + 0.75 * p1[0], 0.25 * p0[1] + 0.75 * p1[1]]);
+        }
+        pts = next;
+    }
+    return pts;
 }
 
-function tierHeatMaxScaleFor(tier) {
-    const OP = window.SMART_HEATMAP_OPACITY || {};
-    const scales = OP.tierHeatMaxScale || {};
-    return scales[tier] != null ? scales[tier] : 1.0;
-}
+function ringBounds(ring, marginM) {
+    marginM = marginM || 0;
+    let minLat = Infinity;
+    let maxLat = -Infinity;
+    let minLng = Infinity;
+    let maxLng = -Infinity;
 
-function tierGradient(hex, tier) {
-    const OP = window.SMART_HEATMAP_OPACITY || {};
-    const tierScale = tierPeakScaleFor(tier);
-    const peak = (OP.gradientPeak || 0.10) * tierScale;
+    ring.forEach(function (p) {
+        minLat = Math.min(minLat, p[0]);
+        maxLat = Math.max(maxLat, p[0]);
+        minLng = Math.min(minLng, p[1]);
+        maxLng = Math.max(maxLng, p[1]);
+    });
+
+    const centerLat = (minLat + maxLat) / 2;
+    const cosLat = Math.max(Math.cos(centerLat * Math.PI / 180), 0.01);
+    const dLat = marginM / 111320;
+    const dLng = marginM / (111320 * cosLat);
+
     return {
-        0.0: hexToRgba(hex, 0),
-        0.2: hexToRgba(hex, peak * 0.18),
-        0.5: hexToRgba(hex, peak * 0.45),
-        0.8: hexToRgba(hex, peak * 0.75),
-        1.0: hexToRgba(hex, peak),
+        minLat: minLat - dLat,
+        maxLat: maxLat + dLat,
+        minLng: minLng - dLng,
+        maxLng: maxLng + dLng,
+        centerLat: centerLat,
     };
 }
 
+function distPointToSegmentM(lat, lng, aLat, aLng, bLat, bLng) {
+    const cosLat = Math.cos(lat * Math.PI / 180);
+    const mPerDegLat = 111320;
+    const mPerDegLng = 111320 * Math.max(cosLat, 0.01);
+
+    const px = lng * mPerDegLng;
+    const py = lat * mPerDegLat;
+    const ax = aLng * mPerDegLng;
+    const ay = aLat * mPerDegLat;
+    const bx = bLng * mPerDegLng;
+    const by = bLat * mPerDegLat;
+
+    const dx = bx - ax;
+    const dy = by - ay;
+    const lenSq = dx * dx + dy * dy;
+
+    if (lenSq === 0) {
+        return Math.hypot(px - ax, py - ay);
+    }
+
+    let t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+
+    const cx = ax + t * dx;
+    const cy = ay + t * dy;
+    return Math.hypot(px - cx, py - cy);
+}
+
+function distanceToPolygonBorder(lat, lng, ring) {
+    let minDist = Infinity;
+
+    for (let i = 0; i < ring.length; i++) {
+        const j = (i + 1) % ring.length;
+        minDist = Math.min(
+            minDist,
+            distPointToSegmentM(lat, lng, ring[i][0], ring[i][1], ring[j][0], ring[j][1])
+        );
+    }
+
+    return minDist;
+}
+
+function nearestEpicenterDist(lat, lng, epicenters) {
+    let minDist = Infinity;
+
+    epicenters.forEach(function (ep) {
+        minDist = Math.min(minDist, haversineM(lat, lng, ep.lat, ep.lng));
+    });
+
+    return minDist;
+}
+
+function maxEpicenterSpread(ring, epicenters) {
+    let maxD = 20;
+
+    epicenters.forEach(function (ep) {
+        ring.forEach(function (v) {
+            maxD = Math.max(maxD, haversineM(ep.lat, ep.lng, v[0], v[1]));
+        });
+    });
+
+    return maxD;
+}
+
+function computeHeatAlpha(lat, lng, tier, ttl, fillCfg, epicenters, ring, maxSpread) {
+    const edgeMin = (fillCfg.edgeMin[tier] || 0.18) * ttl;
+    const coreMax = (fillCfg.coreMax[tier] || 0.34) * ttl;
+    const featherM = fillCfg.edgeFeatherM || 10;
+    const coreFloor = fillCfg.coreFactorFloor || 0.78;
+    const edgeFloor = fillCfg.edgeFactorFloor || 0.72;
+
+    const distEp = nearestEpicenterDist(lat, lng, epicenters);
+    const coreFactor = Math.max(coreFloor, 1 - 0.55 * (distEp / maxSpread));
+    let alpha = edgeMin + coreFactor * (coreMax - edgeMin);
+
+    if (ring) {
+        const distBorder = distanceToPolygonBorder(lat, lng, ring);
+        const edgeFactor = Math.min(1, Math.max(edgeFloor, distBorder / Math.max(featherM, 6)));
+        alpha *= edgeFactor;
+    }
+
+    return Math.max(0, Math.min(1, alpha));
+}
+
+function applyCanvasBlur(sourceCanvas, blurPx) {
+    if (!blurPx || blurPx <= 0) {
+        return sourceCanvas;
+    }
+
+    const pad = Math.ceil(blurPx * 2);
+    const w = sourceCanvas.width + pad * 2;
+    const h = sourceCanvas.height + pad * 2;
+    const out = document.createElement('canvas');
+    out.width = w;
+    out.height = h;
+    const ctx = out.getContext('2d');
+    ctx.filter = 'blur(' + blurPx + 'px)';
+    ctx.drawImage(sourceCanvas, pad, pad);
+    ctx.filter = 'none';
+
+    const cropped = document.createElement('canvas');
+    cropped.width = sourceCanvas.width;
+    cropped.height = sourceCanvas.height;
+    const cropCtx = cropped.getContext('2d');
+    cropCtx.drawImage(out, pad, pad, sourceCanvas.width, sourceCanvas.height, 0, 0, sourceCanvas.width, sourceCanvas.height);
+    return cropped;
+}
+
+function buildHeatRaster(ring, epicenters, tier, ttl, fillCfg) {
+    const smoothRing = chaikinSmoothRing(ring, fillCfg.chaikinIterations || 2);
+    const marginM = (fillCfg.edgeFeatherM || 30) + (fillCfg.blurPx || 7) * 2;
+    const bounds = ringBounds(smoothRing, marginM);
+    const maxSpread = maxEpicenterSpread(smoothRing, epicenters);
+    const rgb = hexToRgb(window.SMART_HEATMAP_TIER_COLORS[tier]);
+
+    const latSpanM = haversineM(bounds.minLat, bounds.minLng, bounds.maxLat, bounds.minLng);
+    const lngSpanM = haversineM(bounds.centerLat, bounds.minLng, bounds.centerLat, bounds.maxLng);
+    const stepM = fillCfg.sampleStepM || 10;
+    const maxPx = fillCfg.maxCanvasPx || 512;
+
+    let cols = Math.max(16, Math.ceil(lngSpanM / stepM));
+    let rows = Math.max(16, Math.ceil(latSpanM / stepM));
+    const scale = Math.min(1, maxPx / Math.max(cols, rows));
+
+    cols = Math.max(16, Math.round(cols * scale));
+    rows = Math.max(16, Math.round(rows * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = cols;
+    canvas.height = rows;
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.createImageData(cols, rows);
+    const data = imageData.data;
+
+    for (let row = 0; row < rows; row++) {
+        const lat = bounds.maxLat - (row / Math.max(rows - 1, 1)) * (bounds.maxLat - bounds.minLat);
+
+        for (let col = 0; col < cols; col++) {
+            const lng = bounds.minLng + (col / Math.max(cols - 1, 1)) * (bounds.maxLng - bounds.minLng);
+
+            if (!pointInPolygon(lat, lng, smoothRing)) continue;
+
+            const alpha = computeHeatAlpha(lat, lng, tier, ttl, fillCfg, epicenters, smoothRing, maxSpread);
+            if (alpha <= 0.004) continue;
+
+            const idx = (row * cols + col) * 4;
+            data[idx] = rgb[0];
+            data[idx + 1] = rgb[1];
+            data[idx + 2] = rgb[2];
+            data[idx + 3] = Math.round(alpha * 255);
+        }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    const blurred = applyCanvasBlur(canvas, fillCfg.blurPx || 7);
+
+    return {
+        dataUrl: blurred.toDataURL('image/png'),
+        bounds: [[bounds.minLat, bounds.minLng], [bounds.maxLat, bounds.maxLng]],
+    };
+}
+
+function buildRadialHeatRaster(lat, lng, tier, ttl, fillCfg) {
+    const radiusM = tierRadiusM(tier);
+    const marginM = radiusM * 0.15 + (fillCfg.blurPx || 7) * 2;
+    const cosLat = Math.cos(lat * Math.PI / 180);
+    const dLat = (radiusM + marginM) / 111320;
+    const dLng = (radiusM + marginM) / (111320 * Math.max(cosLat, 0.01));
+
+    const bounds = {
+        minLat: lat - dLat,
+        maxLat: lat + dLat,
+        minLng: lng - dLng,
+        maxLng: lng + dLng,
+        centerLat: lat,
+    };
+
+    const rgb = hexToRgb(window.SMART_HEATMAP_TIER_COLORS[tier]);
+    const edgeMin = (fillCfg.edgeMin[tier] || 0.18) * ttl;
+    const coreMax = (fillCfg.coreMax[tier] || 0.34) * ttl;
+    const featherM = fillCfg.edgeFeatherM || 30;
+    const stepM = fillCfg.sampleStepM || 10;
+    const maxPx = fillCfg.maxCanvasPx || 512;
+
+    let cols = Math.max(16, Math.ceil((radiusM + marginM) * 2 / stepM));
+    let rows = cols;
+    const scale = Math.min(1, maxPx / cols);
+    cols = Math.max(16, Math.round(cols * scale));
+    rows = cols;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = cols;
+    canvas.height = rows;
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.createImageData(cols, rows);
+    const data = imageData.data;
+
+    for (let row = 0; row < rows; row++) {
+        const pLat = bounds.maxLat - (row / Math.max(rows - 1, 1)) * (bounds.maxLat - bounds.minLat);
+
+        for (let col = 0; col < cols; col++) {
+            const pLng = bounds.minLng + (col / Math.max(cols - 1, 1)) * (bounds.maxLng - bounds.minLng);
+            const dist = haversineM(lat, lng, pLat, pLng);
+
+            if (dist > radiusM + marginM * 0.5) continue;
+
+            const coreFloor = fillCfg.coreFactorFloor || 0.78;
+            const edgeFloor = fillCfg.edgeFactorFloor || 0.72;
+            const coreFactor = Math.max(coreFloor, 1 - 0.55 * (dist / radiusM));
+            const edgeFactor = dist <= radiusM
+                ? Math.min(1, Math.max(edgeFloor, (radiusM - dist) / featherM + edgeFloor))
+                : Math.max(edgeFloor * 0.5, 1 - (dist - radiusM) / marginM);
+
+            let alpha = (edgeMin + coreFactor * (coreMax - edgeMin)) * Math.min(1, edgeFactor);
+            if (alpha <= 0.004) continue;
+
+            const idx = (row * cols + col) * 4;
+            data[idx] = rgb[0];
+            data[idx + 1] = rgb[1];
+            data[idx + 2] = rgb[2];
+            data[idx + 3] = Math.round(alpha * 255);
+        }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    const blurred = applyCanvasBlur(canvas, fillCfg.blurPx || 7);
+
+    return {
+        dataUrl: blurred.toDataURL('image/png'),
+        bounds: [[bounds.minLat, bounds.minLng], [bounds.maxLat, bounds.maxLng]],
+    };
+}
+
+function createHeatOverlay(map, raster, options) {
+    return L.imageOverlay(raster.dataUrl, raster.bounds, {
+        pane: options.pane || 'overlayPane',
+        interactive: false,
+        opacity: 1,
+        className: 'flood-heat-overlay',
+    });
+}
+
 window.createSmartHeatmap = function (map, reports, options = {}) {
-    if (!map || !window.L || !window.L.heatLayer) return null;
+    if (!map || !window.L) return null;
 
     const mode = options.mode || 'auto';
     const ttlHours = options.ttlHours || 3;
-    const sampleStepM = options.sampleStepM || 12;
+    const fillCfg = window.SMART_FLOOD_FILL || {};
 
     const parsedReports = reports.map(function (r) {
         const lat = parseFloat(r.lat || r.lat_reporte || r.latitud);
@@ -130,119 +402,68 @@ window.createSmartHeatmap = function (map, reports, options = {}) {
     });
 
     const useTopographic = mode === 'topographic' || (mode === 'auto' && hasPolygons);
+    const layersByTier = { baja: [], media: [], alta: [] };
 
-    // Puntos de calor agrupados por nivel de intensidad (tier).
-    const pointsByTier = { baja: [], media: [], alta: [] };
+    parsedReports.forEach(function (rep) {
+        const ttl = ttlFactor(rep.updatedAt, ttlHours);
+        if (ttl <= 0) return;
 
-    function addPoints(tier, pts) {
-        if (pts.length > 0) {
-            pointsByTier[tier] = pointsByTier[tier].concat(pts);
+        if (useTopographic && rep.polygonRings.length > 0) {
+            rep.polygonRings.forEach(function (ring) {
+                const ringRaster = buildHeatRaster(ring, rep.epicenters, rep.tier, ttl, fillCfg);
+                if (ringRaster) {
+                    layersByTier[rep.tier].push(createHeatOverlay(map, ringRaster, options));
+                }
+            });
+        } else {
+            const radialRaster = buildRadialHeatRaster(rep.lat, rep.lng, rep.tier, ttl, fillCfg);
+            if (radialRaster) {
+                layersByTier[rep.tier].push(createHeatOverlay(map, radialRaster, options));
+            }
         }
-    }
-
-    if (useTopographic) {
-        parsedReports.forEach(function (rep) {
-            if (rep.polygonRings.length > 0) {
-                rep.polygonRings.forEach(function (ring) {
-                    addPoints(rep.tier, samplePolygonHeatPoints(ring, rep.epicenters, sampleStepM, ttlHours));
-                });
-            } else {
-                addPoints(rep.tier, sampleGeometricHeatPoints(rep.lat, rep.lng, rep.tier, rep.updatedAt, ttlHours));
-            }
-            // Con anillo unificado (1 polígono) los corredores legacy extienden la mancha
-            // más allá del contorno de selección; sólo aplicarlos si aún hay multiparte.
-            if (rep.epicenters.length >= 2 && rep.polygonRings.length !== 1) {
-                addPoints(rep.tier, buildEpicenterCorridors(rep.epicenters, sampleStepM, ttlHours, 400));
-            }
-        });
-    } else {
-        parsedReports.forEach(function (rep) {
-            addPoints(rep.tier, sampleGeometricHeatPoints(rep.lat, rep.lng, rep.tier, rep.updatedAt, ttlHours));
-        });
-        SMART_HEATMAP_TIER_ORDER.forEach(function (tier) {
-            const tierReports = parsedReports.filter(function (r) { return r.tier === tier; });
-            addPoints(tier, buildThermalBridges(tierReports));
-        });
-    }
+    });
 
     const tiersPresent = SMART_HEATMAP_TIER_ORDER.filter(function (tier) {
-        return pointsByTier[tier].length > 0;
+        return layersByTier[tier].length > 0;
     });
 
     if (tiersPresent.length === 0) return null;
 
-    const avgTtl = parsedReports.reduce(function (sum, r) {
-        return sum + ttlFactor(r.updatedAt, ttlHours);
-    }, 0) / parsedReports.length;
+    const debugOpacity = {};
+    tiersPresent.forEach(function (tier) {
+        debugOpacity[tier] = {
+            edge: fillCfg.edgeMin[tier] || 0.18,
+            core: fillCfg.coreMax[tier] || 0.34,
+        };
+    });
 
-    // Radio/blur fijos en píxeles: mismo color y opacidad en todo zoom.
-    // Leaflet.heat escala el canvas con CSS durante el gesto; no tocar setOptions al zoom.
-    // maxZoom bajo (8) anula el factor interno v en zooms urbanos (≥10) → intensidad estable.
-    const HEAT_RADIUS_PX = 28;
-    const HEAT_BLUR_PX = 22;
-    const HEAT_FIXED_MAX_ZOOM = 8;
-
-    const OP = window.SMART_HEATMAP_OPACITY || {
-        minFloor: 0.004,
-        minCeiling: 0.014,
-        heatMax: 5.2,
-    };
-
-    function baseMinOpacity(tier) {
-        const tierScale = tierPeakScaleFor(tier);
-        return Math.max(OP.minFloor, Math.min(OP.minCeiling, 0.006 + 0.022 * avgTtl)) * tierScale;
-    }
-
-    function heatMaxForTier(tier) {
-        return (OP.heatMax || 5.2) * tierHeatMaxScaleFor(tier);
-    }
-
-    const heatDebugState = {
-        lastRadius: HEAT_RADIUS_PX,
-        lastMax: 0,
-    };
-
-    // Una capa de calor por nivel; orden baja→media→alta (alta arriba).
-    const heatLayers = [];
+    const tierGroups = [];
 
     tiersPresent.forEach(function (tier) {
-        const color = window.SMART_HEATMAP_TIER_COLORS[tier];
-        const tierMax = heatMaxForTier(tier);
-        if (tierMax > heatDebugState.lastMax) heatDebugState.lastMax = tierMax;
-
-        const layerOptions = Object.assign({
-            radius: HEAT_RADIUS_PX,
-            blur: HEAT_BLUR_PX,
-            minOpacity: baseMinOpacity(tier),
-            max: tierMax,
-            maxZoom: HEAT_FIXED_MAX_ZOOM,
-        }, options.heatOptions || {});
-        // El gradiente por nivel manda; no permitir override del color.
-        layerOptions.gradient = tierGradient(color, tier);
-
-        const layer = L.heatLayer(pointsByTier[tier], layerOptions);
+        const group = L.layerGroup(layersByTier[tier]);
 
         if (options.targetLayer) {
-            options.targetLayer.addLayer(layer);
+            options.targetLayer.addLayer(group);
         } else {
-            layer.addTo(map);
+            group.addTo(map);
         }
 
-        heatLayers.push(layer);
+        tierGroups.push(group);
     });
 
     return {
-        layers: heatLayers,
+        layers: tierGroups,
         tiers: tiersPresent,
         mode: useTopographic ? 'topographic' : 'geometric',
-        get lastRadius() { return heatDebugState.lastRadius; },
-        get lastMax() { return heatDebugState.lastMax; },
+        debugOpacity: debugOpacity,
+        get lastRadius() { return null; },
+        get lastMax() { return null; },
         remove: function () {
-            heatLayers.forEach(function (layer) {
+            tierGroups.forEach(function (group) {
                 if (options.targetLayer) {
-                    options.targetLayer.removeLayer(layer);
+                    options.targetLayer.removeLayer(group);
                 } else {
-                    map.removeLayer(layer);
+                    map.removeLayer(group);
                 }
             });
         },
@@ -328,189 +549,5 @@ function pointInPolygon(lat, lng, polygon) {
     return inside;
 }
 
-function nearestEpicenter(lat, lng, epicenters) {
-    let nearest = epicenters[0];
-    let minDist = Infinity;
-
-    epicenters.forEach(function (ep) {
-        const dist = haversineM(lat, lng, ep.lat, ep.lng);
-        if (dist < minDist) {
-            minDist = dist;
-            nearest = ep;
-        }
-    });
-
-    return { epicenter: nearest, distance: minDist };
-}
-
-/**
- * Muestrea puntos dentro del polígono. El peso = profundidad estimada × TTL
- * (NO intensidad: el color lo define la capa por nivel). Centro más sólido,
- * bordes difuminados, para una mancha suave.
- */
-function samplePolygonHeatPoints(polygon, epicenters, stepM, ttlHours) {
-    const lats = polygon.map(function (p) { return p[0]; });
-    const lngs = polygon.map(function (p) { return p[1]; });
-    const minLat = Math.min.apply(null, lats);
-    const maxLat = Math.max.apply(null, lats);
-    const minLng = Math.min.apply(null, lngs);
-    const maxLng = Math.max.apply(null, lngs);
-
-    const centerLat = (minLat + maxLat) / 2;
-    const cosLat = Math.cos(centerLat * Math.PI / 180);
-    const stepLat = stepM / 111320;
-    const stepLng = stepM / (111320 * Math.max(cosLat, 0.01));
-
-    const maxDist = Math.max.apply(null, epicenters.map(function (ep) {
-        return Math.max.apply(null, polygon.map(function (p) {
-            return haversineM(ep.lat, ep.lng, p[0], p[1]);
-        }));
-    }));
-
-    const points = [];
-
-    for (let lat = minLat; lat <= maxLat; lat += stepLat) {
-        for (let lng = minLng; lng <= maxLng; lng += stepLng) {
-            if (!pointInPolygon(lat, lng, polygon)) continue;
-
-            const nearest = nearestEpicenter(lat, lng, epicenters);
-            const ttl = ttlFactor(nearest.epicenter.updatedAt, ttlHours);
-            const depthFactor = Math.max(0.25, 1 - 0.7 * (nearest.distance / (maxDist || stepM)));
-            const weight = Math.min(0.28, depthFactor * ttl);
-
-            if (weight > 0.02) {
-                points.push([lat, lng, weight]);
-            }
-        }
-    }
-
-    return points;
-}
-
-/**
- * Mancha suave circular cuando no hay polígono topográfico (fallback geométrico).
- * El peso = profundidad × TTL; el color lo define la capa por nivel.
- */
-function sampleGeometricHeatPoints(lat, lng, tier, updatedAt, ttlHours) {
-    const radiusM = tier === 'alta' ? 130 : (tier === 'media' ? 90 : 55);
-    const stepM = 10;
-    const ttl = ttlFactor(updatedAt, ttlHours);
-    const points = [];
-    const cosLat = Math.cos(lat * Math.PI / 180);
-    const stepLat = stepM / 111320;
-    const stepLng = stepM / (111320 * Math.max(cosLat, 0.01));
-    const latDelta = radiusM / 111320;
-    const lngDelta = radiusM / (111320 * Math.max(cosLat, 0.01));
-
-    for (let dLat = -latDelta; dLat <= latDelta; dLat += stepLat) {
-        for (let dLng = -lngDelta; dLng <= lngDelta; dLng += stepLng) {
-            const dist = haversineM(lat, lng, lat + dLat, lng + dLng);
-            if (dist > radiusM) continue;
-
-            const falloff = Math.max(0.2, 1 - Math.pow(dist / radiusM, 1.4));
-            const weight = falloff * ttl;
-
-            if (weight > 0.02) {
-                points.push([lat + dLat, lng + dLng, weight]);
-            }
-        }
-    }
-
-    return points;
-}
-
-function buildThermalBridges(reports) {
-    const bridges = [];
-
-    if (reports.length < 2) return bridges;
-
-    for (let i = 0; i < reports.length; i++) {
-        for (let j = i + 1; j < reports.length; j++) {
-            const p1 = L.latLng(reports[i].lat, reports[i].lng);
-            const p2 = L.latLng(reports[j].lat, reports[j].lng);
-            const dist = p1.distanceTo(p2);
-
-            if (dist > 10 && dist <= 250) {
-                const steps = Math.floor(dist / 15);
-                const bridgeWeight = 0.35 * Math.min(
-                    ttlFactor(reports[i].updatedAt, 3),
-                    ttlFactor(reports[j].updatedAt, 3)
-                );
-
-                for (let k = 1; k < steps; k++) {
-                    const fraction = k / steps;
-                    bridges.push([
-                        p1.lat + (p2.lat - p1.lat) * fraction,
-                        p1.lng + (p2.lng - p1.lng) * fraction,
-                        bridgeWeight,
-                    ]);
-                }
-            }
-        }
-    }
-
-    return bridges;
-}
-
-/**
- * Corredores de calor entre epicentros (fallback visual para datos legacy multiparte).
- * Muestrea una cápsula suave entre pares de epicentros dentro de maxDistM.
- */
-function buildEpicenterCorridors(epicenters, stepM, ttlHours, maxDistM) {
-    const corridors = [];
-    if (!Array.isArray(epicenters) || epicenters.length < 2) return corridors;
-
-    const maxDist = maxDistM || 400;
-    const corridorHalfWidthM = Math.max(stepM * 2, 20);
-
-    for (let i = 0; i < epicenters.length; i++) {
-        for (let j = i + 1; j < epicenters.length; j++) {
-            const ep1 = epicenters[i];
-            const ep2 = epicenters[j];
-            const lat1 = parseFloat(ep1.lat);
-            const lng1 = parseFloat(ep1.lng);
-            const lat2 = parseFloat(ep2.lat);
-            const lng2 = parseFloat(ep2.lng);
-
-            if (isNaN(lat1) || isNaN(lng1) || isNaN(lat2) || isNaN(lng2)) continue;
-
-            const dist = haversineM(lat1, lng1, lat2, lng2);
-            if (dist <= 10 || dist > maxDist) continue;
-
-            const ttl = Math.min(
-                ttlFactor(ep1.updatedAt || ep1.updated_at, ttlHours),
-                ttlFactor(ep2.updatedAt || ep2.updated_at, ttlHours)
-            );
-            if (ttl <= 0) continue;
-
-            const steps = Math.max(3, Math.floor(dist / Math.max(8, stepM / 2)));
-            const centerLat = (lat1 + lat2) / 2;
-            const cosLat = Math.cos(centerLat * Math.PI / 180);
-            const perpLat = -(lng2 - lng1);
-            const perpLng = (lat2 - lat1);
-            const perpLen = Math.sqrt(perpLat * perpLat + perpLng * perpLng) || 1;
-            const offLat = (perpLat / perpLen) * (corridorHalfWidthM / 111320);
-            const offLng = (perpLng / perpLen) * (corridorHalfWidthM / (111320 * Math.max(cosLat, 0.01)));
-
-            for (let k = 0; k <= steps; k++) {
-                const t = k / steps;
-                const baseLat = lat1 + (lat2 - lat1) * t;
-                const baseLng = lng1 + (lng2 - lng1) * t;
-                const alongFactor = Math.max(0.35, 1 - Math.abs(t - 0.5) * 1.2);
-                const weight = alongFactor * ttl * 0.55;
-
-                if (weight > 0.02) {
-                    corridors.push([baseLat, baseLng, weight]);
-                    corridors.push([baseLat + offLat, baseLng + offLng, weight * 0.75]);
-                    corridors.push([baseLat - offLat, baseLng - offLng, weight * 0.75]);
-                }
-            }
-        }
-    }
-
-    return corridors;
-}
-
-// Export helpers for reports-map
 window.normalizePolygonRings = normalizePolygonRings;
 window.isMultiPolygon = isMultiPolygon;
